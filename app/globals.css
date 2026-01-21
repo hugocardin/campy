@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-background: oklch(98% 0.008 150);
+  --color-foreground: oklch(20% 0.04 140);
+  --color-card: oklch(99% 0.005 148);
+  --color-primary: #88e788;
+  --color-primary-foreground: black;
+  --color-primary-hover: #66cc66;
+  --color-border: oklch(88% 0.02 150 / 0.6);
+  --color-muted-foreground: oklch(45% 0.04 250);
+  --color-destructive: #ef4444;
+  --color-muted: oklch(95% 0.02 250 / 0.6);
+}
+
+.dark {
+  --color-background: oklch(10% 0.04 140);
+  --color-foreground: oklch(96% 0.015 145);
+  --color-card: oklch(14% 0.03 142);
+  --color-primary: #77d977;
+  --color-primary-foreground: black;
+  --color-primary-hover: #5ab55a;
+  --color-border: oklch(22% 0.04 140 / 0.65);
+  --color-muted-foreground: oklch(70% 0.03 250);
+  --color-destructive: #f87171;
+  --color-muted: oklch(15% 0.02 250 / 0.4);
+}
+
+@layer base {
+  :root {
+    @apply bg-background text-foreground antialiased;
+  }
+}
