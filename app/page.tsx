@@ -3,8 +3,8 @@ import Link from "next/link"; // ← added for proper navigation (instead of <a>
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <main className="w-full max-w-4xl px-6 py-16 md:py-24 flex flex-col items-center text-center">
+    <div className="flex min-h-[calc(100vh- theme('spacing.16')*2)] items-center justify-center bg-background px-6 py-16 md:py-24">
+      <main className="w-full max-w-4xl flex flex-col items-center text-center">
         {/* Logo / Brand */}
         <div className="mb-12">
           <Image
