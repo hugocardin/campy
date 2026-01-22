@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase/server";
 import { Trash2 } from "lucide-react";
 
 type Amenity = {
@@ -16,7 +16,7 @@ type Category = {
   id: number;
   name: string;
 };
-
+// TODO get the sql out in the data
 export default function AmenitiesAdmin() {
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -36,15 +36,16 @@ export default function AmenitiesAdmin() {
       setError(null);
 
       // Fetch amenities with category join
-      const { data: amenitiesData, error: amenitiesError } = await supabase
-        .from("amenities")
-        .select(
-          `
+      const { data: amenitiesData, error: amenitiesError } =
+        await getSupabaseClient()
+          .from("amenities")
+          .select(
+            `
           id, name, category_id, created_at,
           amenity_categories!left (name)
         `,
-        )
-        .order("name");
+          )
+          .order("name");
 
       if (!ignore) {
         if (amenitiesError) {
@@ -59,10 +60,11 @@ export default function AmenitiesAdmin() {
       }
 
       // Fetch categories for dropdown
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("amenity_categories")
-        .select("id, name")
-        .order("name");
+      const { data: categoriesData, error: categoriesError } =
+        await getSupabaseClient()
+          .from("amenity_categories")
+          .select("id, name")
+          .order("name");
 
       if (!ignore) {
         if (categoriesError) {
@@ -88,10 +90,12 @@ export default function AmenitiesAdmin() {
     setSubmitting(true);
     setError(null);
 
-    const { error } = await supabase.from("amenities").insert({
-      name: name.trim(),
-      category_id: categoryId || null,
-    });
+    const { error } = await getSupabaseClient()
+      .from("amenities")
+      .insert({
+        name: name.trim(),
+        category_id: categoryId || null,
+      });
 
     if (error) {
       setError(error.message);
@@ -100,7 +104,7 @@ export default function AmenitiesAdmin() {
       setCategoryId("");
 
       // Refresh amenities list
-      const { data } = await supabase
+      const { data } = await getSupabaseClient()
         .from("amenities")
         .select(
           `
@@ -127,7 +131,10 @@ export default function AmenitiesAdmin() {
       return;
 
     setError(null);
-    const { error } = await supabase.from("amenities").delete().eq("id", id);
+    const { error } = await getSupabaseClient()
+      .from("amenities")
+      .delete()
+      .eq("id", id);
 
     if (error) {
       setError(error.message);

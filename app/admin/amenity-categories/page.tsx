@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { Trash2 } from "lucide-react";
-
-type Category = {
-  id: number;
-  name: string;
-  created_at: string;
-};
+import {
+  createAmenityCategory,
+  deleteAmenityCategory,
+  getAllAmenityCategories,
+} from "@/data/amenities-categories/get-amenities-categories";
+import { AmenityCategory } from "@/entities/amenity-categories";
 
 export default function AmenityCategoriesAdmin() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<AmenityCategory[]>([]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -26,15 +25,10 @@ export default function AmenityCategoriesAdmin() {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from("amenity_categories")
-        .select("*")
-        .order("name");
+      const data = await getAllAmenityCategories();
 
       if (!ignore) {
-        if (error) {
-          setError(error.message);
-        } else if (data) {
+        if (data) {
           setCategories(data);
         }
         setLoading(false);
@@ -55,39 +49,28 @@ export default function AmenityCategoriesAdmin() {
     setSubmitting(true);
     setError(null);
 
-    const { error } = await supabase
-      .from("amenity_categories")
-      .insert({ name: name.trim() });
+    await createAmenityCategory({ name: name });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setName("");
-      // Refresh without full reload — but call the same safe fetch
-      const { data } = await supabase
-        .from("amenity_categories")
-        .select("*")
-        .order("name");
-      if (data) setCategories(data);
-    }
+    setName("");
+    // Refresh without full reload — but call the same safe fetch
+    const data = await getAllAmenityCategories();
+    if (data) setCategories(data);
 
     setSubmitting(false);
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Delete "${name}"? This may affect amenities.`)) return;
+  const handleDelete = async (amenityCategory: AmenityCategory) => {
+    if (
+      !confirm(`Delete "${amenityCategory.name}"? This may affect amenities.`)
+    )
+      return;
 
     setError(null);
-    const { error } = await supabase
-      .from("amenity_categories")
-      .delete()
-      .eq("id", id);
+    await deleteAmenityCategory(amenityCategory.id);
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setCategories((prev) => prev.filter((cat) => cat.id !== id));
-    }
+    setCategories((prev) =>
+      prev.filter((amCat) => amCat.id !== amenityCategory.id),
+    );
   };
 
   return (
@@ -173,9 +156,9 @@ export default function AmenityCategoriesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {categories.map((cat) => (
+              {categories.map((amenityCategory) => (
                 <tr
-                  key={cat.id}
+                  key={amenityCategory.id}
                   className="
                     border-t border-border 
                     hover:bg-muted/20 
@@ -183,11 +166,11 @@ export default function AmenityCategoriesAdmin() {
                   "
                 >
                   <td className="p-4 font-medium text-foreground">
-                    {cat.name}
+                    {amenityCategory.name}
                   </td>
                   <td className="p-4 text-right">
                     <button
-                      onClick={() => handleDelete(cat.id, cat.name)}
+                      onClick={() => handleDelete(amenityCategory)}
                       className="
                         inline-flex items-center gap-1.5
                         px-3 py-1.5 

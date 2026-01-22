@@ -90,8 +90,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         </Link>
-
-        {/* You can easily add more cards here later */}
       </div>
     </div>
   );

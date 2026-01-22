@@ -1,6 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/supabase";
 import { UserButton } from "@clerk/nextjs";
+import { getUserProfile } from "@/data/profile/get-profile";
 
 export default async function ProfilePage() {
   const clerkUser = await currentUser();
@@ -15,21 +15,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("full_name, email, role_id")
-    .eq("id", clerkUser.id)
-    .single();
-
-  if (error) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-xl text-destructive">
-          Error loading profile: {error.message}
-        </p>
-      </div>
-    );
-  }
+  const profile = await getUserProfile(clerkUser.id);
 
   return (
     <main className="p-6 md:p-8 max-w-3xl mx-auto min-h-[calc(100vh- theme(spacing.16))]">
@@ -46,10 +32,10 @@ export default async function ProfilePage() {
             </div>
             <div className="min-w-0">
               <h2 className="text-2xl font-semibold text-foreground truncate">
-                {clerkUser.firstName || clerkUser.username || "User"}
+                {clerkUser.firstName} {clerkUser.lastName}
               </h2>
               <p className="mt-1 text-muted-foreground">
-                {clerkUser.emailAddresses[0]?.emailAddress || "No email"}
+                {clerkUser.emailAddresses[0].emailAddress}
               </p>
             </div>
           </div>
@@ -67,7 +53,7 @@ export default async function ProfilePage() {
                 Full Name
               </dt>
               <dd className="mt-1 text-lg font-medium text-foreground">
-                {profile?.full_name || "Not set"}
+                {profile.full_name}
               </dd>
             </div>
 
@@ -76,7 +62,7 @@ export default async function ProfilePage() {
                 Email (Database)
               </dt>
               <dd className="mt-1 text-lg font-medium text-foreground">
-                {profile?.email || "Not set"}
+                {profile.email}
               </dd>
             </div>
 
@@ -85,10 +71,7 @@ export default async function ProfilePage() {
                 Role
               </dt>
               <dd className="mt-1 text-lg font-medium text-foreground">
-                {profile?.role_id === 4 ? "Platform Admin" : "User"}{" "}
-                <span className="text-muted-foreground text-base">
-                  (ID: {profile?.role_id ?? "N/A"})
-                </span>
+                {profile.role_name}
               </dd>
             </div>
           </dl>
