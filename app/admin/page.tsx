@@ -1,7 +1,25 @@
 import { Leaf, Tags } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getUserRoleName } from "@/data/users/get-user-role";
 
-export default function AdminDashboard() {
+export default async function AdminDashboard() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const user_role = await getUserRoleName(user.id);
+
+  if (!user_role || user_role !== "platform_admin") {
+    redirect("/");
+  }
+
   return (
     <div className="space-y-8 p-6 md:p-8">
       <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">

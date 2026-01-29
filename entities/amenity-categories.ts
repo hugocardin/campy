@@ -1,8 +1,8 @@
 export interface AmenityCategory {
   id: number;
-  name: string;
+  code: string;
 }
 
 export interface AmenityCategoryCreateInput {
-  name: string;
+  code: string;
 }

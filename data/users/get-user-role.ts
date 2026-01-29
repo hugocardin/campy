@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Fetches the role name from profiles → user_roles join.
@@ -9,11 +9,12 @@ export async function getUserRoleName(
 ): Promise<string | null> {
   if (!userId) return null;
 
-  const { data, error } = await getSupabaseClient()
+  const supabase = await createClient();
+  const { data, error } = await supabase
     .from("profiles")
-    .select(`role_name:user_roles ( name )`)
+    .select(`role_name:user_roles ( code )`)
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("Failed to fetch user role:", error.message);
@@ -21,12 +22,11 @@ export async function getUserRoleName(
   }
 
   if (!data) {
-    console.warn(`No profile found for user ${userId}`);
     return null;
   }
 
   // @ts-expect-error — types are loose because of the join; improve later with generated types
-  return (data.role_name as { name: string } | null).name;
+  return (data.role_name as { code: string } | null).code;
 }
 
 /**

@@ -1,45 +1,45 @@
 import { UserProfile } from "@/entities/user-profile";
-import { getSupabaseClient } from "@/lib/supabase/server";
-import { cache } from "react";
+import { createClient } from "@/lib/supabase/server";
 
 type ProfileWithRoleNameRow = {
   full_name: string | null;
   email: string | null;
-  role_name: { name: string }; // ← change to object | null
+  role_name: { code: string };
 };
 
 function toDomain(row: ProfileWithRoleNameRow, userId: string): UserProfile {
   return {
     id: userId,
-    role_name: row.role_name.name,
+    role_name: row.role_name.code,
     full_name: (row.full_name ?? "").trim(),
     email: (row.email ?? "").trim(),
   };
 }
 
-export const getUserProfile = cache(
-  async (userId: string): Promise<UserProfile> => {
-    const { data, error } = await getSupabaseClient()
-      .from("profiles")
-      .select(
-        `
+export const getUserProfile = async (
+  userId: string,
+): Promise<UserProfile | null> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      `
         full_name, email,
-        role_name:user_roles ( name )
+        role_name:user_roles ( code )
         `,
-      )
-      .eq("id", userId)
-      .single();
+    )
+    .eq("id", userId)
+    .maybeSingle();
 
-    if (error) {
-      console.error("Failed to load user profile:", error.message);
-      throw error;
-    }
+  if (error) {
+    console.error("Failed to load user profile:", error.message);
+    throw error;
+  }
 
-    if (!data) {
-      throw new Error(`No profile found for user ${userId}`);
-    }
+  if (!data) {
+    return null;
+  }
 
-    // @ts-expect-error — types are loose because of the join; improve later with generated types
-    return toDomain(data, userId);
-  },
-);
+  // @ts-expect-error — types are loose because of the join; improve later with generated types
+  return toDomain(data, userId);
+};
