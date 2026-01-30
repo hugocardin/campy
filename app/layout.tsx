@@ -1,22 +1,21 @@
-import { type Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
+import { cn } from "@/lib/utils";
+
+import "@fontsource/geist-sans"; // 400, 500, 600, 700, etc.
+import "@fontsource/geist-mono"; // mono variant
+
 import "./globals.css";
-import Header from "./components/layout/header";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import Header from "@/components/layout/header";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "Campground Booking App",
-  description: "Online campground reservations",
+  title: {
+    default: "Campy – Campground Booking",
+    template: "%s | Campy",
+  },
+  description:
+    "Find and book your perfect campground — RV sites, tent spots, and more.",
 };
 
 export default function RootLayout({
@@ -25,15 +24,38 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
-      >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={cn(
+        "font-sans antialiased scroll-smooth", // Geist Sans as default
+        "selection:bg-primary/20 selection:text-primary-foreground",
+      )}
+    >
+      <body className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <Header />
-          <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-            {children}
+
+          <main className="flex-1">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+              {children}
+            </div>
           </main>
+
+          <Toaster
+            richColors
+            position="top-right"
+            closeButton
+            toastOptions={{
+              duration: 5000,
+              className: "border-border",
+            }}
+          />
         </ThemeProvider>
       </body>
     </html>

@@ -1,8 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
-import { getUserRoleName } from "@/data/users/get-user-role";
+import { getUserRoleName } from "@/app/data/users/get-user-role";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
   // 1. Public routes → always allow (add more if needed: /about, /search, /login, /signup ...)
   if (
     pathname === "/" ||
-    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth") ||
     pathname.startsWith("/_next") ||
     pathname.includes(".")
   ) {
@@ -46,13 +46,13 @@ export async function middleware(request: NextRequest) {
   // 2. Require login for protected routes
   if (!user) {
     // Redirect to login + preserve original path (so after login you can redirect back)
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL("/auth", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   // 3. Admin-only routes: check role_id === 4 from profiles
-  if (pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/platformAdmin")) {
     const userRole = await getUserRoleName(user.id);
 
     if (userRole !== "platform_admin") {

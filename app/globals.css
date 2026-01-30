@@ -1,35 +1,150 @@
 @import "tailwindcss";
+@plugin "tailwindcss-animate";
+@import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ────────────────────────────────────────────────
+   Core theme variables – light mode first
+───────────────────────────────────────────────── */
 @theme {
-  --color-background: oklch(98% 0.008 150);
-  --color-foreground: oklch(20% 0.04 140);
-  --color-card: oklch(99% 0.005 148);
-  --color-primary: #88e788;
-  --color-primary-foreground: black;
-  --color-primary-hover: #66cc66;
-  --color-border: oklch(88% 0.02 150 / 0.6);
-  --color-muted-foreground: oklch(45% 0.04 250);
-  --color-destructive: #ef4444;
-  --color-muted: oklch(95% 0.02 250 / 0.6);
+  --background: oklch(0.98 0.008 150);
+  --foreground: oklch(0.2 0.04 140);
+
+  --card: oklch(0.99 0.005 148);
+  --card-foreground: var(--foreground);
+
+  --popover: var(--card);
+  --popover-foreground: var(--card-foreground);
+
+  --primary: #88e788;
+  --primary-foreground: oklch(0.15 0.02 140);
+  --primary-hover: #66cc66;
+
+  --secondary: oklch(0.92 0.02 150);
+  --secondary-foreground: var(--foreground);
+
+  --muted: oklch(0.95 0.015 150 / 0.7);
+  --muted-foreground: oklch(0.45 0.04 250);
+
+  --accent: var(--secondary);
+  --accent-foreground: var(--secondary-foreground);
+
+  --destructive: #ef4444;
+  --destructive-foreground: white;
+
+  --border: oklch(0.88 0.02 150 / 0.5);
+  --input: var(--border);
+  --ring: var(--primary);
+
+  --radius: 0.625rem; /* ≈ 10px – feels modern */
+
+  /* Optional charts – feel free to adjust or remove */
+  --chart-1: oklch(0.65 0.2 140);
+  --chart-2: oklch(0.75 0.18 100);
+  --chart-3: oklch(0.7 0.22 60);
+  --chart-4: oklch(0.68 0.19 200);
+  --chart-5: oklch(0.72 0.21 320);
 }
 
+/* ────────────────────────────────────────────────
+   Dark mode overrides
+───────────────────────────────────────────────── */
 .dark {
-  --color-background: oklch(10% 0.04 140);
-  --color-foreground: oklch(96% 0.015 145);
-  --color-card: oklch(14% 0.03 142);
-  --color-primary: #77d977;
-  --color-primary-foreground: black;
-  --color-primary-hover: #5ab55a;
-  --color-border: oklch(22% 0.04 140 / 0.65);
-  --color-muted-foreground: oklch(70% 0.03 250);
-  --color-destructive: #f87171;
-  --color-muted: oklch(15% 0.02 250 / 0.4);
+  --background: oklch(0.12 0.03 145);
+  --foreground: oklch(0.96 0.015 145);
+
+  --card: oklch(0.16 0.03 142);
+  --card-foreground: var(--foreground);
+
+  --popover: var(--card);
+  --popover-foreground: var(--card-foreground);
+
+  --primary: #77d977; /* darkened green – better in dark mode */
+  --primary-foreground: oklch(0.12 0.02 140); /* dark text on green */
+  --primary-hover: #5ab55a;
+
+  --secondary: oklch(0.25 0.03 145);
+  --secondary-foreground: var(--foreground);
+
+  --muted: oklch(0.22 0.02 145 / 0.6);
+  --muted-foreground: oklch(0.7 0.03 250);
+
+  --accent: var(--secondary);
+  --accent-foreground: var(--secondary-foreground);
+
+  --destructive: #f87171;
+  --destructive-foreground: white;
+
+  --border: oklch(0.3 0.04 145 / 0.5);
+  --input: var(--border);
+  --ring: var(--primary);
+
+  /* Charts in dark – adjust if using */
+  --chart-1: oklch(0.75 0.18 140);
+  --chart-2: oklch(0.82 0.16 100);
+  --chart-3: oklch(0.78 0.19 60);
+  --chart-4: oklch(0.76 0.17 200);
+  --chart-5: oklch(0.79 0.18 320);
 }
 
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Optional – only if you plan to use charts soon */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* You can keep your existing radius helpers here too */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+/* ────────────────────────────────────────────────
+   Base styles & radius helpers
+───────────────────────────────────────────────── */
 @layer base {
   :root {
     @apply bg-background text-foreground antialiased;
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
   }
 }
