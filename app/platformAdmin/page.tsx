@@ -20,13 +20,13 @@ export default async function AdminDashboard() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/auth");
+    redirect(routes.auth());
   }
 
   const user_role = await getUserRoleName(user.id);
 
   if (!user_role || user_role !== "platform_admin") {
-    redirect("/");
+    redirect(routes.home());
   }
 
   return (

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { AmenityCreateInput } from "@/entities/amenity";
+import { routes } from "@/lib/routes";
 
 export async function createAmenityAction(input: AmenityCreateInput) {
   const supabase = await createClient();
@@ -19,7 +20,7 @@ export async function createAmenityAction(input: AmenityCreateInput) {
   if (error) return { error: error.message };
   if (!data) return { error: "No data returned after insert" };
 
-  revalidatePath("/admin/amenities");
+  revalidatePath(routes.platformAdmin.amenities());
 
   return { success: true, data };
 }
@@ -31,7 +32,7 @@ export async function deleteAmenityAction(id: string) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/amenities");
+  revalidatePath(routes.platformAdmin.amenities());
 
   return { success: true };
 }

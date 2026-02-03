@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import AuthForm from "./AuthForm";
+import { routes } from "@/lib/routes";
 
 export const metadata = {
   title: "Sign In / Sign Up - Campy",
@@ -15,7 +16,7 @@ export default async function AuthPage({
 }) {
   const params = await searchParams;
   const redirectTo =
-    typeof params.redirect === "string" ? params.redirect : "/profile";
+    typeof params.redirect === "string" ? params.redirect : routes.profile();
 
   const supabase = await createClient();
   const {

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { getUserRoleName } from "@/app/data/users/get-user-role";
+import { routes } from "./lib/routes";
 
 export async function proxy(request: NextRequest) {
   const supabaseResponse = NextResponse.next({
@@ -35,8 +36,8 @@ export async function proxy(request: NextRequest) {
 
   // 1. Public routes → always allow (add more if needed: /about, /search, /login, /signup ...)
   if (
-    pathname === "/" ||
-    pathname.startsWith("/auth") ||
+    pathname === routes.home() ||
+    pathname.startsWith(routes.auth()) ||
     pathname.startsWith("/_next") ||
     pathname.includes(".")
   ) {
@@ -46,18 +47,18 @@ export async function proxy(request: NextRequest) {
   // 2. Require login for protected routes
   if (!user) {
     // Redirect to login + preserve original path (so after login you can redirect back)
-    const loginUrl = new URL("/auth", request.url);
+    const loginUrl = new URL(routes.auth(), request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   // 3. Admin-only routes: check role_id === 4 from profiles
-  if (pathname.startsWith("/platformAdmin")) {
+  if (pathname.startsWith(routes.platformAdmin.root())) {
     const userRole = await getUserRoleName(user.id);
 
     if (userRole !== "platform_admin") {
       // Redirect to home (or to a /unauthorized page if you create one)
-      return NextResponse.redirect(new URL("/", request.url));
+      return NextResponse.redirect(new URL(routes.home(), request.url));
     }
   }
 

@@ -12,6 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { routes } from "@/lib/routes";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -20,11 +21,12 @@ export default async function ProfilePage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/auth");
+    redirect(routes.auth());
   }
 
   let profile = await getUserProfile(user.id);
 
+  // TODO to remove fallback, it needs to exist
   // Fallback: auto-create profile if missing
   if (!profile) {
     const { error } = await supabase.from("profiles").insert({
@@ -55,7 +57,7 @@ export default async function ProfilePage() {
     // Re-fetch after insert
     profile = await getUserProfile(user.id);
     if (!profile) {
-      redirect("/");
+      redirect(routes.home());
     }
   }
 

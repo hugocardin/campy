@@ -32,7 +32,7 @@ export default function RootLayout({
         "selection:bg-primary/20 selection:text-primary-foreground",
       )}
     >
-      <body className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+      <body className="h-screen bg-background text-foreground flex flex-col font-sans">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -41,10 +41,8 @@ export default function RootLayout({
         >
           <Header />
 
-          <main className="flex-1">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-              {children}
-            </div>
+          <main className="flex-1 flex flex-col overflow-hidden">
+            {children}
           </main>
 
           <Toaster

@@ -40,7 +40,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     } else {
       setCode("");
       setCategoryId("");
-      router.refresh(); // Forces server re-fetch of page data
+      router.refresh();
     }
 
     setSubmitting(false);

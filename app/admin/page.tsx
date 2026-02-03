@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getUserRoleName } from "@/data/users/get-user-role";
+import { routes } from "@/lib/routes";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -17,7 +18,7 @@ export default async function AdminDashboard() {
   const user_role = await getUserRoleName(user.id);
 
   if (!user_role || user_role !== "platform_admin") {
-    redirect("/");
+    redirect(routes.home());
   }
 
   return (

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { routes } from "@/lib/routes";
 
 type AuthFormProps = {
   redirectTo: string;
@@ -48,7 +49,7 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
         );
       } else {
         // Sign in success → redirect
-        router.replace(redirectTo || "/profile");
+        router.replace(redirectTo || routes.profile());
       }
     });
   };

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import ThemeToggle from "../ui/button/ThemeToggle";
+import { routes } from "@/lib/routes";
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -39,7 +40,7 @@ export default function Header() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    router.push("/");
+    router.push(routes.home());
     // router.refresh(); // Refresh current page (or router.push('/') if you prefer redirect)
     // Optional: window.location.href = '/' for full reload if needed
   };
@@ -49,7 +50,7 @@ export default function Header() {
     return (
       <header className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-6">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href={routes.home()} className="flex items-center gap-3">
             <Image
               src="/logo.png"
               alt="Campy Logo"
@@ -76,7 +77,7 @@ export default function Header() {
   return (
     <header className="bg-card border-b border-border shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-6">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href={routes.home()} className="flex items-center gap-3">
           <Image
             src="/logo.png"
             alt="Campy Logo"
