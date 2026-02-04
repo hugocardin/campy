@@ -9,7 +9,7 @@ type Props = {
 
 export default function CampgroundList({ campgrounds }: Props) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6 overflow-scroll">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6 overflow-auto">
       {campgrounds.map((campground) => (
         <CampgroundCard key={campground.id} campground={campground} />
       ))}

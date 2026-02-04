@@ -8,6 +8,8 @@ export const routes = {
     root: () => "/platformAdmin",
     amenities: () => "/platformAdmin/amenities",
     amenityCategory: () => "/platformAdmin/amenity-categories",
+    campgrounds: () => "/platformAdmin/campgrounds",
+    campgroundDetail: (id: string) => `/platformAdmin/campgrounds/${id}`,
   },
 } as const;
 

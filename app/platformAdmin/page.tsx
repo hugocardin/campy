@@ -1,6 +1,6 @@
 import { getUserRoleName } from "@/app/data/users/get-user-role";
 import { createClient } from "@/lib/supabase/server";
-import { Leaf, Tags } from "lucide-react";
+import { Leaf, Tags, Tent } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -91,26 +91,30 @@ export default async function AdminDashboard() {
           </Card>
         </Link>
 
-        {/* Example: easy to add more cards */}
-        {/* 
-        <Link href="/admin/campgrounds">
-          <Card className={cn(...same classes...)}>
+        {/* Campgrounds */}
+        <Link href={routes.platformAdmin.campgrounds()}>
+          <Card
+            className={cn(
+              "group h-full transition-all duration-200",
+              "hover:shadow-md hover:border-primary/50 hover:scale-[1.02]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+            )}
+          >
             <CardHeader className="flex flex-row items-center gap-4 pb-4">
               <div className="rounded-lg bg-primary/10 p-3 group-hover:bg-primary/20 transition-colors">
-                <Mountain className="h-6 w-6 text-primary" />
+                <Tent className="h-6 w-6 text-primary" />
               </div>
               <div className="space-y-1">
                 <CardTitle className="text-xl group-hover:text-primary transition-colors">
                   Campgrounds
                 </CardTitle>
                 <CardDescription className="text-sm leading-relaxed">
-                  Add, edit or remove campground listings
+                  Organize campgrounds
                 </CardDescription>
               </div>
             </CardHeader>
           </Card>
         </Link>
-        */}
       </div>
     </div>
   );

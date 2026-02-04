@@ -4,7 +4,6 @@ import { cache } from "react";
 
 type CampgroundRow = {
   id: string;
-  owner_id: string;
   name: string;
   description: string;
   address: string;
@@ -20,7 +19,6 @@ type CampgroundRow = {
 function toDomain(row: CampgroundRow): Campground {
   return {
     id: row.id,
-    owner_id: row.owner_id,
     name: row.name,
     description: row.description,
     address: row.address,
@@ -38,8 +36,9 @@ function toDomain(row: CampgroundRow): Campground {
 
 export const getCampgrounds = cache(async (): Promise<Campground[]> => {
   const supabase = await createClient();
+
   const { data, error } = await supabase
-    .from("campgrounds_with_coords")
+    .from("v_campgrounds")
     .select("*")
     .order("name");
 

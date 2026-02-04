@@ -1,5 +1,8 @@
-export interface Campground {
+export interface CampgroundAdmin {
   id: string;
+  owner_id: string;
+  owner_full_name: string;
+  owner_email: string;
   name: string;
   description: string;
   address: string;
@@ -12,4 +15,5 @@ export interface Campground {
   };
   website: string;
   phone: string;
+  active: boolean;
 }
