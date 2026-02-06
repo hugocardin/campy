@@ -2,6 +2,11 @@ import { getCampgroundsAdmin } from "@/app/data/campgrounds/get-campgrounds-admi
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense } from "react";
 import CampgroundsClient from "./CampgroundsClient";
+import { BackHeader } from "@/components/layout/back-header";
+import { routes } from "@/lib/routes";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 export const metadata = {
   title: "Admin - Amenity Categories",
@@ -13,6 +18,20 @@ export default async function CampgroundsAdminPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <BackHeader
+        title="Campgrounds list"
+        description="List all campgrounds."
+        backTo={routes.platformAdmin.root()}
+        rightContent={
+          <Button asChild size="lg">
+            <Link href={routes.platformAdmin.campgrounds()}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Campground
+            </Link>
+          </Button>
+        }
+      />
+
       <Suspense
         fallback={
           <div className="space-y-6">

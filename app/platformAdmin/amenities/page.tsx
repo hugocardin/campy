@@ -3,6 +3,8 @@ import { getAllAmenities } from "@/app/data/amenities/get-amenities";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense } from "react";
 import AmenitiesClient from "./AmenitiesClient";
+import { BackHeader } from "@/components/layout/back-header";
+import { routes } from "@/lib/routes";
 
 export default async function AmenitiesAdminPage() {
   const [amenities, categories] = await Promise.all([
@@ -12,14 +14,11 @@ export default async function AmenitiesAdminPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-          Manage Amenities
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Add, edit or remove amenities available at campgrounds
-        </p>
-      </div>
+      <BackHeader
+        title="Manage Amenities"
+        description="Add, edit or remove amenities available at campgrounds"
+        backTo={routes.platformAdmin.root()}
+      />
 
       <Suspense
         fallback={

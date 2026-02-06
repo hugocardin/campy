@@ -17,9 +17,14 @@
   --popover: var(--card);
   --popover-foreground: var(--card-foreground);
 
-  --primary: #88e788;
+  --primary: #4caf50;
+  --primary-hover: #43a047;
+  --primary-dark: #388e3c;
   --primary-foreground: oklch(0.15 0.02 140);
-  --primary-hover: #66cc66;
+
+  --primary-soft: #e8f5e9;
+  --primary-muted: #c8e6c9;
+  --primary-border: #a5d6a7;
 
   --secondary: oklch(0.92 0.02 150);
   --secondary-foreground: var(--foreground);
@@ -37,7 +42,7 @@
   --input: var(--border);
   --ring: var(--primary);
 
-  --radius: 0.625rem; /* ≈ 10px – feels modern */
+  --radius: 0.625rem;
 
   /* Optional charts – feel free to adjust or remove */
   --chart-1: oklch(0.65 0.2 140);
@@ -60,9 +65,13 @@
   --popover: var(--card);
   --popover-foreground: var(--card-foreground);
 
-  --primary: #77d977; /* darkened green – better in dark mode */
-  --primary-foreground: oklch(0.12 0.02 140); /* dark text on green */
-  --primary-hover: #5ab55a;
+  --primary: #66bb6a;
+  --primary-hover: #81c784;
+  --primary-dark: #4caf50;
+  --primary-foreground: oklch(0.12 0.02 140);
+
+  --primary-soft: #2e7d32;
+  --primary-muted: #388e3c;
 
   --secondary: oklch(0.25 0.03 145);
   --secondary-foreground: var(--foreground);

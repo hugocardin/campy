@@ -1,17 +1,17 @@
 import { getCampgroundAdminById } from "@/app/data/campgrounds/get-campgrounds-admin";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Suspense } from "react";
+import CampgroundEditClient from "./CampgroundEditClient";
 import { routes } from "@/lib/routes";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
-import CampgroundClient from "./CampgroundClient";
-import { CampgroundHeader } from "./CampgroundHeader";
+import { BackHeader } from "@/components/layout/back-header";
 
 export const metadata = {
   title: "Admin - Campground details",
   description: "Manage a campground's details",
 };
 
-export default async function CampgroundDetailPage({
+export default async function CampgroundEditPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
@@ -25,7 +25,11 @@ export default async function CampgroundDetailPage({
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <CampgroundHeader campground={campground} />
+      <BackHeader
+        title={`Edit ${campground.name} details`}
+        description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
+        backTo={routes.platformAdmin.campgroundDetails(campground.id)}
+      />
 
       <Suspense
         fallback={
@@ -38,7 +42,7 @@ export default async function CampgroundDetailPage({
           </div>
         }
       >
-        <CampgroundClient campground={campground} />
+        <CampgroundEditClient campground={campground} />
       </Suspense>
     </div>
   );

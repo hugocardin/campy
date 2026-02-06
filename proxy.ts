@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { getUserRoleName } from "@/app/data/users/get-user-role";
 import { routes } from "./lib/routes";
+import { USER_ROLE_PLATEFORMADMIN } from "./lib/constants";
 
 export async function proxy(request: NextRequest) {
   const supabaseResponse = NextResponse.next({
@@ -56,7 +57,7 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith(routes.platformAdmin.root())) {
     const userRole = await getUserRoleName(user.id);
 
-    if (userRole !== "platform_admin") {
+    if (userRole !== USER_ROLE_PLATEFORMADMIN) {
       // Redirect to home (or to a /unauthorized page if you create one)
       return NextResponse.redirect(new URL(routes.home(), request.url));
     }

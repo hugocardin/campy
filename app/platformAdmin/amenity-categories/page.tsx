@@ -2,6 +2,8 @@ import { getAllAmenityCategories } from "@/app/data/amenities-categories/get-ame
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense } from "react";
 import AmenityCategoriesClient from "./AmenityCategoriesClient";
+import { BackHeader } from "@/components/layout/back-header";
+import { routes } from "@/lib/routes";
 
 export const metadata = {
   title: "Admin - Amenity Categories",
@@ -13,14 +15,11 @@ export default async function AmenityCategoriesAdminPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-          Manage Amenity Categories
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Create and manage categories that group your amenities
-        </p>
-      </div>
+      <BackHeader
+        title="Manage Amenity Categories"
+        description="Create and manage categories that group your amenities"
+        backTo={routes.platformAdmin.root()}
+      />
 
       <Suspense
         fallback={

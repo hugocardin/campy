@@ -20,7 +20,7 @@ export async function inactivateCampgroundAction(id: string) {
   }
 
   revalidatePath(routes.platformAdmin.campgrounds());
-  revalidatePath(routes.platformAdmin.campgroundDetail(id));
+  revalidatePath(routes.platformAdmin.campgroundDetails(id));
   // TODO: also revalidate the detail page if you have one
   // revalidatePath(`/campgrounds/${id}`);
 
@@ -43,7 +43,7 @@ export async function activateCampgroundAction(id: string) {
   }
 
   revalidatePath(routes.platformAdmin.campgrounds());
-  revalidatePath(routes.platformAdmin.campgroundDetail(id));
+  revalidatePath(routes.platformAdmin.campgroundDetails(id));
   // TODO: also revalidate the detail page if you have one
   // revalidatePath(`/campgrounds/${id}`);
 
@@ -99,7 +99,7 @@ export async function updateCampgroundAction(input: UpdateCampgroundInput) {
 
   // Revalidate both list and detail page
   revalidatePath(routes.platformAdmin.campgrounds());
-  revalidatePath(routes.platformAdmin.campgroundDetail(input.id));
+  revalidatePath(routes.platformAdmin.campgroundDetails(input.id));
 
   return { success: true };
 }

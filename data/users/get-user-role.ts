@@ -1,3 +1,4 @@
+import { USER_ROLE_ADMIN, USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -39,6 +40,6 @@ export async function isAdmin(
   const role = await getUserRoleName(userId);
   if (!role) return false;
 
-  const allowedRoles = ["admin", "platform_admin"];
+  const allowedRoles = [USER_ROLE_ADMIN, USER_ROLE_PLATEFORMADMIN];
   return allowedRoles.includes(role);
 }

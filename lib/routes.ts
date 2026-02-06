@@ -9,7 +9,9 @@ export const routes = {
     amenities: () => "/platformAdmin/amenities",
     amenityCategory: () => "/platformAdmin/amenity-categories",
     campgrounds: () => "/platformAdmin/campgrounds",
-    campgroundDetail: (id: string) => `/platformAdmin/campgrounds/${id}`,
+    campgroundDetails: (id: string) => `/platformAdmin/campgrounds/${id}`,
+    campgroundDetailsEdit: (id: string) =>
+      `/platformAdmin/campgrounds/${id}/edit`,
   },
 } as const;
 

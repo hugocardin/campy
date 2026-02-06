@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getUserRoleName } from "@/data/users/get-user-role";
 import { routes } from "@/lib/routes";
+import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -17,12 +18,12 @@ export default async function AdminDashboard() {
 
   const user_role = await getUserRoleName(user.id);
 
-  if (!user_role || user_role !== "platform_admin") {
+  if (!user_role || user_role !== USER_ROLE_PLATEFORMADMIN) {
     redirect(routes.home());
   }
 
   return (
-    <div className="space-y-8 p-6 md:p-8">
+    <div className="container mx-auto py-6 md:py-10 px-4 sm:px-6 lg:px-8">
       <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
         Admin Dashboard
       </h2>

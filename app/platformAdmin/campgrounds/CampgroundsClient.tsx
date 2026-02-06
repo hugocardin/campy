@@ -22,14 +22,6 @@ export default function CampgroundsClient({ campgrounds }: Props) {
 
   return (
     <div className="space-y-8">
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold">Manage Campgrounds</h1>
-        <p className="mt-2 text-muted-foreground">
-          Create and manage campgrounds
-        </p>
-      </div>
-
-      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -45,7 +37,7 @@ export default function CampgroundsClient({ campgrounds }: Props) {
               <TableRow
                 key={campground.id}
                 onClick={() => {
-                  const url = routes.platformAdmin.campgroundDetail(
+                  const url = routes.platformAdmin.campgroundDetails(
                     campground.id,
                   );
                   console.log("Navigating to:", url);

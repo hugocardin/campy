@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ThemeToggle from "../ThemeToggle";
 import { routes } from "@/lib/routes";
 import { useUserRole } from "@/lib/hooks/use-user-role";
+import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -137,7 +138,7 @@ export default function Header() {
                   <Link href={routes.profile()}>Profile</Link>
                 </DropdownMenuItem>
 
-                {!roleLoading && roleName === "platform_admin" && (
+                {!roleLoading && roleName === USER_ROLE_PLATEFORMADMIN && (
                   <DropdownMenuItem asChild>
                     <Link href={routes.platformAdmin.root()}>
                       Admin Dashboard
