@@ -5,6 +5,7 @@ import CampgroundEditClient from "./CampgroundEditClient";
 import { routes } from "@/lib/routes";
 import { redirect } from "next/navigation";
 import { BackHeader } from "@/components/layout/back-header";
+import { getOwners } from "@/app/data/profile/get-owners";
 
 export const metadata = {
   title: "Admin - Campground details",
@@ -18,8 +19,9 @@ export default async function CampgroundEditPage({
 }) {
   const params = await paramsPromise;
   const campground = await getCampgroundAdminById(params.id);
+  const owners = await getOwners();
 
-  if (!campground) {
+  if (!campground || !owners) {
     redirect(routes.platformAdmin.campgrounds());
   }
 
@@ -42,7 +44,7 @@ export default async function CampgroundEditPage({
           </div>
         }
       >
-        <CampgroundEditClient campground={campground} />
+        <CampgroundEditClient campground={campground} owners={owners} />
       </Suspense>
     </div>
   );

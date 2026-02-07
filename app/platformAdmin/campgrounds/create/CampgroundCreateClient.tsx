@@ -4,8 +4,7 @@ import { AlertCircle, Save } from "lucide-react";
 import { useState, useTransition } from "react";
 import { redirect } from "next/navigation";
 
-import { updateCampgroundAction } from "@/app/actions/campgrounds-admin";
-import { CampgroundAdmin } from "@/app/entities/campground-admin";
+import { createCampgroundAction } from "@/app/actions/campgrounds-admin";
 import { UserProfileNoRole } from "@/app/entities/user-profile";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -21,11 +20,6 @@ import {
 } from "@/components/ui/select";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-
-type Props = {
-  campground: CampgroundAdmin;
-  owners: UserProfileNoRole[];
-};
 
 type FormData = {
   name: string;
@@ -43,23 +37,27 @@ type FormData = {
   };
 };
 
-export default function CampgroundEditClient({ campground, owners }: Props) {
+type Props = {
+  owners: UserProfileNoRole[];
+};
+
+export default function CampgroundCreateClient({ owners }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormData>({
-    name: campground.name,
-    owner_id: campground.owner_id ?? "",
-    description: campground.description || "",
-    address: campground.address || "",
-    city: campground.city || "",
-    province: campground.province || "",
-    country: campground.country || "",
-    website: campground.website || "",
-    phone: campground.phone || "",
+    name: "",
+    owner_id: "",
+    description: "",
+    address: "",
+    city: "",
+    province: "",
+    country: "",
+    website: "",
+    phone: "",
     location: {
-      lat: String(campground.location?.lat ?? ""),
-      lng: String(campground.location?.lng ?? ""),
+      lat: "",
+      lng: "",
     },
   });
 
@@ -79,7 +77,7 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
     const latNum = parseFloat(form.location.lat);
     const lngNum = parseFloat(form.location.lng);
 
-    // Client-side validation
+    // Basic client-side validation for required fields
     if (!form.name.trim()) {
       setError("Campground name is required");
       return;
@@ -97,8 +95,8 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
       return;
     }
 
+    // Convert lat/lng to numbers for the action
     const payload = {
-      id: campground.id,
       ...form,
       location: {
         lat: latNum,
@@ -107,12 +105,12 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
     };
 
     startTransition(async () => {
-      const result = await updateCampgroundAction(payload);
+      const result = await createCampgroundAction(payload);
 
       if (result.error) {
         setError(result.error);
-      } else {
-        redirect(routes.platformAdmin.campgroundDetails(campground.id));
+      } else if (result.campgroundId) {
+        redirect(routes.platformAdmin.campgroundDetails(result.campgroundId));
       }
     });
   };
@@ -346,11 +344,11 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
                 )}
               >
                 {isPending ? (
-                  "Saving..."
+                  "Creating..."
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Save changes
+                    Create campground
                   </>
                 )}
               </Button>

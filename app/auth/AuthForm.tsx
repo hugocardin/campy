@@ -45,6 +45,9 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
         return;
       }
 
+      setEmail("");
+      setPassword("");
+
       if (mode === "signup") {
         setMessage(
           "Account created! Check your email to confirm and activate. (or navigate in dev)",

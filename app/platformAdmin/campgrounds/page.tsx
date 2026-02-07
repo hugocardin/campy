@@ -24,7 +24,7 @@ export default async function CampgroundsAdminPage() {
         backTo={routes.platformAdmin.root()}
         rightContent={
           <Button asChild size="lg">
-            <Link href={routes.platformAdmin.campgrounds()}>
+            <Link href={routes.platformAdmin.campgroundCreate()}>
               <Plus className="mr-2 h-4 w-4" />
               Create Campground
             </Link>

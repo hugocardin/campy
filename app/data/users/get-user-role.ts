@@ -22,6 +22,7 @@ export async function getUserRoleName(
   }
 
   if (!data) {
+    console.error("Failed to find user");
     return null;
   }
 

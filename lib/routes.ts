@@ -9,11 +9,9 @@ export const routes = {
     amenities: () => "/platformAdmin/amenities",
     amenityCategory: () => "/platformAdmin/amenity-categories",
     campgrounds: () => "/platformAdmin/campgrounds",
+    campgroundCreate: () => "/platformAdmin/campgrounds/create",
     campgroundDetails: (id: string) => `/platformAdmin/campgrounds/${id}`,
     campgroundDetailsEdit: (id: string) =>
       `/platformAdmin/campgrounds/${id}/edit`,
   },
 } as const;
-
-// <Link href={routes.campgroundDetail("abc123")}>View Campground</Link>
-// <Link href={routes.admin.amenityCategory()}>Categories</Link>
