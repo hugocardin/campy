@@ -1,13 +1,36 @@
 "use client";
 
-import { CampgroundAdmin } from "@/app/entities/campground-admin";
-import { Card, CardContent } from "@/components/ui/card";
+import { CampgroundAdmin } from "@/entities/campground-admin";
+import { Amenity } from "@/entities/amenity";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 type Props = {
   campground: CampgroundAdmin;
+  amenities: Amenity[];
 };
 
-export default function CampgroundDetail({ campground }: Props) {
+export default function CampgroundDetail({ campground, amenities }: Props) {
+  const groupedAndSorted = amenities.reduce(
+    (acc, amenity) => {
+      const category = amenity.category_code?.trim() || "Uncategorized";
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(amenity);
+      return acc;
+    },
+    {} as Record<string, Amenity[]>,
+  );
+
+  // Sort categories and amenities inside each
+  const sortedGroupedAmenities = Object.fromEntries(
+    Object.entries(groupedAndSorted)
+      .sort(([catA], [catB]) => catA.localeCompare(catB))
+      .map(([category, items]) => [
+        category,
+        items.sort((a, b) => a.code.localeCompare(b.code)),
+      ]),
+  );
+
   return (
     <div className="space-y-10">
       {/* Details */}
@@ -106,6 +129,45 @@ export default function CampgroundDetail({ campground }: Props) {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Amenities Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Amenities</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-8 pt-2">
+          {amenities.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">
+              No amenities have been added for this campground.
+            </p>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(sortedGroupedAmenities).map(
+                ([category, items]) => {
+                  return (
+                    <div key={category} className="pb-2">
+                      <h4 className="font-medium text-base mb-2.5 capitalize border-b pb-1 border-muted">
+                        {category.replace(/_/g, " ")}
+                      </h4>
+                      <div className="flex flex-wrap gap-2.5">
+                        {items.map((amenity) => (
+                          <Badge
+                            key={amenity.id}
+                            variant="secondary"
+                            className="text-sm px-3 py-1"
+                          >
+                            {amenity.code}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                },
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

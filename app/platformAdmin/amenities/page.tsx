@@ -1,16 +1,24 @@
-import { getAllAmenityCategories } from "@/app/data/amenities-categories/get-amenities-categories";
-import { getAllAmenities } from "@/app/data/amenities/get-amenities";
+import { BackHeader } from "@/components/layout/back-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getAllAmenityCategories } from "@/data/amenities-categories/get-amenities-categories";
+import { getAllAmenities } from "@/data/amenities/get-amenities";
+import { routes } from "@/lib/routes";
 import { Suspense } from "react";
 import AmenitiesClient from "./AmenitiesClient";
-import { BackHeader } from "@/components/layout/back-header";
-import { routes } from "@/lib/routes";
+import { redirect } from "next/navigation";
 
 export default async function AmenitiesAdminPage() {
-  const [amenities, categories] = await Promise.all([
+  const [amenitiesResult, categoriesResult] = await Promise.all([
     getAllAmenities(),
     getAllAmenityCategories(),
   ]);
+
+  if (!amenitiesResult.success || !categoriesResult.success) {
+    redirect(routes.platformAdmin.root());
+  }
+
+  const amenities = amenitiesResult.data!;
+  const categories = categoriesResult.data!;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">

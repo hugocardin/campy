@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getUserProfile } from "@/app/data/profile/get-profile";
 
 import {
   Card,
@@ -13,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { routes } from "@/lib/routes";
+import { getUserProfile } from "@/data/profile/get-profile";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -24,42 +24,13 @@ export default async function ProfilePage() {
     redirect(routes.auth());
   }
 
-  let profile = await getUserProfile(user.id);
+  const profileResult = await getUserProfile(user.id);
 
-  // TODO to remove fallback, it needs to exist
-  // Fallback: auto-create profile if missing
-  if (!profile) {
-    const { error } = await supabase.from("profiles").insert({
-      id: user.id,
-      role_id: 1, // default role
-      email: user.email,
-      // you can add defaults like full_name: user.user_metadata?.full_name || null
-    });
-
-    if (error) {
-      console.error("Profile creation fallback failed:", error);
-      return (
-        <div className="container mx-auto py-12 px-4 text-center">
-          <h2 className="text-2xl font-bold text-destructive mb-4">
-            Profile setup incomplete
-          </h2>
-          <p className="text-muted-foreground mb-6">
-            We could not create your profile automatically. Please try signing
-            out and back in, or contact support.
-          </p>
-          <Button asChild variant="outline">
-            <a href="/api/auth/signout">Sign Out</a>
-          </Button>
-        </div>
-      );
-    }
-
-    // Re-fetch after insert
-    profile = await getUserProfile(user.id);
-    if (!profile) {
-      redirect(routes.home());
-    }
+  if (!profileResult.success) {
+    redirect(routes.auth());
   }
+
+  const profile = profileResult.data!;
 
   // Derive initials for avatar fallback
   const initials = profile.full_name

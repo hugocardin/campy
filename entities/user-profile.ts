@@ -4,3 +4,9 @@ export interface UserProfile {
   full_name: string;
   email: string;
 }
+
+export interface UserProfileNoRole {
+  id: string;
+  full_name: string;
+  email: string;
+}

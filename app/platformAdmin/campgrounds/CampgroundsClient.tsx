@@ -1,6 +1,6 @@
 "use client";
 
-import { CampgroundAdmin } from "@/app/entities/campground-admin";
+import { CampgroundAdmin } from "@/entities/campground-admin";
 import {
   Table,
   TableBody,

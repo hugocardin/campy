@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/lib/routes";
+import { mapAuthError } from "@/lib/errors/supabase-auth-errors";
 
 type AuthFormProps = {
   redirectTo: string;
@@ -41,7 +42,9 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
       }
 
       if (result.error) {
-        setError(result.error.message);
+        const { code, message } = mapAuthError(result.error);
+        console.error("Unhandled error during auth : ", message);
+        setError(code);
         return;
       }
 

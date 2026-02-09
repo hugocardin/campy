@@ -1,6 +1,6 @@
 "use client";
 
-import { Campground } from "@/app/entities/campground";
+import { Campground } from "@/entities/campground";
 import CampgroundCard from "./CampgroundCard";
 
 type Props = {

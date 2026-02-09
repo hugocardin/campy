@@ -1,6 +1,6 @@
 "use client";
 
-import { CampgroundAdmin } from "@/app/entities/campground-admin";
+import { CampgroundAdmin } from "@/entities/campground-admin";
 import { BackHeader } from "@/components/layout/back-header";
 import { Badge } from "@/components/ui/badge";
 import { CampgroundActions } from "./CampgroundActions";

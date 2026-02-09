@@ -1,38 +1,53 @@
 "use server";
 
+import { ActionResult } from "@/entities/action-result";
+import { AmenityCreateInput } from "@/entities/amenity";
+import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { AmenityCreateInput } from "@/entities/amenity";
-import { routes } from "@/lib/routes";
 
-export async function createAmenityAction(input: AmenityCreateInput) {
-  const supabase = await createClient();
+export async function createAmenityAction(
+  input: AmenityCreateInput,
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("amenities")
-    .insert({
-      code: input.code.toUpperCase().trim(),
-      category_id: input.category_id,
-    })
-    .select("*")
-    .single();
+    const { data, error } = await supabase
+      .from("amenities")
+      .insert({
+        code: input.code.toUpperCase().trim(),
+        category_id: input.category_id,
+      })
+      .select("*")
+      .single();
 
-  if (error) return { error: error.message };
-  if (!data) return { error: "No data returned after insert" };
+    if (error) {
+      return unhandledErrortoActionResultError(error);
+    }
 
-  revalidatePath(routes.platformAdmin.amenities());
+    revalidatePath(routes.platformAdmin.amenities());
 
-  return { success: true, data };
+    return { success: true, data };
+  } catch (err) {
+    return unhandledErrortoActionResultError(err);
+  }
 }
 
-export async function deleteAmenityAction(id: string) {
-  const supabase = await createClient();
+export async function deleteAmenityAction(id: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
 
-  const { error } = await supabase.from("amenities").delete().eq("id", id);
+    const { error } = await supabase.from("amenities").delete().eq("id", id);
 
-  if (error) return { error: error.message };
+    if (error) {
+      return unhandledErrortoActionResultError(error);
+    }
 
-  revalidatePath(routes.platformAdmin.amenities());
+    revalidatePath(routes.platformAdmin.amenities());
 
-  return { success: true };
+    return { success: true };
+  } catch (err) {
+    return unhandledErrortoActionResultError(err);
+  }
 }

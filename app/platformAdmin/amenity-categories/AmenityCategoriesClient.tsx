@@ -4,7 +4,7 @@ import {
   createAmenityCategoryAction,
   deleteAmenityCategoryAction,
 } from "@/actions/amenity-categories";
-import { AmenityCategory } from "@/app/entities/amenity-categories";
+import { AmenityCategory } from "@/entities/amenity-categories";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -21,7 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toast } from "sonner";
 
 type Props = {
   initialCategories: AmenityCategory[];
@@ -46,7 +45,6 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     if (result.error) {
       setError(result.error);
     } else {
-      toast.success("Amenity added successfully!");
       setCode("");
       router.refresh();
     }

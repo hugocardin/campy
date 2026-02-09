@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { redirect } from "next/navigation";
 
 import { updateCampgroundAction } from "@/app/actions/campgrounds-admin";
-import { CampgroundAdmin } from "@/app/entities/campground-admin";
+import { CampgroundAdmin } from "@/entities/campground-admin";
 import { UserProfileNoRole } from "@/app/entities/user-profile";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -111,8 +111,6 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
 
       if (result.error) {
         setError(result.error);
-      } else {
-        redirect(routes.platformAdmin.campgroundDetails(campground.id));
       }
     });
   };

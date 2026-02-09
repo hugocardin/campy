@@ -2,15 +2,12 @@
 
 import { AlertCircle, Save } from "lucide-react";
 import { useState, useTransition } from "react";
-import { redirect } from "next/navigation";
 
 import { createCampgroundAction } from "@/app/actions/campgrounds-admin";
-import { UserProfileNoRole } from "@/app/entities/user-profile";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { routes } from "@/lib/routes";
+import { Textarea } from "@/components/ui/textarea";
+import { UserProfileNoRole } from "@/entities/user-profile";
 import { cn } from "@/lib/utils";
 
 type FormData = {
@@ -107,10 +105,8 @@ export default function CampgroundCreateClient({ owners }: Props) {
     startTransition(async () => {
       const result = await createCampgroundAction(payload);
 
-      if (result.error) {
-        setError(result.error);
-      } else if (result.campgroundId) {
-        redirect(routes.platformAdmin.campgroundDetails(result.campgroundId));
+      if (!result.success) {
+        setError(result.error.code);
       }
     });
   };

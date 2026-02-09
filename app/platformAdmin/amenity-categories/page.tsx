@@ -1,9 +1,10 @@
-import { getAllAmenityCategories } from "@/app/data/amenities-categories/get-amenities-categories";
+import { getAllAmenityCategories } from "@/data/amenities-categories/get-amenities-categories";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense } from "react";
 import AmenityCategoriesClient from "./AmenityCategoriesClient";
 import { BackHeader } from "@/components/layout/back-header";
 import { routes } from "@/lib/routes";
+import { redirect } from "next/navigation";
 
 export const metadata = {
   title: "Admin - Amenity Categories",
@@ -11,7 +12,13 @@ export const metadata = {
 };
 
 export default async function AmenityCategoriesAdminPage() {
-  const initialCategories = await getAllAmenityCategories();
+  const initialCategoriesResult = await getAllAmenityCategories();
+
+  if (!initialCategoriesResult.success) {
+    redirect(routes.platformAdmin.root());
+  }
+
+  const initialCategories = initialCategoriesResult.data!;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">

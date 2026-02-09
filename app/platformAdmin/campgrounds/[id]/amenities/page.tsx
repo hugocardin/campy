@@ -1,40 +1,47 @@
 import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Suspense } from "react";
-import CampgroundEditClient from "./CampgroundEditClient";
 import { routes } from "@/lib/routes";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { getAmenitiesForCampground } from "@/data/campgrounds/get-campground-amenities";
 import { BackHeader } from "@/components/layout/back-header";
-import { getOwners } from "@/data/profile/get-owners";
+import CampgroundAmenitiesClient from "./CampgroundAmenitiesClient";
+import { getAllAmenities } from "@/data/amenities/get-amenities";
 
 export const metadata = {
-  title: "Admin - Campground details",
-  description: "Manage a campground's details",
+  title: "Admin - Campground' amenities",
+  description: "Manage a campground's amenities",
 };
 
-export default async function CampgroundEditPage({
+export default async function CampgroundAmenitiesPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const params = await paramsPromise;
+  const [campgroundResult, currentAmenitiesResult, allAmenitiesResult] =
+    await Promise.all([
+      getCampgroundAdminById(params.id),
+      getAmenitiesForCampground(params.id),
+      getAllAmenities(),
+    ]);
 
-  const [campgroundresult, ownersResult] = await Promise.all([
-    getCampgroundAdminById(params.id),
-    getOwners(),
-  ]);
-
-  if (!campgroundresult.success || !ownersResult.success) {
+  if (
+    !campgroundResult.success ||
+    !currentAmenitiesResult.success ||
+    !allAmenitiesResult.success
+  ) {
     redirect(routes.platformAdmin.campgrounds());
   }
 
-  const campground = campgroundresult.data!;
-  const owners = ownersResult.data!;
+  const campground = campgroundResult.data!;
+  const currentAmenities = currentAmenitiesResult.data!;
+  const allAmenities = allAmenitiesResult.data!;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`Edit ${campground.name} details`}
+        title={campground.name}
         description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
         backTo={routes.platformAdmin.campgroundDetails(campground.id)}
       />
@@ -50,7 +57,11 @@ export default async function CampgroundEditPage({
           </div>
         }
       >
-        <CampgroundEditClient campground={campground} owners={owners} />
+        <CampgroundAmenitiesClient
+          campground={campground}
+          allAmenities={allAmenities}
+          currentAmenities={currentAmenities}
+        />
       </Suspense>
     </div>
   );

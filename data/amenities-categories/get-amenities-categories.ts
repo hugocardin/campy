@@ -1,4 +1,7 @@
+import { ActionResult } from "@/entities/action-result";
 import { AmenityCategory } from "@/entities/amenity-categories";
+import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
+import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -15,18 +18,26 @@ function toDomain(row: AmenityCategoryRow): AmenityCategory {
 }
 
 export const getAllAmenityCategories = cache(
-  async (): Promise<AmenityCategory[]> => {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("amenity_categories")
-      .select("*")
-      .order("code");
+  async (): Promise<ActionResult<AmenityCategory[]>> => {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("amenity_categories")
+        .select("*")
+        .order("code");
 
-    if (error) {
-      console.error("Failed to load amenity categories:", error);
-      throw error;
+      if (error) {
+        return pgerrorToActionResultError(error);
+      }
+
+      const amenityCategories = data.map(toDomain);
+
+      return {
+        success: true,
+        data: amenityCategories,
+      };
+    } catch (err) {
+      return unhandledErrortoActionResultError(err);
     }
-
-    return (data ?? []).map(toDomain);
   },
 );

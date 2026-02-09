@@ -1,4 +1,4 @@
-import { getOwners } from "@/app/data/profile/get-owners";
+import { getOwners } from "@/data/profile/get-owners";
 import { BackHeader } from "@/components/layout/back-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/lib/routes";
@@ -12,11 +12,13 @@ export const metadata = {
 };
 
 export default async function CampgroundCreatePage() {
-  const owners = await getOwners();
+  const ownersresult = await getOwners();
 
-  if (!owners) {
+  if (!ownersresult.success) {
     redirect(routes.platformAdmin.campgrounds());
   }
+
+  const owners = ownersresult.data!;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">

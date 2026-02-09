@@ -1,4 +1,7 @@
+import { ActionResult } from "@/entities/action-result";
 import { UserProfile } from "@/entities/user-profile";
+import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
+import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { createClient } from "@/lib/supabase/server";
 
 type ProfileWithRoleNameRow = {
@@ -18,28 +21,32 @@ function toDomain(row: ProfileWithRoleNameRow, userId: string): UserProfile {
 
 export const getUserProfile = async (
   userId: string,
-): Promise<UserProfile | null> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(
-      `
+): Promise<ActionResult<UserProfile>> => {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(
+        `
         full_name, email,
         role_name:user_roles ( code )
         `,
-    )
-    .eq("id", userId)
-    .maybeSingle();
+      )
+      .eq("id", userId)
+      .single();
 
-  if (error) {
-    console.error("Failed to load user profile:", error.message);
-    throw error;
+    if (error) {
+      return pgerrorToActionResultError(error);
+    }
+
+    // @ts-expect-error — types are loose because of the join; improve later with generated types
+    const userProfile = toDomain(data, userId);
+
+    return {
+      success: true,
+      data: userProfile,
+    };
+  } catch (err) {
+    return unhandledErrortoActionResultError(err);
   }
-
-  if (!data) {
-    return null;
-  }
-
-  // @ts-expect-error — types are loose because of the join; improve later with generated types
-  return toDomain(data, userId);
 };

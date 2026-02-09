@@ -1,14 +1,15 @@
-import { getUserRoleName } from "@/app/data/users/get-user-role";
+import { getUserRoleName } from "@/data/users/get-user-role";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 import { BackHeader } from "@/components/layout/back-header";
-import { routes } from "@/lib/routes";
 import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
+import { routes } from "@/lib/routes";
 import { DashboardCards } from "./DashboardCards";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -17,9 +18,9 @@ export default async function AdminDashboard() {
     redirect(routes.auth());
   }
 
-  const user_role = await getUserRoleName(user.id);
+  const result = await getUserRoleName(user.id);
 
-  if (!user_role || user_role !== USER_ROLE_PLATEFORMADMIN) {
+  if (!result.success || result.data !== USER_ROLE_PLATEFORMADMIN) {
     redirect(routes.home());
   }
 

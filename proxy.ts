@@ -1,8 +1,8 @@
+import { getUserRoleName } from "@/data/users/get-user-role";
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
-import { getUserRoleName } from "@/app/data/users/get-user-role";
-import { routes } from "./lib/routes";
 import { USER_ROLE_PLATEFORMADMIN } from "./lib/constants";
+import { routes } from "./lib/routes";
 
 export async function proxy(request: NextRequest) {
   const supabaseResponse = NextResponse.next({
@@ -55,9 +55,9 @@ export async function proxy(request: NextRequest) {
 
   // 3. Admin-only routes: check role_id === 4 from profiles
   if (pathname.startsWith(routes.platformAdmin.root())) {
-    const userRole = await getUserRoleName(user.id);
+    const result = await getUserRoleName(user.id);
 
-    if (userRole !== USER_ROLE_PLATEFORMADMIN) {
+    if (!result.success || result.data !== USER_ROLE_PLATEFORMADMIN) {
       // Redirect to home (or to a /unauthorized page if you create one)
       return NextResponse.redirect(new URL(routes.home(), request.url));
     }

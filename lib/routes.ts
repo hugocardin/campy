@@ -13,5 +13,7 @@ export const routes = {
     campgroundDetails: (id: string) => `/platformAdmin/campgrounds/${id}`,
     campgroundDetailsEdit: (id: string) =>
       `/platformAdmin/campgrounds/${id}/edit`,
+    campgroundAmenities: (id: string) =>
+      `/platformAdmin/campgrounds/${id}/amenities`,
   },
 } as const;

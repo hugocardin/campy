@@ -1,4 +1,5 @@
-import { USER_ROLE_ADMIN, USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
+import { ActionResult } from "@/entities/action-result";
+import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -6,40 +7,26 @@ import { createClient } from "@/lib/supabase/server";
  * Returns null if no profile, error, or no role found.
  */
 export async function getUserRoleName(
-  userId: string | null | undefined,
-): Promise<string | null> {
-  if (!userId) return null;
+  userId: string,
+): Promise<ActionResult<string>> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(`role_name:user_roles ( code )`)
+      .eq("id", userId)
+      .single();
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(`role_name:user_roles ( code )`)
-    .eq("id", userId)
-    .maybeSingle();
+    if (error) {
+      return unhandledErrortoActionResultError(error);
+    }
 
-  if (error) {
-    console.error("Failed to fetch user role:", error.message);
-    return null;
+    return {
+      success: true,
+      // @ts-expect-error — types are loose because of the join; improve later with generated types
+      data: (data.role_name as { code: string } | null).code,
+    };
+  } catch (err) {
+    return unhandledErrortoActionResultError(err);
   }
-
-  if (!data) {
-    return null;
-  }
-
-  // @ts-expect-error — types are loose because of the join; improve later with generated types
-  return (data.role_name as { code: string } | null).code;
-}
-
-/**
- * Convenience helper: checks if user has admin-level role.
- * This is what middleware will usually call.
- */
-export async function isAdmin(
-  userId: string | null | undefined,
-): Promise<boolean> {
-  const role = await getUserRoleName(userId);
-  if (!role) return false;
-
-  const allowedRoles = [USER_ROLE_ADMIN, USER_ROLE_PLATEFORMADMIN];
-  return allowedRoles.includes(role);
 }

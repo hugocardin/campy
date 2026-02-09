@@ -1,12 +1,13 @@
-import { getCampgroundsAdmin } from "@/app/data/campgrounds/get-campgrounds-admin";
+import { BackHeader } from "@/components/layout/back-header";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCampgroundsAdmin } from "@/data/campgrounds/get-campgrounds-admin";
+import { routes } from "@/lib/routes";
+import { Plus } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import CampgroundsClient from "./CampgroundsClient";
-import { BackHeader } from "@/components/layout/back-header";
-import { routes } from "@/lib/routes";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 
 export const metadata = {
   title: "Admin - Amenity Categories",
@@ -14,7 +15,13 @@ export const metadata = {
 };
 
 export default async function CampgroundsAdminPage() {
-  const campgrounds = await getCampgroundsAdmin();
+  const campgroundsresult = await getCampgroundsAdmin();
+
+  if (!campgroundsresult.success) {
+    redirect(routes.platformAdmin.root());
+  }
+
+  const campgrounds = campgroundsresult.data!;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">

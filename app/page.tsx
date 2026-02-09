@@ -3,14 +3,31 @@ export const metadata = {
   description: "Discover tent sites, RV parks, cabins, glamping and more.",
 };
 
+import { AlertCircle } from "lucide-react";
 import { Suspense } from "react";
+import { getCampgrounds } from "../data/campgrounds/get-campgrounds";
 import CampgroundCardSkeleton from "./components/search/list/CampgroundCardSkeleton";
 import CampgroundList from "./components/search/list/CampgroundList";
 import CampgroundListControls from "./components/search/list/CampgroundListControls";
-import { getCampgrounds } from "./data/campgrounds/get-campgrounds";
 
 export default async function Home() {
-  const campgrounds = await getCampgrounds();
+  const campgroundsResult = await getCampgrounds();
+
+  if (!campgroundsResult.success) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center">
+        <AlertCircle className="h-16 w-16 text-destructive mb-6" />
+        <h1 className="text-3xl font-bold tracking-tight mb-4">
+          Something went wrong
+        </h1>
+        <p className="text-lg text-muted-foreground max-w-md mb-8">
+          {campgroundsResult.error.message}
+        </p>
+      </div>
+    );
+  }
+
+  const campgrounds = campgroundsResult.data;
 
   return (
     <div className="flex flex-col h-full">
@@ -53,7 +70,7 @@ export default async function Home() {
                   }
                 >
                   <div className="p-6">
-                    <CampgroundList campgrounds={campgrounds} />
+                    <CampgroundList campgrounds={campgrounds!} />
                   </div>
                 </Suspense>
               </div>

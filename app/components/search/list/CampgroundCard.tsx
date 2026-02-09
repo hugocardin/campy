@@ -2,7 +2,7 @@ import { MapPin, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
-import { Campground } from "@/app/entities/campground";
+import { Campground } from "@/entities/campground";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { routes } from "@/lib/routes";
