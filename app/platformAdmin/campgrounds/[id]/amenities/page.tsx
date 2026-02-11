@@ -41,7 +41,7 @@ export default async function CampgroundAmenitiesPage({
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={campground.name}
+        title={`${campground.name} - Manage campground's amenities`}
         description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
         backTo={routes.platformAdmin.campgroundDetails(campground.id)}
       />

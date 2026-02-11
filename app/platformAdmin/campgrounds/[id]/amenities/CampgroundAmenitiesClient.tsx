@@ -82,7 +82,7 @@ export default function CampgroundAmenitiesClient({
     <div className="space-y-10">
       <Card>
         <CardHeader>
-          <CardTitle>Manage Amenities — {campground.name}</CardTitle>
+          <CardTitle>Manage Amenities</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-8">

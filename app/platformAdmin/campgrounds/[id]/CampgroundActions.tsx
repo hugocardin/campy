@@ -36,8 +36,8 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
 
     startTransition(async () => {
       const result = await action(campground.id);
-      if (result.error) {
-        setError(result.error);
+      if (!result.success) {
+        setError(result.error.message);
       } else {
         router.refresh();
       }
@@ -48,15 +48,9 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-3">
         <Button
-          variant="outline"
+          variant={campground.active ? "outline-danger" : "outline-success"}
           onClick={handleToggleStatus}
           disabled={isPending}
-          className={cn(
-            "min-w-37.5 transition-colors",
-            campground.active
-              ? "border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-red-600/60 dark:hover:bg-red-950/40"
-              : "border-primary text-primary hover:bg-primary-soft hover:text-primary dark:border-primary/70 dark:hover:bg-primary-muted dark:text-primary dark:hover:text-primary-foreground",
-          )}
         >
           {campground.active ? (
             <>

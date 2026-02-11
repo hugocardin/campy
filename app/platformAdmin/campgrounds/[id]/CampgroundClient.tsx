@@ -35,7 +35,11 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
     <div className="space-y-10">
       {/* Details */}
       <Card>
-        <CardContent className="pt-6">
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+        </CardHeader>
+
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
             {/* Left column */}
             <div className="space-y-6">
