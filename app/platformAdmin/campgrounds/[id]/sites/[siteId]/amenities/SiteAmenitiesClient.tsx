@@ -1,6 +1,6 @@
 "use client";
 
-import { updateCampgroundAmenitiesAction } from "@/app/actions/campgrounds-admin";
+import { updateSiteAmenitiesAction } from "@/app/actions/site-admin.ts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,12 +11,14 @@ import { useState, useTransition } from "react";
 
 type Props = {
   campgroundId: string;
+  siteId: string;
   allAmenities: Amenity[];
   currentAmenities: Amenity[];
 };
 
-export default function CampgroundAmenitiesClient({
+export default function SiteAmenitiesClient({
   campgroundId,
+  siteId,
   allAmenities,
   currentAmenities,
 }: Props) {
@@ -63,8 +65,9 @@ export default function CampgroundAmenitiesClient({
     setError(null);
 
     startTransition(async () => {
-      const result = await updateCampgroundAmenitiesAction({
+      const result = await updateSiteAmenitiesAction({
         campgroundId: campgroundId,
+        siteId: siteId,
         amenityIds: Array.from(selectedIds),
       });
 

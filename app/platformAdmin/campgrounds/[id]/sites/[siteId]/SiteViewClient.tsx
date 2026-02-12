@@ -1,16 +1,18 @@
 "use client";
 
-import { CampgroundAdmin } from "@/entities/campground-admin";
-import { Amenity } from "@/entities/amenity";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Amenity } from "@/entities/amenity";
+import { CampgroundAdmin } from "@/entities/campground-admin";
+import { Site } from "@/entities/sites";
 
 type Props = {
   campground: CampgroundAdmin;
+  site: Site;
   amenities: Amenity[];
 };
 
-export default function CampgroundDetail({ campground, amenities }: Props) {
+export default function SiteViewClient({ site, amenities }: Props) {
   const groupedAndSorted = amenities.reduce(
     (acc, amenity) => {
       const category = amenity.category_code?.trim();
@@ -45,91 +47,54 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Description
+                  Name
                 </h3>
                 <p className="whitespace-pre-wrap leading-relaxed">
-                  {campground.description || "No description provided"}
+                  {site.name}
                 </p>
               </div>
 
-              {campground.website && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Website
-                  </h3>
-                  <a
-                    href={campground.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline break-all"
-                  >
-                    {campground.website}
-                  </a>
-                </div>
-              )}
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  Description
+                </h3>
+                <p className="whitespace-pre-wrap leading-relaxed">
+                  {site.description}
+                </p>
+              </div>
 
-              {campground.phone && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Phone
-                  </h3>
-                  <p>{campground.phone}</p>
-                </div>
-              )}
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  Site type
+                </h3>
+                <p className="whitespace-pre-wrap leading-relaxed">
+                  {site.site_type_code}
+                </p>
+              </div>
             </div>
 
             {/* Right column */}
             <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Address
-                </h3>
-                <p>{campground.address || "—"}</p>
-              </div>
-
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    City
+                    Price per night
                   </h3>
-                  <p>{campground.city || "—"}</p>
+                  <p>{site.price_per_night}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Province / State
+                    Minimal stay nights
                   </h3>
-                  <p>{campground.province || "—"}</p>
+                  <p>{site.min_stay_nights}</p>
                 </div>
               </div>
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Country
+                  Max rig length
                 </h3>
-                <p>{campground.country || "—"}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Latitude
-                  </h3>
-                  <p>
-                    {campground.location?.lat != null
-                      ? campground.location.lat.toFixed(6)
-                      : "—"}
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Longitude
-                  </h3>
-                  <p>
-                    {campground.location?.lng != null
-                      ? campground.location.lng.toFixed(6)
-                      : "—"}
-                  </p>
-                </div>
+                <p>{site.max_rig_length}</p>
               </div>
             </div>
           </div>
@@ -144,7 +109,7 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
         <CardContent className="space-y-8 pt-2">
           {amenities.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">
-              No amenities have been added for this campground.
+              No amenities have been added for this site.
             </p>
           ) : (
             <div className="space-y-6">

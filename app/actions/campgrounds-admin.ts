@@ -26,8 +26,8 @@ export async function inactivateCampgroundAction(
     }
 
     revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundDetails(id));
-    revalidatePath(routes.platformAdmin.campgroundDetailsEdit(id));
+    revalidatePath(routes.platformAdmin.campgroundView(id));
+    revalidatePath(routes.platformAdmin.campgroundEdit(id));
 
     return { success: true };
   } catch (err) {
@@ -53,8 +53,8 @@ export async function activateCampgroundAction(
     }
 
     revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundDetails(id));
-    revalidatePath(routes.platformAdmin.campgroundDetailsEdit(id));
+    revalidatePath(routes.platformAdmin.campgroundView(id));
+    revalidatePath(routes.platformAdmin.campgroundEdit(id));
 
     return { success: true };
   } catch (err) {
@@ -113,13 +113,13 @@ export async function updateCampgroundAction(
 
     // Revalidate both list and detail page
     revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundDetails(input.id));
-    revalidatePath(routes.platformAdmin.campgroundDetailsEdit(input.id));
+    revalidatePath(routes.platformAdmin.campgroundView(input.id));
+    revalidatePath(routes.platformAdmin.campgroundEdit(input.id));
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundDetails(input.id));
+  redirect(routes.platformAdmin.campgroundView(input.id));
 
   return { success: true };
 }
@@ -175,13 +175,13 @@ export async function createCampgroundAction(
     newId = data.id;
 
     revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundDetails(data.id));
-    revalidatePath(routes.platformAdmin.campgroundDetailsEdit(data.id));
+    revalidatePath(routes.platformAdmin.campgroundView(data.id));
+    revalidatePath(routes.platformAdmin.campgroundEdit(data.id));
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundDetails(newId));
+  redirect(routes.platformAdmin.campgroundView(newId));
 
   return {
     success: true,
@@ -226,13 +226,13 @@ export async function updateCampgroundAmenitiesAction({
     }
 
     revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundDetails(campgroundId));
-    revalidatePath(routes.platformAdmin.campgroundDetailsEdit(campgroundId));
+    revalidatePath(routes.platformAdmin.campgroundView(campgroundId));
+    revalidatePath(routes.platformAdmin.campgroundEdit(campgroundId));
     revalidatePath(routes.platformAdmin.campgroundAmenities(campgroundId));
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundDetails(campgroundId));
+  redirect(routes.platformAdmin.campgroundView(campgroundId));
   return { success: true };
 }

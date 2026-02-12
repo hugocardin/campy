@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Power, PowerOff } from "lucide-react";
+import { Pencil, Tent, Power, PowerOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -73,9 +73,14 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
         </Button>
 
         <Button asChild variant="outline">
-          <Link
-            href={routes.platformAdmin.campgroundDetailsEdit(campground.id)}
-          >
+          <Link href={routes.platformAdmin.campgroundSites(campground.id)}>
+            <Tent className="mr-2 h-4 w-4" />
+            Manage sites
+          </Link>
+        </Button>
+
+        <Button asChild variant="outline">
+          <Link href={routes.platformAdmin.campgroundEdit(campground.id)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </Link>

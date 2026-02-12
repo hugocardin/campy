@@ -37,10 +37,9 @@ export default function CampgroundsClient({ campgrounds }: Props) {
               <TableRow
                 key={campground.id}
                 onClick={() => {
-                  const url = routes.platformAdmin.campgroundDetails(
+                  const url = routes.platformAdmin.campgroundView(
                     campground.id,
                   );
-                  console.log("Navigating to:", url);
                   router.push(url);
                 }}
               >

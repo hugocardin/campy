@@ -1,15 +1,15 @@
-import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
+import { BackHeader } from "@/components/layout/back-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Suspense } from "react";
-import CampgroundEditClient from "./CampgroundEditClient";
+import { getSitesOfCampground } from "@/data/campgrounds/get-campground-sites";
+import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { routes } from "@/lib/routes";
 import { redirect } from "next/navigation";
-import { BackHeader } from "@/components/layout/back-header";
-import { getOwners } from "@/data/profile/get-owners";
+import { Suspense } from "react";
+import SitesClient from "./SitesClient";
 
 export const metadata = {
-  title: "Admin - Campground details",
-  description: "Manage a campground's details",
+  title: "Admin - Campground's sites",
+  description: "Manage a campground's sites",
 };
 
 export default async function CampgroundEditPage({
@@ -19,22 +19,22 @@ export default async function CampgroundEditPage({
 }) {
   const params = await paramsPromise;
 
-  const [campgroundresult, ownersResult] = await Promise.all([
+  const [campgroundresult, sitesResult] = await Promise.all([
     getCampgroundAdminById(params.id),
-    getOwners(),
+    getSitesOfCampground(params.id),
   ]);
 
-  if (!campgroundresult.success || !ownersResult.success) {
-    redirect(routes.platformAdmin.campgrounds());
+  if (!campgroundresult.success || !sitesResult.success) {
+    redirect(routes.platformAdmin.campgroundView(params.id));
   }
 
   const campground = campgroundresult.data!;
-  const owners = ownersResult.data!;
+  const sites = sitesResult.data!;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`Edit ${campground.name} details`}
+        title={`Manage ${campground.name} sites`}
         description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
         backTo={routes.platformAdmin.campgroundView(campground.id)}
       />
@@ -50,7 +50,7 @@ export default async function CampgroundEditPage({
           </div>
         }
       >
-        <CampgroundEditClient campground={campground} owners={owners} />
+        <SitesClient campground={campground} sites={sites} />
       </Suspense>
     </div>
   );

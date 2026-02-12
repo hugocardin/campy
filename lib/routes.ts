@@ -10,10 +10,16 @@ export const routes = {
     amenityCategory: () => "/platformAdmin/amenity-categories",
     campgrounds: () => "/platformAdmin/campgrounds",
     campgroundCreate: () => "/platformAdmin/campgrounds/create",
-    campgroundDetails: (id: string) => `/platformAdmin/campgrounds/${id}`,
-    campgroundDetailsEdit: (id: string) =>
-      `/platformAdmin/campgrounds/${id}/edit`,
+    campgroundView: (id: string) => `/platformAdmin/campgrounds/${id}`,
+    campgroundEdit: (id: string) => `/platformAdmin/campgrounds/${id}/edit`,
     campgroundAmenities: (id: string) =>
       `/platformAdmin/campgrounds/${id}/amenities`,
+    campgroundSites: (id: string) => `/platformAdmin/campgrounds/${id}/sites`,
+    campgroundSiteView: (id: string, siteId: string) =>
+      `/platformAdmin/campgrounds/${id}/sites/${siteId}`,
+    campgroundSiteEdit: (id: string, siteId: string) =>
+      `/platformAdmin/campgrounds/${id}/sites/${siteId}/edit`,
+    campgroundSiteAmenities: (id: string, siteId: string) =>
+      `/platformAdmin/campgrounds/${id}/sites/${siteId}/amenities`,
   },
 } as const;

@@ -2,16 +2,12 @@
 
 import { AlertCircle, Save } from "lucide-react";
 import { useState, useTransition } from "react";
-import { redirect } from "next/navigation";
 
 import { updateCampgroundAction } from "@/app/actions/campgrounds-admin";
-import { CampgroundAdmin } from "@/entities/campground-admin";
-import { UserProfileNoRole } from "@/app/entities/user-profile";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -19,8 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { routes } from "@/lib/routes";
+import { Textarea } from "@/components/ui/textarea";
+import { CampgroundAdmin } from "@/entities/campground-admin";
 import { cn } from "@/lib/utils";
+import { UserProfileNoRole } from "@/entities/user-profile";
 
 type Props = {
   campground: CampgroundAdmin;
@@ -109,8 +107,8 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
     startTransition(async () => {
       const result = await updateCampgroundAction(payload);
 
-      if (result.error) {
-        setError(result.error);
+      if (!result.success) {
+        setError(result.error.message);
       }
     });
   };
