@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Tent, Power, PowerOff } from "lucide-react";
+import { ListChecks, Pencil, Power, PowerOff, Tent } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -8,10 +8,9 @@ import {
   activateCampgroundAction,
   inactivateCampgroundAction,
 } from "@/app/actions/campgrounds-admin";
-import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Button } from "@/components/ui/button";
+import { CampgroundAdmin } from "@/entities/campground-admin";
 import { routes } from "@/lib/routes";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 type CampgroundActionsProps = {
@@ -67,7 +66,7 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
 
         <Button asChild variant="outline">
           <Link href={routes.platformAdmin.campgroundAmenities(campground.id)}>
-            <Pencil className="mr-2 h-4 w-4" />
+            <ListChecks className="mr-2 h-4 w-4" />
             Manage amenities
           </Link>
         </Button>

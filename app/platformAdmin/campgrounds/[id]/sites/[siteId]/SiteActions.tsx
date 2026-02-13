@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { ListChecks, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { routes } from "@/lib/routes";
@@ -22,7 +22,7 @@ export function SiteActions({ campgroundId, siteId }: SiteActionsProps) {
               siteId,
             )}
           >
-            <Pencil className="mr-2 h-4 w-4" />
+            <ListChecks className="mr-2 h-4 w-4" />
             Manage amenities
           </Link>
         </Button>

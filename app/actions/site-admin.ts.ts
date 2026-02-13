@@ -55,6 +55,57 @@ export async function updateSiteAction(
   return { success: true };
 }
 
+type CreateSiteInput = {
+  name: string;
+  description: string;
+  site_type_id: number;
+  max_rig_length: number | null;
+  price_per_night: number;
+  min_stay_nights: number;
+};
+
+export async function createSiteAction(
+  campgroundId: string,
+  input: CreateSiteInput,
+): Promise<ActionResult> {
+  let newId: string;
+
+  try {
+    const supabase = await createClient();
+
+    console.log(`max_rig_length is ${input.max_rig_length}`);
+
+    const { data, error } = await supabase
+      .from("sites")
+      .insert({
+        campground_id: campgroundId,
+        name: input.name,
+        site_type_id: input.site_type_id,
+        max_rig_length: input.max_rig_length ?? null,
+        price_per_night_base: input.price_per_night,
+        min_stay_nights: input.min_stay_nights,
+        description: input.description,
+      })
+
+      .select("id")
+      .single();
+
+    if (error) {
+      return pgerrorToActionResultError(error);
+    }
+
+    newId = data.id;
+
+    revalidatePath(routes.platformAdmin.campgroundSites(campgroundId));
+  } catch (err) {
+    return unhandledErrortoActionResultError(err);
+  }
+
+  redirect(routes.platformAdmin.campgroundSiteView(campgroundId, newId));
+
+  return { success: true };
+}
+
 export async function updateSiteAmenitiesAction({
   campgroundId,
   siteId,

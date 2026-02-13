@@ -175,8 +175,6 @@ export async function createCampgroundAction(
     newId = data.id;
 
     revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundView(data.id));
-    revalidatePath(routes.platformAdmin.campgroundEdit(data.id));
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }
