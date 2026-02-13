@@ -1,12 +1,15 @@
 "use server";
 
 import { ActionResult } from "@/entities/action-result";
-import { AmenityCategoryCreateInput } from "@/entities/amenity-categories";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+
+export interface AmenityCategoryCreateInput {
+  code: string;
+}
 
 export async function createAmenityCategoryAction(
   input: AmenityCategoryCreateInput,

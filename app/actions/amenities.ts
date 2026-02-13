@@ -1,11 +1,15 @@
 "use server";
 
 import { ActionResult } from "@/entities/action-result";
-import { AmenityCreateInput } from "@/entities/amenity";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+
+export interface AmenityCreateInput {
+  code: string;
+  category_id: number;
+}
 
 export async function createAmenityAction(
   input: AmenityCreateInput,

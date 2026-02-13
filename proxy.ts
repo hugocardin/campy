@@ -1,10 +1,31 @@
+import createMiddleware from "next-intl/middleware";
+import { NextRequest, NextResponse } from "next/server";
+import { routing } from "./i18n/routing";
+
 import { getUserRoleName } from "@/data/users/get-user-role";
 import { createServerClient } from "@supabase/ssr";
-import { type NextRequest, NextResponse } from "next/server";
 import { USER_ROLE_PLATEFORMADMIN } from "./lib/constants";
 import { routes } from "./lib/routes";
 
-export async function proxy(request: NextRequest) {
+// 1. Create the next-intl middleware handler
+const handleI18nRouting = createMiddleware(routing);
+
+// 2. Your main middleware (combines both)
+export default async function middleware(request: NextRequest) {
+  // Step A: Run next-intl first → handles locale prefix, detection, rewrite/redirect
+  // It may return a redirect (e.g. / → /en-CA) or rewrite internally
+  const i18nResponse = handleI18nRouting(request);
+
+  // If next-intl already decided to redirect (e.g. missing locale → add /en-CA)
+  // → short-circuit and return it immediately (don't run auth)
+  if (
+    i18nResponse.headers.get("x-middleware-rewrite") ||
+    i18nResponse.status !== 200
+  ) {
+    return i18nResponse;
+  }
+
+  // Step B: Create Supabase client (using the possibly rewritten request)
   const supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -28,56 +49,41 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // Always refresh session if needed (core magic)
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
 
-  // 1. Public routes → always allow (add more if needed: /about, /search, /login, /signup ...)
+  // Your existing public routes check
   if (
     pathname === routes.home() ||
     pathname.startsWith(routes.auth()) ||
     pathname.startsWith("/_next") ||
     pathname.includes(".")
   ) {
-    return supabaseResponse;
+    return supabaseResponse; // or merge with i18nResponse if needed
   }
 
-  // 2. Require login for protected routes
+  // Require login
   if (!user) {
-    // Redirect to login + preserve original path (so after login you can redirect back)
     const loginUrl = new URL(routes.auth(), request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // 3. Admin-only routes: check role_id === 4 from profiles
+  // Admin-only routes
   if (pathname.startsWith(routes.platformAdmin.root())) {
     const result = await getUserRoleName(user.id);
 
     if (!result.success || result.data !== USER_ROLE_PLATEFORMADMIN) {
-      // Redirect to home (or to a /unauthorized page if you create one)
       return NextResponse.redirect(new URL(routes.home(), request.url));
     }
   }
-
-  // 4. /profile (and subpaths) → just needs login (already checked above)
-  // Add more role-based branches here later if needed (e.g. moderator routes)
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

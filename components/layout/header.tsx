@@ -18,16 +18,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import ThemeToggle from "../ThemeToggle";
-import { routes } from "@/lib/routes";
-import { useUserRole } from "@/lib/hooks/use-user-role";
 import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
+import { useUserRole } from "@/lib/hooks/use-user-role";
+import { routes } from "@/lib/routes";
+import { useTranslations } from "next-intl";
+import LocaleSwitcher from "../LocaleSwitcher";
+import ThemeToggle from "../ThemeToggle";
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const router = useRouter();
+  const t = useTranslations();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -99,13 +102,15 @@ export default function Header() {
             />
           </div>
           <span className="text-xl font-bold text-primary hidden md:block">
-            Campy
+            Campy {t("test")}
           </span>
         </Link>
 
         {/* Right side: Theme + Auth */}
         <div className="flex items-center gap-4 md:gap-6">
           <ThemeToggle />
+
+          <LocaleSwitcher />
 
           {user ? (
             <DropdownMenu>
