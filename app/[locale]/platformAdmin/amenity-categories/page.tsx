@@ -1,17 +1,20 @@
-import { getAllAmenityCategories } from "@/data/amenities-categories/get-amenities-categories";
+import { BackHeader } from "@/components/layout/back-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getAllAmenityCategories } from "@/data/amenities-categories/get-amenities-categories";
+import { routes } from "@/lib/routes";
+import { generatePageMetadata } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import AmenityCategoriesClient from "./AmenityCategoriesClient";
-import { BackHeader } from "@/components/layout/back-header";
-import { routes } from "@/lib/routes";
-import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Admin - Amenity Categories",
-  description: "Manage amenity categories for campgrounds",
-};
+const NAMESPACE = "AdminAmenityCategoryPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function AmenityCategoriesAdminPage() {
+  const t = await getTranslations(NAMESPACE);
+
   const initialCategoriesResult = await getAllAmenityCategories();
 
   if (!initialCategoriesResult.success) {
@@ -23,8 +26,8 @@ export default async function AmenityCategoriesAdminPage() {
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title="Manage Amenity Categories"
-        description="Create and manage categories that group your amenities"
+        title={t("title")}
+        description={t("description")}
         backTo={routes.platformAdmin.root()}
       />
 

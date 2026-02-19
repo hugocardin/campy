@@ -21,12 +21,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useTranslations } from "next-intl";
 
 type Props = {
   initialCategories: AmenityCategory[];
 };
 
 export default function AmenityCategoriesClient({ initialCategories }: Props) {
+  const tc = useTranslations("common");
+  const t = useTranslations("AdminAmenityCategoryPage");
+
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,9 +58,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
 
   const handleDelete = async (category: AmenityCategory) => {
     if (
-      !confirm(
-        `Delete "${category.code}"? This may affect associated amenities.`,
-      )
+      !confirm(t("confirmAmenityCategoryDeletion", { category: category.code }))
     )
       return;
 
@@ -79,19 +81,19 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
       {/* Create form */}
       <form onSubmit={handleCreate} className="space-y-4 max-w-xl">
         <div className="space-y-2">
-          <Label htmlFor="category-name">Category Name</Label>
+          <Label htmlFor="category-name">{t("categoryName")}</Label>
           <div className="flex flex-col sm:flex-row gap-3">
             <Input
               id="category-name"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="e.g. Services, Facilities, Activities"
+              placeholder={t("placeholder")}
               disabled={submitting}
               required
               className="flex-1"
             />
             <Button type="submit" disabled={submitting || !code.trim()}>
-              {submitting ? "Adding..." : "Add Category"}
+              {submitting ? tc("processing") : tc("add")}
             </Button>
           </div>
         </div>
@@ -101,10 +103,10 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
       {initialCategories.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center">
           <p className="text-muted-foreground text-lg font-medium">
-            No categories yet
+            {t("noCategory")}
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Add your first amenity category using the form above.
+            {t("useFormToCreateOne")}
           </p>
         </div>
       ) : (
@@ -112,8 +114,8 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Category Name</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t("categoryName")}</TableHead>
+                <TableHead className="text-right">{t("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -128,7 +130,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
                       className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
+                      {tc("delete")}
                     </Button>
                   </TableCell>
                 </TableRow>

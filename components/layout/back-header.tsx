@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { ReactNode } from "react";
 
 type BackHeaderProps = {
@@ -11,11 +11,7 @@ type BackHeaderProps = {
   description?: string;
   backTo?: string;
   className?: string;
-
-  /** Content to put on the left side (usually badges, status, owner info) */
   leftContent?: ReactNode;
-
-  /** Content to put on the right side (usually actions/buttons) */
   rightContent?: ReactNode;
 };
 

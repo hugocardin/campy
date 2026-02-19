@@ -2,20 +2,32 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { routes } from "@/lib/routes";
 import { mapAuthError } from "@/lib/errors/supabase-auth-errors";
+import { routes } from "@/lib/routes";
+import Image from "next/image";
 
 type AuthFormProps = {
   redirectTo: string;
 };
 
 export default function AuthForm({ redirectTo }: AuthFormProps) {
+  const t = useTranslations("AuthPage");
+  const tc = useTranslations("common");
+
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,7 +55,7 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
 
       if (result.error) {
         const { code, message } = mapAuthError(result.error);
-        console.error("Unhandled error during auth : ", message);
+        console.error("Auth error:", message);
         setError(code);
         return;
       }
@@ -52,9 +64,7 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
       setPassword("");
 
       if (mode === "signup") {
-        setMessage(
-          "Account created! Check your email to confirm and activate. (or navigate in dev)",
-        );
+        setMessage(t("signupSuccess"));
       } else {
         router.replace(redirectTo || routes.profile());
       }
@@ -67,76 +77,100 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
     setMessage(null);
   };
 
-  const title = mode === "signin" ? "Sign In" : "Create Account";
-  const submitText = mode === "signin" ? "Sign In" : "Sign Up";
-  const switchText =
-    mode === "signin"
-      ? "Don't have an account? Sign up"
-      : "Already have an account? Sign in";
+  const title = mode === "signin" ? t("signInTitle") : t("signUpTitle");
+  const submitText = mode === "signin" ? tc("signIn") : tc("signUp");
+  const switchText = mode === "signin" ? t("noAccount") : t("haveAccount");
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="text-center text-lg font-medium">{title}</div>
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-4 text-center">
+          <div className="flex justify-center">
+            <Image
+              src="/logo.png"
+              alt={tc("logoAlt")}
+              width={140}
+              height={48}
+              priority
+              className="h-12 w-auto"
+            />
+          </div>
+          <CardTitle className="text-3xl font-bold tracking-tight">
+            {t("welcome")}
+          </CardTitle>
+          <CardDescription>{t("subtitle")}</CardDescription>
+        </CardHeader>
 
-      {/* Email */}
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          required
-          autoComplete="email"
-        />
-      </div>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="text-center text-lg font-medium">{title}</div>
 
-      {/* Password */}
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            minLength={8}
-            autoComplete={
-              mode === "signin" ? "current-password" : "new-password"
-            }
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
-        </div>
-      </div>
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email">{t("emailLabel")}</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t("emailPlaceholder")}
+                required
+                autoComplete="email"
+              />
+            </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {message && (
-        <p className="text-sm text-green-600 dark:text-green-400">{message}</p>
-      )}
+            {/* Password */}
+            <div className="space-y-2">
+              <Label htmlFor="password">{t("passwordLabel")}</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t("passwordPlaceholder")}
+                  required
+                  minLength={8}
+                  autoComplete={
+                    mode === "signin" ? "current-password" : "new-password"
+                  }
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
 
-      <Button type="submit" disabled={isPending} className="w-full">
-        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isPending ? "Processing..." : submitText}
-      </Button>
+            {error && (
+              <p className="text-sm text-destructive">{t(`errors.${error}`)}</p>
+            )}
+            {message && (
+              <p className="text-sm text-green-600 dark:text-green-400">
+                {message}
+              </p>
+            )}
 
-      <div className="text-center text-sm">
-        <button
-          type="button"
-          onClick={toggleMode}
-          className="text-primary hover:underline font-medium"
-        >
-          {switchText}
-        </button>
-      </div>
-    </form>
+            <Button type="submit" disabled={isPending} className="w-full">
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isPending ? tc("processing") : submitText}
+            </Button>
+
+            <div className="text-center text-sm">
+              <button
+                type="button"
+                onClick={toggleMode}
+                className="text-primary hover:underline font-medium"
+              >
+                {switchText}
+              </button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

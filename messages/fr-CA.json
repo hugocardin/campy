@@ -1,1 +1,87 @@
-{ "test": "Baguette de pain" }
+{
+  "common": {
+    "add": "Ajouter",
+    "brand": "Campy",
+    "delete": "Supprimer",
+    "logoAlt": "Logo Campy",
+    "signIn": "Connexion",
+    "signOut": "Déconnexion",
+    "signUp": "Inscription",
+    "processing": "Traitement en cours..."
+  },
+
+  "header": {
+    "profile": "Profil",
+    "plateformAdminDashboard": "Tableau de bord administrateur de la plateforme"
+  },
+
+  "HomePage": {
+    "meta": {
+      "title": "Campy – Réservez des terrains de camping",
+      "description": "Trouvez et réservez vos voyages au Canada. Commencez votre aventure dès aujourd'hui."
+    }
+  },
+
+  "AuthPage": {
+    "meta": {
+      "title": "Connexion / Inscription | Campy",
+      "description": "Connectez-vous ou créez un compte Campy pour réserver votre prochain voyage en camping."
+    },
+    "welcome": "Bienvenue sur Campy",
+    "signInTitle": "Connexion",
+    "signUpTitle": "Créer un compte",
+    "subtitle": "Connectez-vous pour gérer vos réservations ou créez un compte",
+    "noAccount": "Pas encore de compte ? Inscrivez-vous",
+    "haveAccount": "Déjà un compte ? Connectez-vous",
+    "signupSuccess": "Compte créé ! Vérifiez votre courriel pour confirmer.",
+    "emailLabel": "Courriel",
+    "emailPlaceholder": "vous@exemple.com",
+    "passwordLabel": "Mot de passe",
+    "passwordPlaceholder": "••••••••"
+  },
+
+  "ProfilePage": {
+    "meta": {
+      "title": "Profil | Campy",
+      "description": "Gérez vos réservations, préférences et paramètres de compte sur Campy."
+    }
+  },
+
+  "AdminDashboard": {
+    "meta": {
+      "title": "Admin | Campy",
+      "description": "Gérez les utilisateurs, terrains de camping, réservations et paramètres de la plateforme."
+    }
+  },
+  "AdminAmenitiesPage": {
+    "title": "Gestion des commodités",
+    "description": "Ajout, modification ou retrait des commidités",
+    "meta": {
+      "title": "Commodités | Admin | Campy",
+      "description": "Gérez les commodités disponibles."
+    },
+    "actions": "Actions",
+    "amenityName": "Nom",
+    "amenityPlaceholder": "ex. Wi-Fi, Animaux acceptés, Feu de camp",
+    "categoryName": "Catégorie",
+    "categoryPlaceholder": "Choisissez une catégorie",
+    "confirmAmenityDeletion": "Supprimer la commodité '{code}' ? Cette action est irréversible.",
+    "noAmenity": "Aucune commodité",
+    "noCategory": "Aucune catégorie",
+    "useFormToCreateOne": "Utilisez le formulaire ci-haut pour en créer une."
+  },
+  "AdminAmenityCategoryPage": {
+    "title": "Gestion des catégories de commodités",
+    "description": "Ajout, modification ou retrait des catégories de commidités",
+    "meta": {
+      "title": "Catégories de Commodités | Admin | Campy",
+      "description": "Gérer les catégories de commodités."
+    },
+    "actions": "Actions",
+    "categoryName": "Catégorie",
+    "confirmAmenityCategoryDeletion": "Supprimer la catégorie de commodité '{category}' ? Cette action est irréversible.",
+    "noCategory": "Aucune catégorie",
+    "placeholder": "ex. Services, Installations, Activités",
+    "useFormToCreateOne": "Utilisez le formulaire ci-haut pour en créer une."
+  }
+}

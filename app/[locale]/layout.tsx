@@ -1,15 +1,14 @@
-// app/[locale]/layout.tsx
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { NextIntlClientProvider } from "next-intl";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { routing } from "@/i18n/routing"; // your routing config file
+import { routing } from "@/i18n/routing";
 
 import "@fontsource/geist-sans";
 import "@fontsource/geist-mono";
 
-import "./globals.css"; // adjust path if needed
+import "./globals.css";
 import Header from "@/components/layout/header";
 import { Toaster } from "sonner";
 
@@ -27,7 +26,7 @@ export default async function LocaleLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ locale: string }>; // Next.js 15+ uses Promise for params
+  params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
 

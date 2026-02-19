@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Amenity } from "@/entities/amenity";
 import { AmenityCategory } from "@/entities/amenity-categories";
+import { useTranslations } from "next-intl";
 
 type Props = {
   amenities: Amenity[];
@@ -36,8 +37,11 @@ type Props = {
 };
 
 export default function AmenitiesClient({ amenities, categories }: Props) {
+  const tc = useTranslations("common");
+  const t = useTranslations("AdminAmenitiesPage");
+
   const [code, setCode] = useState("");
-  const [categoryId, setCategoryId] = useState<string>(""); // changed to string for Select value
+  const [categoryId, setCategoryId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +56,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
 
     const result = await createAmenityAction({
       code: code.trim(),
-      category_id: Number(categoryId), // convert back to number
+      category_id: Number(categoryId),
     });
 
     if (!result.success) {
@@ -67,8 +71,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
   };
 
   const handleDelete = async (id: string, code: string) => {
-    if (!confirm(`Delete amenity "${code}"? This action cannot be undone.`))
-      return;
+    if (!confirm(t("confirmAmenityDeletion", { code }))) return;
 
     setError(null);
 
@@ -89,29 +92,29 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
       <form onSubmit={handleCreate} className="space-y-4 max-w-3xl">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="code">Amenity Name</Label>
+            <Label htmlFor="code">{t("amenityName")}</Label>
             <Input
               id="code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="e.g. WiFi, Pet friendly, Fire pit"
+              placeholder={t("amenityPlaceholder")}
               disabled={submitting}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="category">{t("categoryName")}</Label>
             <Select
               value={categoryId}
               onValueChange={setCategoryId}
               disabled={submitting}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select category (optional)" />
+                <SelectValue placeholder={t("categoryPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No category</SelectItem>
+                <SelectItem value="none">{t("noCategory")}</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id.toString()}>
                     {cat.code}
@@ -126,11 +129,10 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
           <Button type="submit" disabled={submitting || !code.trim()}>
             {submitting ? (
               <>
-                <span className="mr-2">Adding...</span>
-                {/* Optional: add a spinner if you want */}
+                <span className="mr-2">{tc("processing")}</span>
               </>
             ) : (
-              "Add Amenity"
+              tc("add")
             )}
           </Button>
         </div>
@@ -139,9 +141,9 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
       {/* Amenities list */}
       {amenities.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
-          <p className="text-muted-foreground">No amenities added yet.</p>
+          <p className="text-muted-foreground">{t("noAmenity")}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Use the form above to create one.
+            {t("useFormToCreateOne")}
           </p>
         </div>
       ) : (
@@ -149,9 +151,9 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Amenity Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t("amenityName")}</TableHead>
+                <TableHead>{t("categoryName")}</TableHead>
+                <TableHead className="text-right">{t("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -169,7 +171,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
                       className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
+                      {tc("delete")}
                     </Button>
                   </TableCell>
                 </TableRow>

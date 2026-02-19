@@ -30,7 +30,8 @@ export default function Header() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const router = useRouter();
-  const t = useTranslations();
+  const t = useTranslations("header");
+  const tc = useTranslations("common");
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -61,7 +62,6 @@ export default function Header() {
 
   const { roleName, isLoading: roleLoading } = useUserRole();
 
-  // Loading skeleton
   if (loading) {
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
@@ -70,7 +70,7 @@ export default function Header() {
             <div className="relative h-10 w-40">
               <Image
                 src="/logo.png"
-                alt="Campy Logo"
+                alt={tc("logoAlt")}
                 fill
                 className="object-contain"
                 priority
@@ -95,14 +95,14 @@ export default function Header() {
           <div className="relative h-10 w-40 md:w-48">
             <Image
               src="/logo.png"
-              alt="Campy Logo"
+              alt={tc("logoAlt")}
               fill
               className="object-contain"
               priority
             />
           </div>
           <span className="text-xl font-bold text-primary hidden md:block">
-            Campy {t("test")}
+            {tc("brand")}
           </span>
         </Link>
 
@@ -120,9 +120,8 @@ export default function Header() {
                   className="relative h-10 w-10 rounded-full"
                 >
                   <Avatar className="h-10 w-10">
-                    {/* Add avatar_url later: <AvatarImage src={user.user_metadata?.avatar_url} /> */}
                     <AvatarFallback className="bg-primary/10 text-primary">
-                      {user.email?.[0]?.toUpperCase() || "?"}
+                      {user.email?.[0]?.toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -140,13 +139,13 @@ export default function Header() {
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem asChild>
-                  <Link href={routes.profile()}>Profile</Link>
+                  <Link href={routes.profile()}>{t("profile")}</Link>
                 </DropdownMenuItem>
 
                 {!roleLoading && roleName === USER_ROLE_PLATEFORMADMIN && (
                   <DropdownMenuItem asChild>
                     <Link href={routes.platformAdmin.root()}>
-                      Admin Dashboard
+                      {t("plateformAdminDashboard")}
                     </Link>
                   </DropdownMenuItem>
                 )}
@@ -157,13 +156,15 @@ export default function Header() {
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                   onClick={handleSignOut}
                 >
-                  Sign Out
+                  {tc("signOut")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <Button variant="default" size="sm" asChild>
-              <Link href={routes.auth()}>Sign In / Sign Up</Link>
+              <Link href={routes.auth()}>
+                {tc("signIn")} / {tc("signOut")}
+              </Link>
             </Button>
           )}
         </div>

@@ -1,1 +1,84 @@
-{ "test": "english motherfucker" }
+{
+  "common": {
+    "add": "Add",
+    "brand": "Campy",
+    "delete": "Delete",
+    "logoAlt": "Campy logo",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "signUp": "Sign Up",
+    "processing": "Processing..."
+  },
+
+  "header": {
+    "profile": "Profile",
+    "plateformAdminDashboard": "Plateform Admin Dashboard"
+  },
+
+  "HomePage": {
+    "meta": {
+      "title": "Campy – Book Campgrounds",
+      "description": "Find & book you trips in Canada. Start your adventure today."
+    }
+  },
+  "AuthPage": {
+    "meta": {
+      "title": "Sign In / Sign Up | Campy",
+      "description": "Log in or create a Campy account to book your next camping trip."
+    },
+    "welcome": "Welcome to Campy",
+    "signInTitle": "Sign In",
+    "signUpTitle": "Create Account",
+    "subtitle": "Sign in to manage bookings or create an account",
+    "noAccount": "Don't have an account? Sign up",
+    "haveAccount": "Already have an account? Sign in",
+    "signupSuccess": "Account created! Check your email to confirm.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "••••••••"
+  },
+  "ProfilePage": {
+    "meta": {
+      "title": "Profile | Campy",
+      "description": "Manage your bookings, preferences and account settings on Campy."
+    }
+  },
+  "AdminDashboard": {
+    "meta": {
+      "title": "Admin Dashboard | Campy",
+      "description": "Manage users, campsites, bookings & platform settings."
+    }
+  },
+  "AdminAmenitiesPage": {
+    "title": "Manage Amenities",
+    "description": "Add, edit or remove amenities",
+    "meta": {
+      "title": "Amenities | Admin | Campy",
+      "description": "Manage the available amenities."
+    },
+    "actions": "Actions",
+    "amenityName": "Amenity Name",
+    "amenityPlaceholder": "e.g. WiFi, Pet friendly, Fire pit",
+    "categoryName": "Category",
+    "categoryPlaceholder": "Select category",
+    "confirmAmenityDeletion": "Delete amenity '{code}'? This action cannot be undone.",
+    "noAmenity": "No amenity",
+    "noCategory": "No category",
+    "useFormToCreateOne": "Use the form above to create one."
+  },
+  "AdminAmenityCategoryPage": {
+    "title": "Manage Amenity Categories",
+    "description": "Add, edit or remove amenity categories",
+    "meta": {
+      "title": "Amenity Categories | Admin | Campy",
+      "description": "Manage the available amenity categories."
+    },
+    "actions": "Actions",
+    "categoryName": "Category",
+    "confirmAmenityCategoryDeletion": "Delete amenity category '{category}'? This action cannot be undone.",
+    "noCategory": "No category",
+    "placeholder": "e.g. Services, Facilities, Activities",
+    "useFormToCreateOne": "Use the form above to create one."
+  }
+}

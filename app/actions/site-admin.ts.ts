@@ -73,8 +73,6 @@ export async function createSiteAction(
   try {
     const supabase = await createClient();
 
-    console.log(`max_rig_length is ${input.max_rig_length}`);
-
     const { data, error } = await supabase
       .from("sites")
       .insert({

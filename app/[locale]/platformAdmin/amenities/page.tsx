@@ -3,11 +3,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getAllAmenityCategories } from "@/data/amenities-categories/get-amenities-categories";
 import { getAllAmenities } from "@/data/amenities/get-amenities";
 import { routes } from "@/lib/routes";
+import { generatePageMetadata } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import AmenitiesClient from "./AmenitiesClient";
-import { redirect } from "next/navigation";
+
+const NAMESPACE = "AdminAmenitiesPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function AmenitiesAdminPage() {
+  const t = await getTranslations(NAMESPACE);
+
   const [amenitiesResult, categoriesResult] = await Promise.all([
     getAllAmenities(),
     getAllAmenityCategories(),
@@ -23,8 +31,8 @@ export default async function AmenitiesAdminPage() {
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title="Manage Amenities"
-        description="Add, edit or remove amenities available at campgrounds"
+        title={t("title")}
+        description={t("description")}
         backTo={routes.platformAdmin.root()}
       />
 

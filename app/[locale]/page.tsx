@@ -1,14 +1,14 @@
-export const metadata = {
-  title: "Campy – Find and Book Campgrounds",
-  description: "Discover tent sites, RV parks, cabins, glamping and more.",
-};
-
 import CampgroundCardSkeleton from "@/components/search/CampgroundCardSkeleton";
 import CampgroundList from "@/components/search/CampgroundList";
 import { AlertCircle } from "lucide-react";
 import { Suspense } from "react";
 import CampgroundListControls from "../../components/search/list/CampgroundListControls";
 import { getCampgrounds } from "../../data/campgrounds/get-campgrounds";
+
+export const metadata = {
+  title: "Campy – Find and Book Campgrounds",
+  description: "Discover tent sites, RV parks, cabins, glamping and more.",
+};
 
 export default async function Home() {
   const campgroundsResult = await getCampgrounds();
