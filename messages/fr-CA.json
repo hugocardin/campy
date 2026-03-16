@@ -2,6 +2,7 @@
   "common": {
     "add": "Ajouter",
     "brand": "Campy",
+    "create": "Créer",
     "delete": "Supprimer",
     "logoAlt": "Logo Campy",
     "signIn": "Connexion",
@@ -83,5 +84,59 @@
     "noCategory": "Aucune catégorie",
     "placeholder": "ex. Services, Installations, Activités",
     "useFormToCreateOne": "Utilisez le formulaire ci-haut pour en créer une."
+  },
+  "AdminCampgroundsPage": {
+    "title": "Gérer les campings",
+    "description": "Ajouter, modifier ou supprimer des campings",
+    "meta": {
+      "title": "Campings | Admin | Campy",
+      "description": "Gérer les campings."
+    },
+    "createCampground": "Créer un camping",
+    "name": "Nom",
+    "location": "Emplacement",
+    "owner": "Propriétaire",
+    "phone": "Téléphone"
+  },
+
+  "AdminCampgroundCreatePage": {
+    "title": "Créer un nouveau camping",
+    "description": "Ajouter un nouveau camping",
+    "meta": {
+      "title": "Créer un camping | Admin | Campy",
+      "description": "Création d'un camping."
+    },
+    "errors": {
+      "nameRequired": "Le nom du camping est requis",
+      "ownerRequired": "Le propriétaire du camping est requis",
+      "latitudeInvalid": "La latitude doit être entre -90 et +90",
+      "longitudeInvalid": "La longitude doit être entre -180 et +180"
+    },
+    "form": {
+      "nameLabel": "Nom",
+      "namePlaceholder": "Entrez le nom du camping",
+      "ownerLabel": "Propriétaire",
+      "ownerPlaceholder": "Sélectionnez un propriétaire",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Décrivez le camping...",
+      "websiteLabel": "Site web",
+      "websitePlaceholder": "https://...",
+      "phoneLabel": "Téléphone",
+      "phonePlaceholder": "(555) 123-4567",
+      "addressLabel": "Adresse",
+      "addressPlaceholder": "123 Rue Principale",
+      "cityLabel": "Ville",
+      "cityPlaceholder": "Montréal, Ottawa, Vancouver...",
+      "provinceLabel": "Province / État",
+      "provincePlaceholder": "Québec, Ontario, Colombie-Britannique...",
+      "countryLabel": "Pays",
+      "countryPlaceholder": "Canada, États-Unis...",
+      "latitudeLabel": "Latitude",
+      "latitudePlaceholder": "ex. 45.4215",
+      "latitudeRange": "Intervalle : -90° à +90°",
+      "longitudeLabel": "Longitude",
+      "longitudePlaceholder": "ex. -75.6972",
+      "longitudeRange": "Intervalle : -180° à +180°"
+    }
   }
 }

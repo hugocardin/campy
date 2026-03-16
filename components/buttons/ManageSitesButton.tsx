@@ -1,22 +1,22 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Tent } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 
-type EditButtonProps = {
+type ManageSitesButtonProps = {
   href: string;
 };
 
-export function EditButton({ href }: EditButtonProps) {
-  const tc = useTranslations("common");
+export function ManageSitesButton({ href }: ManageSitesButtonProps) {
+  const t_site = useTranslations("entities.site");
 
   return (
     <Button asChild variant="outline">
       <Link href={href}>
-        <Pencil className="mr-2 h-4 w-4" />
-        {tc("edit")}
+        <Tent className="mr-2 h-4 w-4" />
+        {t_site("sites")}
       </Link>
     </Button>
   );

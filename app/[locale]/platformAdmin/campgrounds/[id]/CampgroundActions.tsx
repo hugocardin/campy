@@ -1,25 +1,27 @@
 "use client";
 
-import { Power, PowerOff, Tent } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-
 import {
   activateCampgroundAction,
   inactivateCampgroundAction,
 } from "@/app/actions/campgrounds-admin";
 import { EditButton } from "@/components/buttons/EditButton";
 import { ManageAmenitiesButton } from "@/components/buttons/ManageAmenitiesButton";
+import { ManageSitesButton } from "@/components/buttons/ManageSitesButton";
 import { Button } from "@/components/ui/button";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { routes } from "@/lib/routes";
-import Link from "next/link";
+import { Power, PowerOff } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 
 type CampgroundActionsProps = {
   campground: CampgroundAdmin;
 };
 
 export function CampgroundActions({ campground }: CampgroundActionsProps) {
+  const t = useTranslations("AdminCampgroundDetailsPage");
+
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,10 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
       ? inactivateCampgroundAction
       : activateCampgroundAction;
     const actionName = campground.active ? "deactivate" : "activate";
-    const confirmMessage = `Are you sure you want to ${actionName} "${campground.name}"?`;
+    const confirmMessage = t("confirmDeActivateAction", {
+      actionName,
+      name: campground.name,
+    });
 
     if (!confirm(confirmMessage)) return;
 
@@ -49,19 +54,19 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-3">
         <Button
-          variant={campground.active ? "outline-danger" : "outline-success"}
+          variant={campground.active ? "destructive" : "outline-success"}
           onClick={handleToggleStatus}
           disabled={isPending}
         >
           {campground.active ? (
             <>
               <PowerOff className="mr-2 h-4 w-4" />
-              Deactivate
+              {t("deactivate")}
             </>
           ) : (
             <>
               <Power className="mr-2 h-4 w-4" />
-              Activate
+              {t("activate")}
             </>
           )}
         </Button>
@@ -70,12 +75,9 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
           href={routes.platformAdmin.campgroundAmenities(campground.id)}
         ></ManageAmenitiesButton>
 
-        <Button asChild variant="outline">
-          <Link href={routes.platformAdmin.campgroundSites(campground.id)}>
-            <Tent className="mr-2 h-4 w-4" />
-            Manage sites
-          </Link>
-        </Button>
+        <ManageSitesButton
+          href={routes.platformAdmin.campgroundSites(campground.id)}
+        ></ManageSitesButton>
 
         <EditButton
           href={routes.platformAdmin.campgroundEdit(campground.id)}

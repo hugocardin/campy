@@ -1,25 +1,28 @@
 import { BackHeader } from "@/components/layout/back-header";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSitesOfCampground } from "@/data/campgrounds/get-campground-sites";
 import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { routes } from "@/lib/routes";
+import { generatePageMetadata } from "@/lib/utils";
+import { Plus } from "lucide-react";
+import { getTranslations } from "next-intl/server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import SitesClient from "./SitesClient";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { Plus } from "lucide-react";
 
-export const metadata = {
-  title: "Admin - Campground's sites",
-  description: "Manage a campground's sites",
-};
+const NAMESPACE = "AdminCampgroundSitesPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function CampgroundEditPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations(NAMESPACE);
+
   const params = await paramsPromise;
 
   const [campgroundresult, sitesResult] = await Promise.all([
@@ -37,8 +40,11 @@ export default async function CampgroundEditPage({
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`Manage ${campground.name} sites`}
-        description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
+        title={t("pageHeader.title", { name: campground.name })}
+        description={t("pageHeader.description", {
+          ownerName: campground.owner_full_name,
+          ownerEmail: campground.owner_email,
+        })}
         backTo={routes.platformAdmin.campgroundView(campground.id)}
         rightContent={
           <Button asChild size="lg">
@@ -46,7 +52,7 @@ export default async function CampgroundEditPage({
               href={routes.platformAdmin.campgroundSiteCreate(campground.id)}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Create Site
+              {t("createSite")}
             </Link>
           </Button>
         }

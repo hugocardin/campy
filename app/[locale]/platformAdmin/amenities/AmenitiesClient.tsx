@@ -1,6 +1,5 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -9,6 +8,8 @@ import {
   deleteAmenityAction,
 } from "@/app/actions/amenities";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
+import { DeleteButton } from "@/components/buttons/DeleteButton";
+import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +40,8 @@ type Props = {
 export default function AmenitiesClient({ amenities, categories }: Props) {
   const tc = useTranslations("common");
   const t = useTranslations("AdminAmenitiesPage");
+  const t_amenity = useTranslations("entities.amenity");
+  const t_amenityCategory = useTranslations("entities.amenityCategory");
 
   const [code, setCode] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
@@ -70,10 +73,10 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     setSubmitting(false);
   };
 
-  const handleDelete = async (id: string, code: string) => {
-    if (!confirm(t("confirmAmenityDeletion", { code }))) return;
-
+  const handleDelete = async (id: string) => {
+    console.log("test : in handleDelete");
     setError(null);
+    setSubmitting(true);
 
     const result = await deleteAmenityAction(id);
 
@@ -82,6 +85,8 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     } else {
       router.refresh();
     }
+
+    setSubmitting(false);
   };
 
   return (
@@ -92,29 +97,35 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
       <form onSubmit={handleCreate} className="space-y-4 max-w-3xl">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="code">{t("amenityName")}</Label>
+            <Label htmlFor="code">{t_amenity("amenityLabel")}</Label>
             <Input
               id="code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder={t("amenityPlaceholder")}
+              placeholder={t_amenity("amenityPlaceholder")}
               disabled={submitting}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">{t("categoryName")}</Label>
+            <Label htmlFor="category">
+              {t_amenityCategory("amenityCategory")}
+            </Label>
             <Select
               value={categoryId}
               onValueChange={setCategoryId}
               disabled={submitting}
             >
               <SelectTrigger>
-                <SelectValue placeholder={t("categoryPlaceholder")} />
+                <SelectValue
+                  placeholder={t_amenityCategory("amenityCategoryPlaceholder")}
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">{t("noCategory")}</SelectItem>
+                <SelectItem value="none">
+                  {t_amenityCategory("noAmenityCategory")}
+                </SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id.toString()}>
                     {cat.code}
@@ -151,8 +162,8 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("amenityName")}</TableHead>
-                <TableHead>{t("categoryName")}</TableHead>
+                <TableHead>{t_amenity("amenity")}</TableHead>
+                <TableHead>{t_amenityCategory("amenityCategory")}</TableHead>
                 <TableHead className="text-right">{t("actions")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -164,15 +175,18 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
                     {a.category_code || "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(a.id, a.code)}
-                      className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {tc("delete")}
-                    </Button>
+                    {/* <ConfirmDialog
+                      onConfirm={() => handleDelete(a.id)}
+                      title={t("deleteAmenityTitle")}
+                      description={t("confirmAmenityDeletion", {
+                        code: a.code,
+                      })}
+                    > */}
+                    <DeleteButton
+                      disabled={submitting}
+                      onConfirm={() => handleDelete(a.id)}
+                    />
+                    {/* </ConfirmDialog> */}
                   </TableCell>
                 </TableRow>
               ))}

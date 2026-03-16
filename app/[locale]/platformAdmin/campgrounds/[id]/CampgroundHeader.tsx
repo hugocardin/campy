@@ -1,30 +1,36 @@
 "use client";
 
-import { CampgroundAdmin } from "@/entities/campground-admin";
 import { BackHeader } from "@/components/layout/back-header";
 import { Badge } from "@/components/ui/badge";
-import { CampgroundActions } from "./CampgroundActions";
+import { CampgroundAdmin } from "@/entities/campground-admin";
 import { routes } from "@/lib/routes";
+import { useTranslations } from "next-intl";
+import { CampgroundActions } from "./CampgroundActions";
 
 type CampgroundHeaderProps = {
   campground: CampgroundAdmin;
 };
 
 export function CampgroundHeader({ campground }: CampgroundHeaderProps) {
+  const t = useTranslations("AdminCampgroundDetailsPage");
+
   return (
     <BackHeader
-      title={campground.name}
-      description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
+      title={t("pageHeader.title", { name: campground.name })}
+      description={t("pageHeader.description", {
+        ownerName: campground.owner_full_name,
+        ownerEmail: campground.owner_email,
+      })}
       backTo={routes.platformAdmin.campgrounds()}
       leftContent={
         <div className="flex items-center gap-4 flex-wrap">
           {campground.active ? (
             <Badge className="bg-primary-soft text-primary border-primary-border px-3 py-1 text-base font-medium">
-              Active
+              {t("active")}
             </Badge>
           ) : (
             <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-700/50 px-3 py-1 text-base font-medium">
-              Inactive
+              {t("inactive")}
             </Badge>
           )}
         </div>

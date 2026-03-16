@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Amenity } from "@/entities/amenity";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 
 type Props = {
@@ -20,6 +21,9 @@ export default function CampgroundAmenitiesClient({
   allAmenities,
   currentAmenities,
 }: Props) {
+  const tc = useTranslations("common");
+  const t = useTranslations("AdminCampgroundAmenitiesPage");
+
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
@@ -79,14 +83,12 @@ export default function CampgroundAmenitiesClient({
     <div className="space-y-10">
       <Card>
         <CardHeader>
-          <CardTitle>Manage Amenities</CardTitle>
+          <CardTitle>{t("manageAmenities")}</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-8">
           {allAmenities.length === 0 ? (
-            <p className="text-muted-foreground italic">
-              No amenities defined in the system yet.
-            </p>
+            <p className="text-muted-foreground italic">{t("noAmenity")}</p>
           ) : (
             <div className="space-y-8">
               {Object.entries(sortedGrouped).map(([category, items]) => (
@@ -135,10 +137,10 @@ export default function CampgroundAmenitiesClient({
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {tc("processing")}
                 </>
               ) : (
-                "Save changes"
+                tc("save")
               )}
             </Button>
 

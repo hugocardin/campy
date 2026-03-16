@@ -31,8 +31,8 @@ export default async function AmenitiesAdminPage() {
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={t("title")}
-        description={t("description")}
+        title={t("pageHeader.title")}
+        description={t("pageHeader.description")}
         backTo={routes.platformAdmin.root()}
       />
 

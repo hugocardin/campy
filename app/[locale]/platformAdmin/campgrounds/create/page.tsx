@@ -1,17 +1,20 @@
-import { getOwners } from "@/data/profile/get-owners";
 import { BackHeader } from "@/components/layout/back-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getOwners } from "@/data/profile/get-owners";
 import { routes } from "@/lib/routes";
+import { generatePageMetadata } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import CampgroundCreateClient from "./CampgroundCreateClient";
 
-export const metadata = {
-  title: "Admin - Create Campground",
-  description: "Create a new campground",
-};
+const NAMESPACE = "AdminCampgroundCreatePage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function CampgroundCreatePage() {
+  const t = await getTranslations(NAMESPACE);
+
   const ownersresult = await getOwners();
 
   if (!ownersresult.success) {
@@ -23,8 +26,8 @@ export default async function CampgroundCreatePage() {
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`Create new campground`}
-        description=""
+        title={t("pageHeader.title")}
+        description={t("pageHeader.description")}
         backTo={routes.platformAdmin.campgrounds()}
       />
 

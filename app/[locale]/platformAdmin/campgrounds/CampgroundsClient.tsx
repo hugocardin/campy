@@ -1,6 +1,5 @@
 "use client";
 
-import { CampgroundAdmin } from "@/entities/campground-admin";
 import {
   Table,
   TableBody,
@@ -9,8 +8,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CampgroundAdmin } from "@/entities/campground-admin";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 
 type Props = {
@@ -18,6 +19,8 @@ type Props = {
 };
 
 export default function CampgroundsClient({ campgrounds }: Props) {
+  const t_campground = useTranslations("entities.campground");
+
   const router = useRouter();
 
   return (
@@ -26,10 +29,10 @@ export default function CampgroundsClient({ campgrounds }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>Phone</TableHead>
+              <TableHead>{t_campground("nameLabel")}</TableHead>
+              <TableHead>{t_campground("locationLabel")}</TableHead>
+              <TableHead>{t_campground("ownerLabel")}</TableHead>
+              <TableHead>{t_campground("phoneLabel")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

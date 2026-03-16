@@ -6,17 +6,20 @@ import { routes } from "@/lib/routes";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import SiteCreateClient from "./SiteCreateClient";
+import { generatePageMetadata } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = {
-  title: "Admin - Create a new site",
-  description: "Create a campground's site",
-};
+const NAMESPACE = "AdminCampgroundSiteCreatePage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function SiteCreatePage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations(NAMESPACE);
+
   const params = await paramsPromise;
 
   const [campgroundresult, siteTypesResult] = await Promise.all([
@@ -34,8 +37,11 @@ export default async function SiteCreatePage({
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`Create site for ${campground.name}`}
-        description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
+        title={t("pageHeader.title", { name: campground.name })}
+        description={t("pageHeader.description", {
+          ownerName: campground.owner_full_name,
+          ownerEmail: campground.owner_email,
+        })}
         backTo={routes.platformAdmin.campgroundSites(campground.id)}
       />
 

@@ -4,20 +4,23 @@ import { getAllAmenities } from "@/data/amenities/get-amenities";
 import { getAmenitiesForCampground } from "@/data/campgrounds/get-campground-amenities";
 import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { routes } from "@/lib/routes";
+import { generatePageMetadata } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import CampgroundAmenitiesClient from "./CampgroundAmenitiesClient";
 
-export const metadata = {
-  title: "Admin - Campground' amenities",
-  description: "Manage a campground's amenities",
-};
+const NAMESPACE = "AdminCampgroundAmenitiesPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function CampgroundAmenitiesPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations(NAMESPACE);
+
   const params = await paramsPromise;
   const [campgroundResult, currentAmenitiesResult, allAmenitiesResult] =
     await Promise.all([
@@ -41,8 +44,11 @@ export default async function CampgroundAmenitiesPage({
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`${campground.name} - Manage campground's amenities`}
-        description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
+        title={t("pageHeader.title", { name: campground.name })}
+        description={t("pageHeader.description", {
+          ownerName: campground.owner_full_name,
+          ownerEmail: campground.owner_email,
+        })}
         backTo={routes.platformAdmin.campgroundView(campground.id)}
       />
 

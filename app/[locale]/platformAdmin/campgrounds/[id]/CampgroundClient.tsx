@@ -1,9 +1,10 @@
 "use client";
 
-import { CampgroundAdmin } from "@/entities/campground-admin";
-import { Amenity } from "@/entities/amenity";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Amenity } from "@/entities/amenity";
+import { CampgroundAdmin } from "@/entities/campground-admin";
+import { useTranslations } from "next-intl";
 
 type Props = {
   campground: CampgroundAdmin;
@@ -11,6 +12,10 @@ type Props = {
 };
 
 export default function CampgroundDetail({ campground, amenities }: Props) {
+  const t = useTranslations("AdminCampgroundDetailsPage");
+  const t_campground = useTranslations("entities.campground");
+  const t_amenity = useTranslations("entities.amenity");
+
   const groupedAndSorted = amenities.reduce(
     (acc, amenity) => {
       const category = amenity.category_code?.trim();
@@ -36,7 +41,7 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
       {/* Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
+          <CardTitle>{t("details")}</CardTitle>
         </CardHeader>
 
         <CardContent>
@@ -45,17 +50,17 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Description
+                  {t_campground("descriptionLabel")}
                 </h3>
                 <p className="whitespace-pre-wrap leading-relaxed">
-                  {campground.description || "No description provided"}
+                  {campground.description}
                 </p>
               </div>
 
               {campground.website && (
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Website
+                    {t_campground("websiteLabel")}
                   </h3>
                   <a
                     href={campground.website}
@@ -71,7 +76,7 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
               {campground.phone && (
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Phone
+                    {t_campground("phoneLabel")}
                   </h3>
                   <p>{campground.phone}</p>
                 </div>
@@ -82,52 +87,52 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Address
+                  {t_campground("addressLabel")}
                 </h3>
-                <p>{campground.address || "—"}</p>
+                <p>{campground.address}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    City
+                    {t_campground("cityLabel")}
                   </h3>
-                  <p>{campground.city || "—"}</p>
+                  <p>{campground.city}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Province / State
+                    {t_campground("provinceLabel")}
                   </h3>
-                  <p>{campground.province || "—"}</p>
+                  <p>{campground.province}</p>
                 </div>
               </div>
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Country
+                  {t_campground("countryLabel")}
                 </h3>
-                <p>{campground.country || "—"}</p>
+                <p>{campground.country}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Latitude
+                    {t_campground("latitudeLabel")}
                   </h3>
                   <p>
                     {campground.location?.lat != null
                       ? campground.location.lat.toFixed(6)
-                      : "—"}
+                      : ""}
                   </p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Longitude
+                    {t_campground("longitudeLabel")}
                   </h3>
                   <p>
                     {campground.location?.lng != null
                       ? campground.location.lng.toFixed(6)
-                      : "—"}
+                      : ""}
                   </p>
                 </div>
               </div>
@@ -139,12 +144,12 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
       {/* Amenities Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Amenities</CardTitle>
+          <CardTitle>{t_amenity("amenities")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-8 pt-2">
           {amenities.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">
-              No amenities have been added for this campground.
+              {t_amenity("noAmenity")}
             </p>
           ) : (
             <div className="space-y-6">
@@ -153,7 +158,7 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
                   return (
                     <div key={category} className="pb-2">
                       <h4 className="font-medium text-base mb-2.5 capitalize border-b pb-1 border-muted">
-                        {category.replace(/_/g, " ")}
+                        {category}
                       </h4>
                       <div className="flex flex-wrap gap-2.5">
                         {items.map((amenity) => (

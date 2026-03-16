@@ -6,17 +6,20 @@ import { routes } from "@/lib/routes";
 import { redirect } from "next/navigation";
 import { BackHeader } from "@/components/layout/back-header";
 import { getOwners } from "@/data/profile/get-owners";
+import { generatePageMetadata } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = {
-  title: "Admin - Campground details",
-  description: "Manage a campground's details",
-};
+const NAMESPACE = "AdminCampgroundEditPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function CampgroundEditPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations(NAMESPACE);
+
   const params = await paramsPromise;
 
   const [campgroundresult, ownersResult] = await Promise.all([
@@ -34,8 +37,11 @@ export default async function CampgroundEditPage({
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`Edit ${campground.name} details`}
-        description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
+        title={t("pageHeader.title", { name: campground.name })}
+        description={t("pageHeader.description", {
+          ownerName: campground.owner_full_name,
+          ownerEmail: campground.owner_email,
+        })}
         backTo={routes.platformAdmin.campgroundView(campground.id)}
       />
 

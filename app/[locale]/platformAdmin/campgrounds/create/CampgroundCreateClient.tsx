@@ -18,6 +18,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { UserProfileNoRole } from "@/entities/user-profile";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 type FormData = {
   name: string;
@@ -40,6 +41,10 @@ type Props = {
 };
 
 export default function CampgroundCreateClient({ owners }: Props) {
+  const tc = useTranslations("common");
+  const t = useTranslations("AdminCampgroundCreatePage");
+  const t_campground = useTranslations("entities.campground");
+
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -77,19 +82,19 @@ export default function CampgroundCreateClient({ owners }: Props) {
 
     // Basic client-side validation for required fields
     if (!form.name.trim()) {
-      setError("Campground name is required");
+      setError(t("errors.nameRequired"));
       return;
     }
     if (!form.owner_id) {
-      setError("Please select an owner");
+      setError(t("errors.ownerRequired"));
       return;
     }
     if (isNaN(latNum) || latNum < -90 || latNum > 90) {
-      setError("Latitude must be between -90 and +90");
+      setError(t("errors.latitudeInvalid"));
       return;
     }
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
-      setError("Longitude must be between -180 and +180");
+      setError(t("errors.longitudeInvalid"));
       return;
     }
 
@@ -150,7 +155,8 @@ export default function CampgroundCreateClient({ owners }: Props) {
           <div className="space-y-6">
             <div>
               <Label htmlFor="name">
-                Name <span className="text-red-500">*</span>
+                {t_campground("nameLabel")}{" "}
+                <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
@@ -159,13 +165,14 @@ export default function CampgroundCreateClient({ owners }: Props) {
                 onChange={handleChange}
                 required
                 className="mt-1.5"
-                placeholder="Enter campground name"
+                placeholder={t_campground("namePlaceholder")}
               />
             </div>
 
             <div>
               <Label htmlFor="owner_id">
-                Owner <span className="text-red-500">*</span>
+                {t_campground("ownerLabel")}{" "}
+                <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={form.owner_id}
@@ -173,7 +180,7 @@ export default function CampgroundCreateClient({ owners }: Props) {
                 required
               >
                 <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder="Select an owner" />
+                  <SelectValue placeholder={t_campground("ownerPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {sortedOwners.map((owner) => (
@@ -188,7 +195,9 @@ export default function CampgroundCreateClient({ owners }: Props) {
             </div>
 
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">
+                {t_campground("descriptionLabel")}
+              </Label>
               <Textarea
                 id="description"
                 name="description"
@@ -196,31 +205,32 @@ export default function CampgroundCreateClient({ owners }: Props) {
                 onChange={handleChange}
                 rows={5}
                 className="mt-1.5 resize-y"
-                placeholder="Describe the campground..."
+                placeholder={t_campground("descriptionPlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="website">Website</Label>
+              <Label htmlFor="website">{t_campground("websiteLabel")}</Label>
               <Input
                 id="website"
                 name="website"
                 type="url"
                 value={form.website}
                 onChange={handleChange}
-                placeholder="https://..."
+                placeholder={t_campground("websitePlaceholder")}
                 className="mt-1.5"
               />
             </div>
 
             <div>
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t_campground("phoneLabel")}</Label>
               <Input
                 id="phone"
                 name="phone"
                 type="tel"
                 value={form.phone}
                 onChange={handleChange}
+                placeholder={t_campground("phonePlaceholder")}
                 className="mt-1.5"
               />
             </div>
@@ -229,56 +239,61 @@ export default function CampgroundCreateClient({ owners }: Props) {
           {/* Right column */}
           <div className="space-y-6">
             <div>
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address">{t_campground("addressLabel")}</Label>
               <Input
                 id="address"
                 name="address"
                 value={form.address}
                 onChange={handleChange}
+                placeholder={t_campground("addressPlaceholder")}
                 className="mt-1.5"
-                placeholder="Street address"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="city">{t_campground("cityLabel")}</Label>
                 <Input
                   id="city"
                   name="city"
                   value={form.city}
                   onChange={handleChange}
+                  placeholder={t_campground("cityPlaceholder")}
                   className="mt-1.5"
                 />
               </div>
               <div>
-                <Label htmlFor="province">Province / State</Label>
+                <Label htmlFor="province">
+                  {t_campground("provinceLabel")}
+                </Label>
                 <Input
                   id="province"
                   name="province"
                   value={form.province}
                   onChange={handleChange}
+                  placeholder={t_campground("provincePlaceholder")}
                   className="mt-1.5"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="country">Country</Label>
+              <Label htmlFor="country">{t_campground("countryLabel")}</Label>
               <Input
                 id="country"
                 name="country"
                 value={form.country}
                 onChange={handleChange}
+                placeholder={t_campground("countryPlaceholder")}
                 className="mt-1.5"
-                placeholder="Canada"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="lat">
-                  Latitude <span className="text-red-500">*</span>
+                  {t_campground("latitudeLabel")}{" "}
+                  <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="lat"
@@ -291,16 +306,17 @@ export default function CampgroundCreateClient({ owners }: Props) {
                   onChange={handleLocationChange}
                   required
                   className="mt-1.5"
-                  placeholder="e.g. 45.4215"
+                  placeholder={t_campground("latitudePlaceholder")}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Range: -90° to +90°
+                  {t_campground("latitudeRange")}
                 </p>
               </div>
 
               <div>
                 <Label htmlFor="lng">
-                  Longitude <span className="text-red-500">*</span>
+                  {t_campground("longitudeLabel")}{" "}
+                  <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="lng"
@@ -313,10 +329,10 @@ export default function CampgroundCreateClient({ owners }: Props) {
                   onChange={handleLocationChange}
                   required
                   className="mt-1.5"
-                  placeholder="e.g. -75.6972"
+                  placeholder={t_campground("longitudePlaceholder")}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Range: -180° to +180°
+                  {t_campground("longitudeRange")}
                 </p>
               </div>
             </div>
@@ -334,11 +350,11 @@ export default function CampgroundCreateClient({ owners }: Props) {
                 )}
               >
                 {isPending ? (
-                  "Creating..."
+                  tc("processing")
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Create campground
+                    {tc("create")}
                   </>
                 )}
               </Button>

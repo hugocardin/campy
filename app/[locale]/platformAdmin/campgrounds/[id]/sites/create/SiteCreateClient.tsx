@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { SiteType } from "@/entities/site-type";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 type Props = {
   campground: CampgroundAdmin;
@@ -35,6 +36,9 @@ type FormData = {
 };
 
 export default function SiteCreateClient({ campground, siteTypes }: Props) {
+  const tc = useTranslations("common");
+  const t = useTranslations("AdminCampgroundSiteCreatePage");
+
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -65,31 +69,27 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
 
     // Client-side validation
     if (!form.name.trim()) {
-      setError("Site name is required");
-      return;
-    }
-    if (!form.description) {
-      setError("Please select an owner");
+      setError(t("nameRequired"));
       return;
     }
     if (!form.site_type_id) {
-      setError("Please select a site type");
+      setError(t("typeRequired"));
       return;
     }
-    if (!form.description) {
-      setError("Please select an owner");
+    if (!form.price_per_night) {
+      setError(t("priceRequired"));
       return;
     }
     if (!isNaN(maxRigLengthNum) && maxRigLengthNum < 0) {
-      setError("Please fill the max rig length");
+      setError(t("invalidMaxLength"));
       return;
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
-      setError("Please fill the price per night");
+      setError(t("invalidPricePerNight"));
       return;
     }
-    if (isNaN(minStayNightsNum) || minStayNightsNum < 0) {
-      setError("Please fill the minimum stay nights");
+    if (!isNaN(minStayNightsNum) && minStayNightsNum < 0) {
+      setError(t("invalidMinStayNights"));
       return;
     }
 
@@ -137,7 +137,7 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
           <div className="space-y-6">
             <div>
               <Label htmlFor="name">
-                Name <span className="text-red-500">*</span>
+                {t("form.nameLabel")} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
@@ -146,12 +146,12 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
                 onChange={handleChange}
                 required
                 className="mt-1.5"
-                placeholder="Enter site name"
+                placeholder={t("form.namePlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t("form.descriptionLabel")}</Label>
               <Textarea
                 id="description"
                 name="description"
@@ -159,12 +159,14 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
                 onChange={handleChange}
                 rows={5}
                 className="mt-1.5 resize-y"
-                placeholder="Describe the site..."
+                placeholder={t("form.descriptionPlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="max_rig_length">Max rig length</Label>
+              <Label htmlFor="max_rig_length">
+                {t("form.maxRigLengthLabel")}
+              </Label>
               <Input
                 id="max_rig_length"
                 name="max_rig_length"
@@ -178,14 +180,17 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
           {/* Right column */}
           <div className="space-y-6">
             <div>
-              <Label htmlFor="site_type_id">Site type</Label>
+              <Label htmlFor="site_type_id">
+                {t("form.siteTypeLabel")}{" "}
+                <span className="text-red-500">*</span>
+              </Label>
               <Select
                 value={form.site_type_id}
                 onValueChange={handleSiteTypeChange}
                 required
               >
                 <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder="Select a type" />
+                  <SelectValue placeholder={t("form.siteTypePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {sortedSiteTypes.map((siteType) => (
@@ -198,7 +203,10 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
             </div>
 
             <div>
-              <Label htmlFor="price_per_night">Price per night</Label>
+              <Label htmlFor="price_per_night">
+                {t("form.pricePerNightLabel")}{" "}
+                <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="price_per_night"
                 name="price_per_night"
@@ -210,7 +218,9 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="min_stay_nights">Minimal stay nights</Label>
+                <Label htmlFor="min_stay_nights">
+                  {t("form.minStayNightLabel")}
+                </Label>
                 <Input
                   id="min_stay_nights"
                   name="min_stay_nights"
@@ -234,11 +244,11 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
                 )}
               >
                 {isPending ? (
-                  "Saving..."
+                  tc("processing")
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Save changes
+                    {tc("save")}
                   </>
                 )}
               </Button>

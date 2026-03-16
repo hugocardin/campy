@@ -1,16 +1,16 @@
-import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getAmenitiesForCampground } from "@/data/campgrounds/get-campground-amenities";
+import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { routes } from "@/lib/routes";
+import { generatePageMetadata } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import CampgroundClient from "./CampgroundClient";
 import { CampgroundHeader } from "./CampgroundHeader";
-import { getAmenitiesForCampground } from "@/data/campgrounds/get-campground-amenities";
 
-export const metadata = {
-  title: "Admin - Campground details",
-  description: "Manage a campground's details",
-};
+const NAMESPACE = "AdminCampgroundDetailsPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function CampgroundDetailPage({
   params: paramsPromise,
