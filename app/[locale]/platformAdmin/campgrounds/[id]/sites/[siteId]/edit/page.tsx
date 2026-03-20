@@ -7,17 +7,20 @@ import { routes } from "@/lib/routes";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import SiteEditClient from "./SiteEditClient";
+import { generatePageMetadata } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = {
-  title: "Admin - Campground's site details",
-  description: "Manage a campground's site details",
-};
+const NAMESPACE = "AdminSiteEditPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function SiteEditPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string; siteId: string }>;
 }) {
+  const t = await getTranslations(NAMESPACE);
+
   const params = await paramsPromise;
 
   const [campgroundresult, siteResult, siteTypesResult] = await Promise.all([
@@ -41,9 +44,11 @@ export default async function SiteEditPage({
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`Edit ${campground.name} details`}
-        description={`Owner: ${campground.owner_full_name} · ${campground.owner_email}`}
-        backTo={routes.platformAdmin.campgroundSites(campground.id)}
+        title={t("pageHeader.title", { name: site.name })}
+        description={t("pageHeader.description", {
+          description: site.description,
+        })}
+        backTo={routes.platformAdmin.campgroundSiteView(campground.id, site.id)}
       />
 
       <Suspense

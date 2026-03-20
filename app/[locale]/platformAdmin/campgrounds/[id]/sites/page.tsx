@@ -12,7 +12,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import SitesClient from "./SitesClient";
 
-const NAMESPACE = "AdminCampgroundSitesPage" as const;
+const NAMESPACE = "AdminSitesPage" as const;
 
 export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 

@@ -12,7 +12,7 @@ type Props = {
 };
 
 export default function CampgroundDetail({ campground, amenities }: Props) {
-  const t = useTranslations("AdminCampgroundDetailsPage");
+  const tc = useTranslations("commun");
   const t_campground = useTranslations("entities.campground");
   const t_amenity = useTranslations("entities.amenity");
 
@@ -41,7 +41,7 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
       {/* Details */}
       <Card>
         <CardHeader>
-          <CardTitle>{t("details")}</CardTitle>
+          <CardTitle>{tc("details")}</CardTitle>
         </CardHeader>
 
         <CardContent>

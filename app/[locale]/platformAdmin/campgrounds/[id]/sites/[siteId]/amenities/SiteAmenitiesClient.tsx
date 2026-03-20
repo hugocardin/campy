@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Amenity } from "@/entities/amenity";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 
 type Props = {
@@ -22,6 +23,9 @@ export default function SiteAmenitiesClient({
   allAmenities,
   currentAmenities,
 }: Props) {
+  const tc = useTranslations("common");
+  const t_amenity = useTranslations("entities.amenity");
+
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
@@ -82,20 +86,20 @@ export default function SiteAmenitiesClient({
     <div className="space-y-10">
       <Card>
         <CardHeader>
-          <CardTitle>Manage Amenities</CardTitle>
+          <CardTitle>{t_amenity("amenities")}</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-8">
           {allAmenities.length === 0 ? (
             <p className="text-muted-foreground italic">
-              No amenities defined in the system yet.
+              {t_amenity("noAmenity")}
             </p>
           ) : (
             <div className="space-y-8">
               {Object.entries(sortedGrouped).map(([category, items]) => (
                 <div key={category} className="space-y-4">
                   <h3 className="font-medium text-lg capitalize border-b pb-2 border-muted">
-                    {category.replace(/_/g, " ")}
+                    {category}
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -138,10 +142,10 @@ export default function SiteAmenitiesClient({
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {tc("processing")}
                 </>
               ) : (
-                "Save changes"
+                tc("save")
               )}
             </Button>
 

@@ -45,6 +45,7 @@ type FormData = {
 export default function CampgroundEditClient({ campground, owners }: Props) {
   const tc = useTranslations("common");
   const t = useTranslations("AdminCampgroundEditPage");
+  const t_campground = useTranslations("entities.campground");
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +157,8 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
           <div className="space-y-6">
             <div>
               <Label htmlFor="name">
-                {t("form.nameLabel")} <span className="text-red-500">*</span>
+                {t_campground("nameLabel")}{" "}
+                <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
@@ -165,13 +167,14 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
                 onChange={handleChange}
                 required
                 className="mt-1.5"
-                placeholder={t("form.namePlaceholder")}
+                placeholder={t_campground("namePlaceholder")}
               />
             </div>
 
             <div>
               <Label htmlFor="owner_id">
-                {t("form.ownerLabel")} <span className="text-red-500">*</span>
+                {t_campground("ownerLabel")}{" "}
+                <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={form.owner_id}
@@ -179,7 +182,7 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
                 required
               >
                 <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder={t("form.ownerPlaceholder")} />
+                  <SelectValue placeholder={t_campground("ownerPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {sortedOwners.map((owner) => (
@@ -194,7 +197,9 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
             </div>
 
             <div>
-              <Label htmlFor="description">{t("form.descriptionLabel")}</Label>
+              <Label htmlFor="description">
+                {t_campground("descriptionLabel")}
+              </Label>
               <Textarea
                 id="description"
                 name="description"
@@ -202,32 +207,32 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
                 onChange={handleChange}
                 rows={5}
                 className="mt-1.5 resize-y"
-                placeholder={t("form.descriptionPlaceholder")}
+                placeholder={t_campground("descriptionPlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="website">{t("form.websiteLabel")}</Label>
+              <Label htmlFor="website">{t_campground("websiteLabel")}</Label>
               <Input
                 id="website"
                 name="website"
                 type="url"
                 value={form.website}
                 onChange={handleChange}
-                placeholder={t("form.websitePlaceholder")}
+                placeholder={t_campground("websitePlaceholder")}
                 className="mt-1.5"
               />
             </div>
 
             <div>
-              <Label htmlFor="phone">{t("form.phoneLabel")}</Label>
+              <Label htmlFor="phone">{t_campground("phoneLabel")}</Label>
               <Input
                 id="phone"
                 name="phone"
                 type="tel"
                 value={form.phone}
                 onChange={handleChange}
-                placeholder={t("form.phonePlaceholder")}
+                placeholder={t_campground("phonePlaceholder")}
                 className="mt-1.5"
               />
             </div>
@@ -236,58 +241,60 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
           {/* Right column */}
           <div className="space-y-6">
             <div>
-              <Label htmlFor="address">{t("form.addressLabel")}</Label>
+              <Label htmlFor="address">{t_campground("addressLabel")}</Label>
               <Input
                 id="address"
                 name="address"
                 value={form.address}
                 onChange={handleChange}
                 className="mt-1.5"
-                placeholder={t("form.addressPlaceholder")}
+                placeholder={t_campground("addressPlaceholder")}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="city">{t("form.cityLabel")}</Label>
+                <Label htmlFor="city">{t_campground("cityLabel")}</Label>
                 <Input
                   id="city"
                   name="city"
                   value={form.city}
                   onChange={handleChange}
-                  placeholder={t("form.cityPlaceholder")}
+                  placeholder={t_campground("cityPlaceholder")}
                   className="mt-1.5"
                 />
               </div>
               <div>
-                <Label htmlFor="province">{t("form.provinceLabel")}</Label>
+                <Label htmlFor="province">
+                  {t_campground("provinceLabel")}
+                </Label>
                 <Input
                   id="province"
                   name="province"
                   value={form.province}
                   onChange={handleChange}
-                  placeholder={t("form.provincePlaceholder")}
+                  placeholder={t_campground("provincePlaceholder")}
                   className="mt-1.5"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="country">{t("form.countryLabel")}</Label>
+              <Label htmlFor="country">{t_campground("countryLabel")}</Label>
               <Input
                 id="country"
                 name="country"
                 value={form.country}
                 onChange={handleChange}
                 className="mt-1.5"
-                placeholder={t("form.countryPlaceholder")}
+                placeholder={t_campground("countryPlaceholder")}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="lat">
-                  {t("form.latitudeLabel")}{" "}
+                  {t_campground("latitudeLabel")}{" "}
                   <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -301,16 +308,16 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
                   onChange={handleLocationChange}
                   required
                   className="mt-1.5"
-                  placeholder={t("form.latitudePlaceholder")}
+                  placeholder={t_campground("latitudePlaceholder")}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {t("form.latitudeRange")}
+                  {t_campground("latitudeRange")}
                 </p>
               </div>
 
               <div>
                 <Label htmlFor="lng">
-                  {t("form.longitudeLabel")}{" "}
+                  {t_campground("longitudeLabel")}{" "}
                   <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -324,10 +331,10 @@ export default function CampgroundEditClient({ campground, owners }: Props) {
                   onChange={handleLocationChange}
                   required
                   className="mt-1.5"
-                  placeholder={t("form.longitudePlaceholder")}
+                  placeholder={t_campground("longitudePlaceholder")}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {t("form.longitudeRange")}
+                  {t_campground("longitudeRange")}
                 </p>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Site } from "@/entities/sites";
+import { useTranslations } from "next-intl";
 
 type Props = {
   campground: CampgroundAdmin;
@@ -13,6 +14,10 @@ type Props = {
 };
 
 export default function SiteViewClient({ site, amenities }: Props) {
+  const tc = useTranslations("common");
+  const t_site = useTranslations("entities.site");
+  const t_amenity = useTranslations("entities.amenity");
+
   const groupedAndSorted = amenities.reduce(
     (acc, amenity) => {
       const category = amenity.category_code?.trim();
@@ -38,7 +43,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
       {/* Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
+          <CardTitle>{tc("details")}</CardTitle>
         </CardHeader>
 
         <CardContent>
@@ -47,7 +52,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Name
+                  {t_site("nameLabel")}
                 </h3>
                 <p className="whitespace-pre-wrap leading-relaxed">
                   {site.name}
@@ -56,7 +61,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Description
+                  {t_site("descriptionLabel")}
                 </h3>
                 <p className="whitespace-pre-wrap leading-relaxed">
                   {site.description}
@@ -65,7 +70,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Site type
+                  {t_site("siteTypeLabel")}
                 </h3>
                 <p className="whitespace-pre-wrap leading-relaxed">
                   {site.site_type_code}
@@ -78,13 +83,13 @@ export default function SiteViewClient({ site, amenities }: Props) {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Price per night
+                    {t_site("pricePerNightLabel")}
                   </h3>
                   <p>{site.price_per_night}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    Minimal stay nights
+                    {t_site("minStayNightLabel")}
                   </h3>
                   <p>{site.min_stay_nights}</p>
                 </div>
@@ -92,7 +97,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  Max rig length
+                  {t_site("maxRigLengthLabel")}
                 </h3>
                 <p>{site.max_rig_length}</p>
               </div>
@@ -104,12 +109,12 @@ export default function SiteViewClient({ site, amenities }: Props) {
       {/* Amenities Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Amenities</CardTitle>
+          <CardTitle>{t_amenity("amenities")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-8 pt-2">
           {amenities.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">
-              No amenities have been added for this site.
+              {t_amenity("noAmenity")}
             </p>
           ) : (
             <div className="space-y-6">

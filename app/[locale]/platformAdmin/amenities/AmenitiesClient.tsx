@@ -8,8 +8,7 @@ import {
   deleteAmenityAction,
 } from "@/app/actions/amenities";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
-import { DeleteButton } from "@/components/buttons/DeleteButton";
-import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
+import { DeleteButtonWithConfirmation } from "@/components/dialogs/DeleteButtonWithConfirmation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,7 +118,9 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
             >
               <SelectTrigger>
                 <SelectValue
-                  placeholder={t_amenityCategory("amenityCategoryPlaceholder")}
+                  placeholder={t_amenityCategory(
+                    "selectAmenityCategoryPlaceholder",
+                  )}
                 />
               </SelectTrigger>
               <SelectContent>
@@ -152,10 +153,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
       {/* Amenities list */}
       {amenities.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
-          <p className="text-muted-foreground">{t("noAmenity")}</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t("useFormToCreateOne")}
-          </p>
+          <p className="text-muted-foreground">{t_amenity("noAmenity")}</p>
         </div>
       ) : (
         <div className="rounded-md border">
@@ -175,18 +173,14 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
                     {a.category_code || "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    {/* <ConfirmDialog
-                      onConfirm={() => handleDelete(a.id)}
+                    <DeleteButtonWithConfirmation
                       title={t("deleteAmenityTitle")}
                       description={t("confirmAmenityDeletion", {
                         code: a.code,
                       })}
-                    > */}
-                    <DeleteButton
-                      disabled={submitting}
                       onConfirm={() => handleDelete(a.id)}
-                    />
-                    {/* </ConfirmDialog> */}
+                      disabled={submitting}
+                    ></DeleteButtonWithConfirmation>
                   </TableCell>
                 </TableRow>
               ))}

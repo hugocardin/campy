@@ -4,20 +4,23 @@ import { getAllAmenities } from "@/data/amenities/get-amenities";
 import { getSiteOfCampground } from "@/data/campgrounds/get-campground-sites";
 import { getAmenitiesForSite } from "@/data/sites/get-site-amenities";
 import { routes } from "@/lib/routes";
+import { generatePageMetadata } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import SiteAmenitiesClient from "./SiteAmenitiesClient";
 
-export const metadata = {
-  title: "Admin - Site' amenities",
-  description: "Manage a site's amenities",
-};
+const NAMESPACE = "AdminSiteAmenitiesPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function SiteAmenitiesPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string; siteId: string }>;
 }) {
+  const t = await getTranslations(NAMESPACE);
+
   const params = await paramsPromise;
 
   const [siteResult, currentAmenitiesResult, allAmenitiesResult] =
@@ -42,8 +45,10 @@ export default async function SiteAmenitiesPage({
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <BackHeader
-        title={`Manage ${site.name}'s amenities`}
-        description={`Site: ${site.description}`}
+        title={t("pageHeader.title", { name: site.name })}
+        description={t("pageHeader.description", {
+          description: site.description,
+        })}
         backTo={routes.platformAdmin.campgroundSiteView(
           params.id,
           params.siteId,

@@ -3,15 +3,15 @@ import { getSiteOfCampground } from "@/data/campgrounds/get-campground-sites";
 import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { getAmenitiesForSite } from "@/data/sites/get-site-amenities";
 import { routes } from "@/lib/routes";
+import { generatePageMetadata } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { SiteHeader } from "./SiteHeader";
 import SiteViewClient from "./SiteViewClient";
 
-export const metadata = {
-  title: "Admin - Campground's site details",
-  description: "Manage a campground's site details",
-};
+const NAMESPACE = "AdminSiteDetailsPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function SiteViewPage({
   params: paramsPromise,

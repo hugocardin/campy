@@ -1,25 +1,15 @@
-import type { Metadata } from "next";
-import { ThemeProvider } from "next-themes";
-import { NextIntlClientProvider } from "next-intl";
-import { notFound } from "next/navigation";
-import { cn } from "@/lib/utils";
 import { routing } from "@/i18n/routing";
+import { cn } from "@/lib/utils";
+import { NextIntlClientProvider } from "next-intl";
+import { ThemeProvider } from "next-themes";
+import { notFound } from "next/navigation";
 
-import "@fontsource/geist-sans";
 import "@fontsource/geist-mono";
+import "@fontsource/geist-sans";
 
-import "./globals.css";
 import Header from "@/components/layout/header";
 import { Toaster } from "sonner";
-
-export const metadata: Metadata = {
-  title: {
-    default: "Campy – Campground Booking",
-    template: "%s | Campy",
-  },
-  description:
-    "Find and book your perfect campground — RV sites, tent spots, and more.",
-};
+import "./globals.css";
 
 export default async function LocaleLayout({
   children,

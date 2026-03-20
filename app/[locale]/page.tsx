@@ -4,11 +4,11 @@ import { AlertCircle } from "lucide-react";
 import { Suspense } from "react";
 import CampgroundListControls from "../../components/search/list/CampgroundListControls";
 import { getCampgrounds } from "../../data/campgrounds/get-campgrounds";
+import { generatePageMetadata } from "@/lib/utils";
 
-export const metadata = {
-  title: "Campy – Find and Book Campgrounds",
-  description: "Discover tent sites, RV parks, cabins, glamping and more.",
-};
+const NAMESPACE = "SearchPage" as const;
+
+export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
 export default async function Home() {
   const campgroundsResult = await getCampgrounds();

@@ -6,6 +6,7 @@
     "confirm": "Confirm",
     "create": "Create",
     "delete": "Delete",
+    "details": "Details",
     "edit": "Edit",
     "logoAlt": "Campy logo",
     "save": "Save",
@@ -29,15 +30,15 @@
       "websiteLabel": "Website",
       "websitePlaceholder": "https://...",
       "phoneLabel": "Phone",
-      "phonePlaceholder": "Select an owner",
+      "phonePlaceholder": "e.g. 555-555-5555",
       "addressLabel": "Address",
-      "addressPlaceholder": "123 Street Name",
+      "addressPlaceholder": "e.g. 123 Street Name",
       "cityLabel": "City",
-      "cityPlaceholder": "Montreal, Ottawa, Vancouver...",
+      "cityPlaceholder": "e.g. Montreal, Ottawa, Vancouver...",
       "provinceLabel": "Province / State",
-      "provincePlaceholder": "Quebec, Ontario, British Columbia...",
+      "provincePlaceholder": "e.g. Quebec, Ontario, British Columbia...",
       "countryLabel": "Country",
-      "countryPlaceholder": "Canada, United States...",
+      "countryPlaceholder": "e.g. Canada, United States...",
       "latitudeLabel": "Latitude",
       "latitudePlaceholder": "e.g. 45.4215",
       "latitudeRange": "Range: -90° to +90°",
@@ -49,13 +50,23 @@
     "site": {
       "site": "Site",
       "sites": "Sites",
-      "noSite": "No site"
+      "noSite": "No site",
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter site name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Describe the site...",
+      "maxRigLengthLabel": "Max rig length (feet)",
+      "siteTypeLabel": "Site type",
+      "siteTypePlaceholder": "Select a type",
+      "pricePerNightLabel": "Price per night",
+      "minStayNightLabel": "Minimal stay nights"
     },
     "amenityCategory": {
       "amenityCategory": "Category",
       "amenityCategories": "Categories",
       "noAmenityCategory": "No category",
-      "amenityCategoryPlaceholder": "Select category"
+      "selectAmenityCategoryPlaceholder": "Select category",
+      "createCategoryPlaceholder": "e.g. Services, Facilities, Activities"
     },
     "amenity": {
       "amenity": "Amenity",
@@ -71,9 +82,13 @@
     "plateformAdminDashboard": "Plateform Admin Dashboard"
   },
 
-  "HomePage": {
+  "SearchPage": {
+    "pageHeader": {
+      "title": "Campy – Find and Book Campgrounds",
+      "description": "Discover tent sites, RV parks, cabins, glamping and more."
+    },
     "meta": {
-      "title": "Campy – Book Campgrounds",
+      "title": "Campy – Find and Book Campgrounds",
       "description": "Find & book you trips in Canada. Start your adventure today."
     }
   },
@@ -95,18 +110,22 @@
     "passwordPlaceholder": "••••••••"
   },
   "ProfilePage": {
+    "pageHeader": {
+      "title": "Your Profile",
+      "description": "Manage your account information and preferences"
+    },
     "meta": {
       "title": "Profile | Campy",
       "description": "Manage your bookings, preferences and account settings on Campy."
-    }
+    },
+    "cardTitle": "Account Information",
+    "cardDescription": "Basic details about your account",
+    "fullname": "Full Name",
+    "email": "Email",
+    "role": "Role",
+    "joined": "Joined"
   },
 
-  "AdminDashboard": {
-    "meta": {
-      "title": "Admin Dashboard | Campy",
-      "description": "Manage users, campsites, bookings & platform settings."
-    }
-  },
   "AdminAmenitiesPage": {
     "pageHeader": {
       "title": "Manage Amenities",
@@ -117,10 +136,10 @@
       "description": "Manage the available amenities."
     },
     "actions": "Actions",
-    "confirmAmenityDeletion": "Delete amenity '{code}'? This action cannot be undone.",
-    "deleteAmenityTitle": "Delete amenity",
-    "useFormToCreateOne": "Use the form above to create one."
+    "confirmAmenityDeletion": "Delete amenity \"{code}\"? This action cannot be undone.",
+    "deleteAmenityTitle": "Delete amenity"
   },
+
   "AdminAmenityCategoryPage": {
     "pageHeader": {
       "title": "Manage Amenity Categories",
@@ -131,12 +150,10 @@
       "description": "Manage the available amenity categories."
     },
     "actions": "Actions",
-    "categoryName": "Category",
-    "confirmAmenityCategoryDeletion": "Delete amenity category '{category}'? This action cannot be undone.",
-    "noCategory": "No category",
-    "placeholder": "e.g. Services, Facilities, Activities",
-    "useFormToCreateOne": "Use the form above to create one."
+    "deleteAmenityCategoryTitle": "Delete amenity category",
+    "confirmAmenityCategoryDeletion": "Delete amenity category \"{category}\"? This action cannot be undone."
   },
+
   "AdminCampgroundsPage": {
     "pageHeader": {
       "title": "Manage campgrounds",
@@ -148,6 +165,7 @@
     },
     "createCampground": "Create Campground"
   },
+
   "AdminCampgroundCreatePage": {
     "pageHeader": {
       "title": "Create new campground",
@@ -164,6 +182,7 @@
       "longitudeInvalid": "Longitude must be between -180 and +180"
     }
   },
+
   "AdminCampgroundDetailsPage": {
     "pageHeader": {
       "title": "Campground : {name}",
@@ -177,9 +196,9 @@
     "inactive": "Inactive",
     "confirmDeActivateAction": "Are you sure you want to {actionName} \"{name}\"?",
     "activate": "Activate",
-    "deactivate": "Deactivate",
-    "details": "Details"
+    "deactivate": "Deactivate"
   },
+
   "AdminCampgroundAmenitiesPage": {
     "pageHeader": {
       "title": "{name} - Manage campground's amenities",
@@ -188,10 +207,9 @@
     "meta": {
       "title": "Manage Campground's amenities | Admin | Campy",
       "description": "Manage campground."
-    },
-    "manageAmenities": "Manage Amenities",
-    "noAmenity": "No amenity"
+    }
   },
+
   "AdminCampgroundEditPage": {
     "pageHeader": {
       "title": "Edit {name}",
@@ -206,53 +224,33 @@
       "ownerRequired": "Campground owner is required",
       "latitudeInvalid": "Latitude must be between -90 and +90",
       "longitudeInvalid": "Longitude must be between -180 and +180"
-    },
-    "form": {
-      "nameLabel": "Name",
-      "namePlaceholder": "Enter campground name",
-      "ownerLabel": "Owner",
-      "ownerPlaceholder": "Select an owner",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "Describe the campground...",
-      "websiteLabel": "Website",
-      "websitePlaceholder": "https://...",
-      "phoneLabel": "Phone",
-      "phonePlaceholder": "Select an owner",
-      "addressLabel": "Address",
-      "addressPlaceholder": "123 Street Name",
-      "cityLabel": "City",
-      "cityPlaceholder": "Montreal, Ottawa, Vancouver...",
-      "provinceLabel": "Province / State",
-      "provincePlaceholder": "Quebec, Ontario, British Columbia...",
-      "countryLabel": "Country",
-      "countryPlaceholder": "Canada, United States...",
-      "latitudeLabel": "Latitude",
-      "latitudePlaceholder": "e.g. 45.4215",
-      "latitudeRange": "Range: -90° to +90°",
-      "longitudeLabel": "Longitude",
-      "longitudePlaceholder": "e.g. -75.6972",
-      "longitudeRange": "Range: -180° to +180°"
     }
   },
-  "AdminCampgroundSitesPage": {
+
+  "AdminSitesPage": {
     "pageHeader": {
       "title": "{name} - Manage campground's sites",
       "description": "Owner: {ownerName} · {ownerEmail}"
     },
     "meta": {
       "title": "Manage Campground's sites | Admin | Campy",
-      "description": "Manage campground. sites"
+      "description": "Manage campground's sites"
     },
-    "createSite": "Create Site",
-    "name": "Name",
-    "description": "Name",
-    "siteType": "Name",
-    "maxRigLength": "Name",
-    "pricePerNight": "Name",
-    "minStayNight": "Min stay night"
+    "createSite": "Create Site"
   },
 
-  "AdminCampgroundSiteCreatePage": {
+  "AdminSiteDetailsPage": {
+    "pageHeader": {
+      "title": "Site: {name}",
+      "description": "From campground : {name}"
+    },
+    "meta": {
+      "title": "Site details | Admin | Campy",
+      "description": "See site details"
+    }
+  },
+
+  "AdminSiteCreatePage": {
     "pageHeader": {
       "title": "{name} - Create site",
       "description": "Owner: {ownerName} · {ownerEmail}"
@@ -261,13 +259,6 @@
       "title": "Create Campground's site | Admin | Campy",
       "description": "Create campground's site"
     },
-    "createSite": "Create Site",
-    "name": "Name",
-    "description": "Name",
-    "siteType": "Name",
-    "maxRigLength": "Name",
-    "pricePerNight": "Name",
-    "minStayNight": "Min stay night",
     "errors": {
       "nameRequired": "Name is required",
       "typeRequired": "Type is required",
@@ -275,17 +266,50 @@
       "invalidMaxLength": "Invalid max rig length",
       "invalidPricePerNight": "Invalid price per night",
       "invalidMinStayNights": "Invalid min stay nights"
-    },
-    "form": {
-      "nameLabel": "Name",
-      "namePlaceholder": "Enter site name",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "Describe the site...",
-      "maxRigLengthLabel": "Max rig length (feet)",
-      "siteTypeLabel": "Site type",
-      "siteTypePlaceholder": "Select a type",
-      "pricePerNightLabel": "Price per night",
-      "minStayNightLabel": "Minimal stay nights"
     }
+  },
+
+  "AdminSiteAmenitiesPage": {
+    "pageHeader": {
+      "title": "Manage site {name} amenities",
+      "description": "Site: {description}"
+    },
+    "meta": {
+      "title": "Manage site's amenities | Admin | Campy",
+      "description": "Manage a site's amenities"
+    }
+  },
+
+  "AdminSiteEditPage": {
+    "pageHeader": {
+      "title": "Edit site {name}",
+      "description": "Site: {description}"
+    },
+    "meta": {
+      "title": "Edit site's information | Admin | Campy",
+      "description": "Edit a site's information"
+    },
+    "errors": {
+      "nameRequired": "Name is required",
+      "typeRequired": "Type is required",
+      "priceRequired": "Price is required",
+      "invalidMaxLength": "Invalid max rig length",
+      "invalidPricePerNight": "Invalid price per night",
+      "invalidMinStayNights": "Invalid min stay nights"
+    }
+  },
+
+  "AdminDashboardPage": {
+    "pageHeader": {
+      "title": "Admin Dashboard",
+      "description": "Quick access to admin management tools"
+    },
+    "meta": {
+      "title": "Admin Dashboard | Admin | Campy",
+      "description": "Manage data as Admin"
+    },
+    "amenitiesDescription": "Manage the list of available amenities",
+    "amenityCategoriesDescription": "Organize amenities into groups (Services, Facilities, etc.)",
+    "campgroundDescription": "Organize campgrounds"
   }
 }

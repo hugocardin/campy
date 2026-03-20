@@ -37,7 +37,8 @@ type FormData = {
 
 export default function SiteCreateClient({ campground, siteTypes }: Props) {
   const tc = useTranslations("common");
-  const t = useTranslations("AdminCampgroundSiteCreatePage");
+  const t = useTranslations("AdminSiteCreatePage");
+  const t_site = useTranslations("entities.site");
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -137,7 +138,7 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
           <div className="space-y-6">
             <div>
               <Label htmlFor="name">
-                {t("form.nameLabel")} <span className="text-red-500">*</span>
+                {t_site("nameLabel")} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
@@ -146,12 +147,12 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
                 onChange={handleChange}
                 required
                 className="mt-1.5"
-                placeholder={t("form.namePlaceholder")}
+                placeholder={t_site("namePlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="description">{t("form.descriptionLabel")}</Label>
+              <Label htmlFor="description">{t_site("descriptionLabel")}</Label>
               <Textarea
                 id="description"
                 name="description"
@@ -159,13 +160,13 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
                 onChange={handleChange}
                 rows={5}
                 className="mt-1.5 resize-y"
-                placeholder={t("form.descriptionPlaceholder")}
+                placeholder={t_site("descriptionPlaceholder")}
               />
             </div>
 
             <div>
               <Label htmlFor="max_rig_length">
-                {t("form.maxRigLengthLabel")}
+                {t_site("maxRigLengthLabel")}
               </Label>
               <Input
                 id="max_rig_length"
@@ -181,7 +182,7 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
           <div className="space-y-6">
             <div>
               <Label htmlFor="site_type_id">
-                {t("form.siteTypeLabel")}{" "}
+                {t_site("siteTypeLabel")}{" "}
                 <span className="text-red-500">*</span>
               </Label>
               <Select
@@ -190,7 +191,7 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
                 required
               >
                 <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder={t("form.siteTypePlaceholder")} />
+                  <SelectValue placeholder={t_site("siteTypePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {sortedSiteTypes.map((siteType) => (
@@ -204,7 +205,7 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
 
             <div>
               <Label htmlFor="price_per_night">
-                {t("form.pricePerNightLabel")}{" "}
+                {t_site("pricePerNightLabel")}{" "}
                 <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -219,7 +220,7 @@ export default function SiteCreateClient({ campground, siteTypes }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="min_stay_nights">
-                  {t("form.minStayNightLabel")}
+                  {t_site("minStayNightLabel")}
                 </Label>
                 <Input
                   id="min_stay_nights"

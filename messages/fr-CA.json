@@ -68,8 +68,7 @@
     "categoryPlaceholder": "Choisissez une catégorie",
     "confirmAmenityDeletion": "Supprimer la commodité '{code}' ? Cette action est irréversible.",
     "noAmenity": "Aucune commodité",
-    "noCategory": "Aucune catégorie",
-    "useFormToCreateOne": "Utilisez le formulaire ci-haut pour en créer une."
+    "noCategory": "Aucune catégorie"
   },
   "AdminAmenityCategoryPage": {
     "title": "Gestion des catégories de commodités",
@@ -82,8 +81,7 @@
     "categoryName": "Catégorie",
     "confirmAmenityCategoryDeletion": "Supprimer la catégorie de commodité '{category}' ? Cette action est irréversible.",
     "noCategory": "Aucune catégorie",
-    "placeholder": "ex. Services, Installations, Activités",
-    "useFormToCreateOne": "Utilisez le formulaire ci-haut pour en créer une."
+    "placeholder": "ex. Services, Installations, Activités"
   },
   "AdminCampgroundsPage": {
     "title": "Gérer les campings",

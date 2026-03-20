@@ -9,7 +9,7 @@ import SiteCreateClient from "./SiteCreateClient";
 import { generatePageMetadata } from "@/lib/utils";
 import { getTranslations } from "next-intl/server";
 
-const NAMESPACE = "AdminCampgroundSiteCreatePage" as const;
+const NAMESPACE = "AdminSiteCreatePage" as const;
 
 export const generateMetadata = () => generatePageMetadata(NAMESPACE);
 
