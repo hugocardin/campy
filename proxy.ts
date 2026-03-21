@@ -1,15 +1,14 @@
 import createMiddleware from "next-intl/middleware";
 import { NextRequest, NextResponse } from "next/server";
 import { routing } from "./i18n/routing";
-
-import { getUserRoleName } from "@/data/users/get-user-role";
 import { createServerClient } from "@supabase/ssr";
+import { getUserRoleName } from "@/data/users/get-user-role";
 import { USER_ROLE_PLATEFORMADMIN } from "./lib/constants";
 import { routes } from "./lib/routes";
 
-const publicBasePaths = [routes.home(), routes.auth()];
-
 const handleI18nRouting = createMiddleware(routing);
+
+const publicBasePaths = [routes.home(), routes.auth()];
 
 export default async function middleware(request: NextRequest) {
   const response = handleI18nRouting(request);
@@ -31,13 +30,18 @@ export default async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options);
+          });
         },
       },
     },
   );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const isPublic =
     publicBasePaths.some(
@@ -51,10 +55,6 @@ export default async function middleware(request: NextRequest) {
   if (isPublic) {
     return response;
   }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   // Require login
   if (!user) {
