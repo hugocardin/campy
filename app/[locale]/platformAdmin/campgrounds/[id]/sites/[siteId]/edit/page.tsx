@@ -1,14 +1,16 @@
+import { updateSiteAction } from "@/app/actions/site-admin.ts";
 import { BackHeader } from "@/components/layout/back-header";
+import SiteFormClient from "@/components/site/SiteFormClient";
+import { toSiteFormData } from "@/components/site/site-form-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSiteOfCampground } from "@/data/campgrounds/get-campground-sites";
 import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { getAllSiteTypes } from "@/data/site-types/get-site-types";
 import { routes } from "@/lib/routes";
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
-import SiteEditClient from "./SiteEditClient";
 import { generatePageMetadata } from "@/lib/utils";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 const NAMESPACE = "AdminSiteEditPage" as const;
 
@@ -62,10 +64,12 @@ export default async function SiteEditPage({
           </div>
         }
       >
-        <SiteEditClient
-          campground={campground}
-          site={site}
+        <SiteFormClient
+          campgroundId={campground.id}
           siteTypes={siteTypes}
+          initialData={toSiteFormData(site)}
+          onSubmit={updateSiteAction}
+          tNamespace={NAMESPACE}
         />
       </Suspense>
     </div>

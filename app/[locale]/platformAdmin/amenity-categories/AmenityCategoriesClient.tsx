@@ -48,7 +48,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     const result = await createAmenityCategoryAction({ code: code.trim() });
 
     if (!result.success) {
-      setError(result.error.message);
+      setError(result.error_code);
     } else {
       setCode("");
       router.refresh();
@@ -64,7 +64,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     const result = await deleteAmenityCategoryAction(categoryId);
 
     if (!result.success) {
-      setError(result.error.message);
+      setError(result.error_code);
     } else {
       router.refresh();
     }

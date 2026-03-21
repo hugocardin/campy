@@ -21,7 +21,7 @@ export default async function Home() {
           Something went wrong
         </h1>
         <p className="text-lg text-muted-foreground max-w-md mb-8">
-          {campgroundsResult.error.message}
+          {campgroundsResult.error_code}
         </p>
       </div>
     );

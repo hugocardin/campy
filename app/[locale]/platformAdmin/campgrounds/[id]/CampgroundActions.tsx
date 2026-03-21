@@ -43,7 +43,7 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     startTransition(async () => {
       const result = await action(campground.id);
       if (!result.success) {
-        setError(result.error.message);
+        setError(result.error_code);
       } else {
         router.refresh();
       }

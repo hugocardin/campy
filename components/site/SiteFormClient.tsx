@@ -3,8 +3,8 @@
 import { Save } from "lucide-react";
 import { useState, useTransition } from "react";
 
-import { updateSiteAction } from "@/app/actions/site-admin.ts";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
+import { SiteFormData } from "@/components/site/site-form-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,49 +16,52 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CampgroundAdmin } from "@/entities/campground-admin";
+import { ActionResult } from "@/entities/action-result";
 import { SiteType } from "@/entities/site-type";
-import { Site } from "@/entities/sites";
+import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 
-type Props = {
-  campground: CampgroundAdmin;
-  site: Site;
+type SiteFormProps = {
+  campgroundId: string;
   siteTypes: SiteType[];
+  initialData?: SiteFormData;
+  onSubmit: (
+    campgroundId: string,
+    site: SiteCreateUpdateInput,
+  ) => Promise<ActionResult>;
+  tNamespace: string;
 };
 
-type FormData = {
-  name: string;
-  description: string;
-  site_type_id: string;
-  max_rig_length: string;
-  price_per_night: string;
-  min_stay_nights: string;
-};
-
-export default function SiteEditClient({ campground, site, siteTypes }: Props) {
+export default function SiteFormClient({
+  campgroundId,
+  siteTypes,
+  initialData,
+  onSubmit,
+  tNamespace,
+}: SiteFormProps) {
   const tc = useTranslations("common");
-  const t = useTranslations("AdminSiteEditPage");
+  const t = useTranslations(tNamespace);
   const t_site = useTranslations("entities.site");
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [form, setForm] = useState<FormData>({
-    name: site.name,
-    description: site.description,
-    site_type_id: String(site.site_type_id),
-    max_rig_length: String(site.max_rig_length ?? ""),
-    price_per_night: String(site.price_per_night ?? ""),
-    min_stay_nights: String(site.min_stay_nights ?? ""),
-  });
+  const [form, setForm] = useState<SiteFormData>(() => ({
+    name: initialData?.name ?? "",
+    description: initialData?.description ?? "",
+    site_type_id: initialData?.site_type_id ?? "",
+    max_rig_length: initialData?.max_rig_length ?? "",
+    price_per_night: initialData?.price_per_night ?? "",
+    min_stay_nights: initialData?.min_stay_nights ?? "",
+  }));
 
   const isFormValid = Boolean(
     form.name.trim() &&
     form.site_type_id &&
+    form.price_per_night &&
     !isNaN(parseFloat(form.price_per_night)) &&
-    !isNaN(parseFloat(form.min_stay_nights)),
+    !isNaN(parseFloat(form.min_stay_nights || "0")),
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -68,45 +71,39 @@ export default function SiteEditClient({ campground, site, siteTypes }: Props) {
     const maxRigLengthNum = parseFloat(form.max_rig_length);
     const pricePerNightNum = parseFloat(form.price_per_night);
     const minStayNightsNum = parseFloat(form.min_stay_nights);
-    const siteTypeNum = parseFloat(form.site_type_id);
+    const siteTypeIdNum = parseInt(form.site_type_id, 10);
 
-    // Client-side validation
-    if (!form.name.trim()) {
-      setError(t("nameRequired"));
-      return;
-    }
-    if (!form.site_type_id) {
-      setError(t("typeRequired"));
-      return;
-    }
-    if (!form.price_per_night) {
-      setError(t("priceRequired"));
-      return;
-    }
+    if (!form.name.trim()) return setError(t("nameRequired"));
+    if (!form.site_type_id) return setError(t("typeRequired"));
+    if (!form.price_per_night) return setError(t("priceRequired"));
     if (!isNaN(maxRigLengthNum) && maxRigLengthNum < 0) {
-      setError(t("invalidMaxLength"));
-      return;
+      return setError(t("invalidMaxLength"));
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
-      setError(t("invalidPricePerNight"));
-      return;
+      return setError(t("invalidPricePerNight"));
     }
     if (!isNaN(minStayNightsNum) && minStayNightsNum < 0) {
-      setError(t("invalidMinStayNights"));
-      return;
+      return setError(t("invalidMinStayNights"));
+    }
+    if (isNaN(siteTypeIdNum)) {
+      return setError(t("typeRequired"));
     }
 
-    const payload = {
-      id: site.id,
-      ...form,
-      site_type_id: siteTypeNum,
+    const payload: SiteCreateUpdateInput = {
+      id: initialData?.id,
+      name: form.name,
+      description: form.description,
+      site_type_id: siteTypeIdNum,
+      max_rig_length: isNaN(maxRigLengthNum) ? undefined : maxRigLengthNum,
+      price_per_night: pricePerNightNum,
+      min_stay_nights: isNaN(minStayNightsNum) ? undefined : minStayNightsNum,
     };
 
     startTransition(async () => {
-      const result = await updateSiteAction(campground.id, payload);
+      const result = await onSubmit(campgroundId, payload);
 
       if (!result.success) {
-        setError(result.error.message);
+        setError(result.error_code);
       }
     });
   };
@@ -130,7 +127,7 @@ export default function SiteEditClient({ campground, site, siteTypes }: Props) {
 
   return (
     <div className="space-y-10">
-      <ErrorAlert errorMsg={error}></ErrorAlert>
+      <ErrorAlert errorMsg={error} />
 
       <form id="site-form" onSubmit={handleSubmit} className="space-y-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
@@ -171,9 +168,11 @@ export default function SiteEditClient({ campground, site, siteTypes }: Props) {
               <Input
                 id="max_rig_length"
                 name="max_rig_length"
+                type="number"
                 value={form.max_rig_length}
                 onChange={handleChange}
                 className="mt-1.5"
+                placeholder={t_site("maxRigLengthPlaceholder")}
               />
             </div>
           </div>
@@ -211,25 +210,29 @@ export default function SiteEditClient({ campground, site, siteTypes }: Props) {
               <Input
                 id="price_per_night"
                 name="price_per_night"
+                type="number"
+                step="0.01"
                 value={form.price_per_night}
                 onChange={handleChange}
                 className="mt-1.5"
+                placeholder={t_site("pricePerNightPlaceholder")}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="min_stay_nights">
-                  {t_site("minStayNightLabel")}
-                </Label>
-                <Input
-                  id="min_stay_nights"
-                  name="min_stay_nights"
-                  value={form.min_stay_nights}
-                  onChange={handleChange}
-                  className="mt-1.5"
-                />
-              </div>
+            <div>
+              <Label htmlFor="min_stay_nights">
+                {t_site("minStayNightLabel")}
+              </Label>
+              <Input
+                id="min_stay_nights"
+                name="min_stay_nights"
+                type="number"
+                min="0"
+                value={form.min_stay_nights}
+                onChange={handleChange}
+                className="mt-1.5"
+                placeholder={t_site("minStayNightPlaceholder")}
+              />
             </div>
 
             <div className="flex justify-end pt-4">

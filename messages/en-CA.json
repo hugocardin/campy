@@ -56,10 +56,13 @@
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Describe the site...",
       "maxRigLengthLabel": "Max rig length (feet)",
+      "maxRigLengthPlaceholder": "e.g. 35",
       "siteTypeLabel": "Site type",
       "siteTypePlaceholder": "Select a type",
       "pricePerNightLabel": "Price per night",
-      "minStayNightLabel": "Minimal stay nights"
+      "pricePerNightPlaceholder": "e.g. 45.00",
+      "minStayNightLabel": "Minimal stay nights",
+      "minStayNightPlaceholder": "e.g. 2"
     },
     "amenityCategory": {
       "amenityCategory": "Category",

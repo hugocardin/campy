@@ -1,13 +1,14 @@
+import { createSiteAction } from "@/app/actions/site-admin.ts";
 import { BackHeader } from "@/components/layout/back-header";
+import SiteFormClient from "@/components/site/SiteFormClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { getAllSiteTypes } from "@/data/site-types/get-site-types";
 import { routes } from "@/lib/routes";
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
-import SiteCreateClient from "./SiteCreateClient";
 import { generatePageMetadata } from "@/lib/utils";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 const NAMESPACE = "AdminSiteCreatePage" as const;
 
@@ -56,7 +57,12 @@ export default async function SiteCreatePage({
           </div>
         }
       >
-        <SiteCreateClient campground={campground} siteTypes={siteTypes} />
+        <SiteFormClient
+          campgroundId={campground.id}
+          siteTypes={siteTypes}
+          onSubmit={createSiteAction}
+          tNamespace={NAMESPACE}
+        />
       </Suspense>
     </div>
   );

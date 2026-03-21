@@ -1,6 +1,7 @@
 "use server";
 
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultFailure } from "@/entities/action-result";
+import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { routes } from "@/lib/routes";
@@ -8,20 +9,14 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-type UpdateSiteInput = {
-  id: string;
-  name: string;
-  description: string;
-  site_type_id: number;
-  max_rig_length: string;
-  price_per_night: string;
-  min_stay_nights: string;
-};
-
 export async function updateSiteAction(
   campgroundId: string,
-  input: UpdateSiteInput,
+  input: SiteCreateUpdateInput,
 ): Promise<ActionResult> {
+  if (!input.id) {
+    return resultFailure("missing_id");
+  }
+
   try {
     const supabase = await createClient();
 
@@ -53,18 +48,9 @@ export async function updateSiteAction(
   redirect(routes.platformAdmin.campgroundSiteView(campgroundId, input.id));
 }
 
-type CreateSiteInput = {
-  name: string;
-  description: string;
-  site_type_id: number;
-  max_rig_length: number | null;
-  price_per_night: number;
-  min_stay_nights: number;
-};
-
 export async function createSiteAction(
   campgroundId: string,
-  input: CreateSiteInput,
+  input: SiteCreateUpdateInput,
 ): Promise<ActionResult> {
   let newId: string;
 

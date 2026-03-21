@@ -21,7 +21,7 @@ export async function getUserRoleName(
       return unhandledErrortoActionResultError(error);
     }
 
-    return resultSuccess(data.role_name[0].code);
+    return resultSuccess((data.role_name as unknown as { code: string }).code);
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }

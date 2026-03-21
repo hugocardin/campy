@@ -62,7 +62,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     });
 
     if (!result.success) {
-      setError(result.error.message);
+      setError(result.error_code);
     } else {
       setCode("");
       setCategoryId("");
@@ -80,7 +80,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     const result = await deleteAmenityAction(id);
 
     if (!result.success) {
-      setError(result.error.message);
+      setError(result.error_code);
     } else {
       router.refresh();
     }
