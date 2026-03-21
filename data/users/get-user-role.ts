@@ -1,4 +1,4 @@
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,11 +21,7 @@ export async function getUserRoleName(
       return unhandledErrortoActionResultError(error);
     }
 
-    return {
-      success: true,
-      // @ts-expect-error — types are loose because of the join; improve later with generated types
-      data: (data.role_name as { code: string } | null).code,
-    };
+    return resultSuccess(data.role_name[0].code);
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }

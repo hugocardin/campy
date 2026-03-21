@@ -1,4 +1,4 @@
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { AmenityCategory } from "@/entities/amenity-categories";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
@@ -32,10 +32,7 @@ export const getAllAmenityCategories = cache(
 
       const amenityCategories = data.map(toDomain);
 
-      return {
-        success: true,
-        data: amenityCategories,
-      };
+      return resultSuccess(amenityCategories);
     } catch (err) {
       return unhandledErrortoActionResultError(err);
     }

@@ -107,7 +107,17 @@
     "emailLabel": "Email",
     "emailPlaceholder": "you@example.com",
     "passwordLabel": "Password",
-    "passwordPlaceholder": "••••••••"
+    "passwordPlaceholder": "••••••••",
+    "errors": {
+      "invalid_credentials": "Oops! That email/password combination doesn't match our records. Double-check and try again.",
+      "email_already_exists": "Looks like this email is already in use. Want to log in instead?",
+      "weak_password": "Your password needs to be a bit stronger. Try making it longer or adding numbers & symbols.",
+      "email_not_confirmed": "We sent you a confirmation email — please check your inbox (including spam/junk) and click the link to activate your account.",
+      "too_many_requests": "Whoa, slow down! 😅 Give it a minute and we'll be ready for another try.",
+      "invalid_email": "Hmm… that doesn't look like a valid email address. Could you double-check?",
+      "network_error": "We couldn't reach our servers right now. Please check your connection and give it another go.",
+      "unknown_auth_error": "Something unexpected happened on our end. Try again in a moment — or reach out to support if it keeps happening."
+    }
   },
   "ProfilePage": {
     "pageHeader": {
@@ -186,7 +196,7 @@
   "AdminCampgroundDetailsPage": {
     "pageHeader": {
       "title": "Campground : {name}",
-      "description": "Owner: {ownerName} · {ownerEmail}"
+      "description": "Owner: {ownerName} ({ownerEmail})"
     },
     "meta": {
       "title": "Manage Campground | Admin | Campy",
@@ -202,7 +212,7 @@
   "AdminCampgroundAmenitiesPage": {
     "pageHeader": {
       "title": "{name} - Manage campground's amenities",
-      "description": "Owner: {ownerName} · {ownerEmail}"
+      "description": "Owner: {ownerName} ({ownerEmail})"
     },
     "meta": {
       "title": "Manage Campground's amenities | Admin | Campy",
@@ -213,7 +223,7 @@
   "AdminCampgroundEditPage": {
     "pageHeader": {
       "title": "Edit {name}",
-      "description": "Owner: {ownerName} · {ownerEmail}"
+      "description": "Owner: {ownerName} ({ownerEmail})"
     },
     "meta": {
       "title": "Edit Campground | Admin | Campy",
@@ -230,7 +240,7 @@
   "AdminSitesPage": {
     "pageHeader": {
       "title": "{name} - Manage campground's sites",
-      "description": "Owner: {ownerName} · {ownerEmail}"
+      "description": "Owner: {ownerName} ({ownerEmail})"
     },
     "meta": {
       "title": "Manage Campground's sites | Admin | Campy",
@@ -253,7 +263,7 @@
   "AdminSiteCreatePage": {
     "pageHeader": {
       "title": "{name} - Create site",
-      "description": "Owner: {ownerName} · {ownerEmail}"
+      "description": "Owner: {ownerName} ({ownerEmail})"
     },
     "meta": {
       "title": "Create Campground's site | Admin | Campy",

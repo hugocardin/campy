@@ -12,7 +12,7 @@ type Props = {
 };
 
 export default function CampgroundDetail({ campground, amenities }: Props) {
-  const tc = useTranslations("commun");
+  const tc = useTranslations("common");
   const t_campground = useTranslations("entities.campground");
   const t_amenity = useTranslations("entities.amenity");
 

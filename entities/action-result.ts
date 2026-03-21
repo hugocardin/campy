@@ -5,10 +5,17 @@ export type ActionResult<T = unknown> =
     }
   | {
       success: false;
-      error: ActionError;
+      error_code: string;
     };
 
-export type ActionError = {
-  code: string;
-  message: string;
-};
+// ── Factory functions ────────────────────────────────────────────────
+export function resultSuccess<T>(data?: T): ActionResult<T> {
+  return { success: true, data };
+}
+
+export function resultFailure(error_code: string): ActionResult<never> {
+  return {
+    success: false,
+    error_code: error_code,
+  };
+}

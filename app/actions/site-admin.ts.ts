@@ -51,8 +51,6 @@ export async function updateSiteAction(
   }
 
   redirect(routes.platformAdmin.campgroundSiteView(campgroundId, input.id));
-
-  return { success: true };
 }
 
 type CreateSiteInput = {
@@ -100,8 +98,6 @@ export async function createSiteAction(
   }
 
   redirect(routes.platformAdmin.campgroundSiteView(campgroundId, newId));
-
-  return { success: true };
 }
 
 export async function updateSiteAmenitiesAction({
@@ -154,5 +150,4 @@ export async function updateSiteAmenitiesAction({
   }
 
   redirect(routes.platformAdmin.campgroundSiteView(campgroundId, siteId));
-  return { success: true };
 }

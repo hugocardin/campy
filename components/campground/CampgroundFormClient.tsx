@@ -3,7 +3,6 @@
 import { Save } from "lucide-react";
 import { useState, useTransition } from "react";
 
-import { createCampgroundAction } from "@/app/actions/campgrounds-admin";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,53 +15,48 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ActionResult } from "@/entities/action-result";
 import { UserProfileNoRole } from "@/entities/user-profile";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
+import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
+import { CampgroundFormData } from "@/components/campground/campground-form-utils";
 
-type FormData = {
-  name: string;
-  owner_id: string;
-  description: string;
-  address: string;
-  city: string;
-  province: string;
-  country: string;
-  website: string;
-  phone: string;
-  location: {
-    lat: string;
-    lng: string;
-  };
-};
-
-type Props = {
+type CampgroundFormProps = {
   owners: UserProfileNoRole[];
+  initialData?: CampgroundFormData;
+  onSubmit: (data: CampgroundCreateUpdateInput) => Promise<ActionResult>;
+  tNamespace: string;
 };
 
-export default function CampgroundCreateClient({ owners }: Props) {
+export default function CampgroundFormClient({
+  owners,
+  initialData,
+  onSubmit,
+  tNamespace,
+}: CampgroundFormProps) {
   const tc = useTranslations("common");
-  const t = useTranslations("AdminCampgroundCreatePage");
+  const t = useTranslations(tNamespace);
   const t_campground = useTranslations("entities.campground");
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [form, setForm] = useState<FormData>({
-    name: "",
-    owner_id: "",
-    description: "",
-    address: "",
-    city: "",
-    province: "",
-    country: "",
-    website: "",
-    phone: "",
+  const [form, setForm] = useState<CampgroundFormData>(() => ({
+    name: initialData?.name ?? "",
+    owner_id: initialData?.owner_id ?? "",
+    description: initialData?.description ?? "",
+    address: initialData?.address ?? "",
+    city: initialData?.city ?? "",
+    province: initialData?.province ?? "",
+    country: initialData?.country ?? "",
+    website: initialData?.website ?? "",
+    phone: initialData?.phone ?? "",
     location: {
-      lat: "",
-      lng: "",
+      lat: initialData?.location?.lat ?? "",
+      lng: initialData?.location?.lng ?? "",
     },
-  });
+  }));
 
   const isFormValid = Boolean(
     form.name.trim() &&
@@ -80,27 +74,24 @@ export default function CampgroundCreateClient({ owners }: Props) {
     const latNum = parseFloat(form.location.lat);
     const lngNum = parseFloat(form.location.lng);
 
-    // Basic client-side validation for required fields
-    if (!form.name.trim()) {
-      setError(t("errors.nameRequired"));
-      return;
-    }
-    if (!form.owner_id) {
-      setError(t("errors.ownerRequired"));
-      return;
-    }
-    if (isNaN(latNum) || latNum < -90 || latNum > 90) {
-      setError(t("errors.latitudeInvalid"));
-      return;
-    }
-    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
-      setError(t("errors.longitudeInvalid"));
-      return;
-    }
+    if (!form.name.trim()) return setError(t("errors.nameRequired"));
+    if (!form.owner_id) return setError(t("errors.ownerRequired"));
+    if (isNaN(latNum) || latNum < -90 || latNum > 90)
+      return setError(t("errors.latitudeInvalid"));
+    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180)
+      return setError(t("errors.longitudeInvalid"));
 
-    // Convert lat/lng to numbers for the action
-    const payload = {
-      ...form,
+    const payload: CampgroundCreateUpdateInput = {
+      id: initialData?.id,
+      name: form.name,
+      owner_id: form.owner_id,
+      description: form.description,
+      address: form.address,
+      city: form.city,
+      province: form.province,
+      country: form.country,
+      website: form.website,
+      phone: form.phone,
       location: {
         lat: latNum,
         lng: lngNum,
@@ -108,10 +99,10 @@ export default function CampgroundCreateClient({ owners }: Props) {
     };
 
     startTransition(async () => {
-      const result = await createCampgroundAction(payload);
+      const result = await onSubmit(payload);
 
       if (!result.success) {
-        setError(result.error.code);
+        setError(result.error_code);
       }
     });
   };
@@ -124,6 +115,11 @@ export default function CampgroundCreateClient({ owners }: Props) {
     setError(null);
   };
 
+  const handleOwnerChange = (value: string) => {
+    setForm((prev) => ({ ...prev, owner_id: value }));
+    setError(null);
+  };
+
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({
@@ -133,11 +129,6 @@ export default function CampgroundCreateClient({ owners }: Props) {
         [name]: value,
       },
     }));
-    setError(null);
-  };
-
-  const handleOwnerChange = (value: string) => {
-    setForm((prev) => ({ ...prev, owner_id: value }));
     setError(null);
   };
 
@@ -245,8 +236,8 @@ export default function CampgroundCreateClient({ owners }: Props) {
                 name="address"
                 value={form.address}
                 onChange={handleChange}
-                placeholder={t_campground("addressPlaceholder")}
                 className="mt-1.5"
+                placeholder={t_campground("addressPlaceholder")}
               />
             </div>
 
@@ -284,8 +275,8 @@ export default function CampgroundCreateClient({ owners }: Props) {
                 name="country"
                 value={form.country}
                 onChange={handleChange}
-                placeholder={t_campground("countryPlaceholder")}
                 className="mt-1.5"
+                placeholder={t_campground("countryPlaceholder")}
               />
             </div>
 
@@ -354,7 +345,7 @@ export default function CampgroundCreateClient({ owners }: Props) {
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    {tc("create")}
+                    {tc("save")}
                   </>
                 )}
               </Button>

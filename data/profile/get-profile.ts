@@ -1,4 +1,4 @@
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { UserProfile } from "@/entities/user-profile";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
@@ -42,10 +42,7 @@ export const getUserProfile = async (
     // @ts-expect-error — types are loose because of the join; improve later with generated types
     const userProfile = toDomain(data, userId);
 
-    return {
-      success: true,
-      data: userProfile,
-    };
+    return resultSuccess(userProfile);
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }

@@ -1,5 +1,5 @@
 import { Campground } from "@/entities/campground";
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { createClient } from "@/lib/supabase/server";
@@ -53,10 +53,7 @@ export const getCampgrounds = cache(
 
       const campgrounds = data.map(toDomain);
 
-      return {
-        success: true,
-        data: campgrounds,
-      };
+      return resultSuccess(campgrounds);
     } catch (err) {
       return unhandledErrortoActionResultError(err);
     }

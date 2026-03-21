@@ -1,3 +1,5 @@
+import { createCampgroundAction } from "@/app/actions/campgrounds-admin";
+import CampgroundFormClient from "@/components/campground/CampgroundFormClient";
 import { BackHeader } from "@/components/layout/back-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getOwners } from "@/data/profile/get-owners";
@@ -6,7 +8,6 @@ import { generatePageMetadata } from "@/lib/utils";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import CampgroundCreateClient from "./CampgroundCreateClient";
 
 const NAMESPACE = "AdminCampgroundCreatePage" as const;
 
@@ -38,7 +39,11 @@ export default async function CampgroundCreatePage() {
           </div>
         }
       >
-        <CampgroundCreateClient owners={owners} />
+        <CampgroundFormClient
+          owners={owners}
+          onSubmit={createCampgroundAction}
+          tNamespace={NAMESPACE}
+        />
       </Suspense>
     </div>
   );

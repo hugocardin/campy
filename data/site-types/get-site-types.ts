@@ -1,4 +1,4 @@
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { SiteType } from "@/entities/site-type";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
@@ -32,10 +32,7 @@ export const getAllSiteTypes = cache(
 
       const siteTypes = data.map(toDomain);
 
-      return {
-        success: true,
-        data: siteTypes,
-      };
+      return resultSuccess(siteTypes);
     } catch (err) {
       return unhandledErrortoActionResultError(err);
     }

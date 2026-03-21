@@ -1,6 +1,11 @@
 "use server";
 
-import { ActionResult } from "@/entities/action-result";
+import {
+  ActionResult,
+  resultFailure,
+  resultSuccess,
+} from "@/entities/action-result";
+import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { routes } from "@/lib/routes";
@@ -29,7 +34,7 @@ export async function inactivateCampgroundAction(
     revalidatePath(routes.platformAdmin.campgroundView(id));
     revalidatePath(routes.platformAdmin.campgroundEdit(id));
 
-    return { success: true };
+    return resultSuccess();
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }
@@ -56,32 +61,20 @@ export async function activateCampgroundAction(
     revalidatePath(routes.platformAdmin.campgroundView(id));
     revalidatePath(routes.platformAdmin.campgroundEdit(id));
 
-    return { success: true };
+    return resultSuccess();
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }
 }
 
-type UpdateCampgroundInput = {
-  id: string;
-  name: string;
-  description: string;
-  address: string;
-  city: string;
-  province: string;
-  country: string;
-  website: string;
-  phone: string;
-  location: {
-    lat: number;
-    lng: number;
-  };
-};
-
 export async function updateCampgroundAction(
-  input: UpdateCampgroundInput,
+  input: CampgroundCreateUpdateInput,
 ): Promise<ActionResult> {
   try {
+    if (!input.id) {
+      return resultFailure("missing_id");
+    }
+
     const supabase = await createClient();
 
     // Build the geography point in WKT format (Well-Known Text)
@@ -93,6 +86,7 @@ export async function updateCampgroundAction(
       .from("campgrounds")
       .update({
         name: input.name,
+        owner_id: input.owner_id,
         description: input.description || null,
         address: input.address || null,
         city: input.city || null,
@@ -120,28 +114,10 @@ export async function updateCampgroundAction(
   }
 
   redirect(routes.platformAdmin.campgroundView(input.id));
-
-  return { success: true };
 }
 
-type CreateCampgroundInput = {
-  name: string;
-  owner_id: string;
-  description?: string;
-  address?: string;
-  city?: string;
-  province?: string;
-  country?: string;
-  website?: string;
-  phone?: string;
-  location: {
-    lat: number;
-    lng: number;
-  };
-};
-
 export async function createCampgroundAction(
-  input: CreateCampgroundInput,
+  input: CampgroundCreateUpdateInput,
 ): Promise<ActionResult> {
   let newId: string;
 
@@ -180,11 +156,6 @@ export async function createCampgroundAction(
   }
 
   redirect(routes.platformAdmin.campgroundView(newId));
-
-  return {
-    success: true,
-    data: newId,
-  };
 }
 
 export async function updateCampgroundAmenitiesAction({
@@ -232,5 +203,4 @@ export async function updateCampgroundAmenitiesAction({
   }
 
   redirect(routes.platformAdmin.campgroundView(campgroundId));
-  return { success: true };
 }

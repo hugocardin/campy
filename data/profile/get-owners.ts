@@ -1,4 +1,4 @@
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { UserProfileNoRole } from "@/entities/user-profile";
 import { USER_ROLE_OWNER } from "@/lib/constants";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
@@ -34,10 +34,7 @@ export const getOwners = async (): Promise<
 
     const ownerProfiles = data.map(toDomain);
 
-    return {
-      success: true,
-      data: ownerProfiles,
-    };
+    return resultSuccess(ownerProfiles);
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }

@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { routes } from "@/lib/routes";
@@ -29,7 +29,7 @@ export async function createAmenityCategoryAction(
 
     revalidatePath(routes.platformAdmin.amenityCategory());
 
-    return { success: true, data };
+    return resultSuccess(data);
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }
@@ -52,7 +52,7 @@ export async function deleteAmenityCategoryAction(
 
     revalidatePath(routes.platformAdmin.amenityCategory());
 
-    return { success: true };
+    return resultSuccess();
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }

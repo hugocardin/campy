@@ -1,5 +1,5 @@
 import { CampgroundAdmin } from "@/entities/campground-admin";
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { createClient } from "@/lib/supabase/server";
@@ -63,10 +63,7 @@ export const getCampgroundsAdmin = cache(
 
       const campgrounds = data.map(toDomain);
 
-      return {
-        success: true,
-        data: campgrounds,
-      };
+      return resultSuccess(campgrounds);
     } catch (err) {
       return unhandledErrortoActionResultError(err);
     }
@@ -89,10 +86,7 @@ export const getCampgroundAdminById = cache(
       }
       const campground = toDomain(data);
 
-      return {
-        success: true,
-        data: campground,
-      };
+      return resultSuccess(campground);
     } catch (err) {
       return unhandledErrortoActionResultError(err);
     }

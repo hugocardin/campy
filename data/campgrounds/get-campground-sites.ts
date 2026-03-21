@@ -1,4 +1,4 @@
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { Site } from "@/entities/sites";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
@@ -57,10 +57,7 @@ export const getSitesOfCampground = cache(
       // @ts-expect-error — types are loose because of the join
       const sites = data.map(toDomain);
 
-      return {
-        success: true,
-        data: sites,
-      };
+      return resultSuccess(sites);
     } catch (err) {
       return unhandledErrortoActionResultError(err);
     }
@@ -95,10 +92,7 @@ export const getSiteOfCampground = cache(
       // @ts-expect-error — types are loose because of the join
       const site = toDomain(data);
 
-      return {
-        success: true,
-        data: site,
-      };
+      return resultSuccess(site);
     } catch (err) {
       return unhandledErrortoActionResultError(err);
     }

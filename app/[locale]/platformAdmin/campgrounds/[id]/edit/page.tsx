@@ -1,13 +1,15 @@
-import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Suspense } from "react";
-import CampgroundEditClient from "./CampgroundEditClient";
-import { routes } from "@/lib/routes";
-import { redirect } from "next/navigation";
+import { updateCampgroundAction } from "@/app/actions/campgrounds-admin";
+import { toCampgroundFormData } from "@/components/campground/campground-form-utils";
+import CampgroundFormClient from "@/components/campground/CampgroundFormClient";
 import { BackHeader } from "@/components/layout/back-header";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { getOwners } from "@/data/profile/get-owners";
+import { routes } from "@/lib/routes";
 import { generatePageMetadata } from "@/lib/utils";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 const NAMESPACE = "AdminCampgroundEditPage" as const;
 
@@ -56,7 +58,12 @@ export default async function CampgroundEditPage({
           </div>
         }
       >
-        <CampgroundEditClient campground={campground} owners={owners} />
+        <CampgroundFormClient
+          owners={owners}
+          onSubmit={updateCampgroundAction}
+          tNamespace={NAMESPACE}
+          initialData={toCampgroundFormData(campground)}
+        />
       </Suspense>
     </div>
   );

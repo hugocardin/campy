@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
 import { routes } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +32,7 @@ export async function createAmenityAction(
 
     revalidatePath(routes.platformAdmin.amenities());
 
-    return { success: true, data };
+    return resultSuccess(data);
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }
@@ -50,7 +50,7 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
 
     revalidatePath(routes.platformAdmin.amenities());
 
-    return { success: true };
+    return resultSuccess();
   } catch (err) {
     return unhandledErrortoActionResultError(err);
   }

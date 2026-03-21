@@ -1,4 +1,4 @@
-import { ActionResult } from "@/entities/action-result";
+import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { Amenity } from "@/entities/amenity";
 import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
 import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
@@ -53,10 +53,7 @@ export const getAmenitiesForSite = cache(
       // @ts-expect-error — types are loose because of the join
       const amenities = data.map(toDomain);
 
-      return {
-        success: true,
-        data: amenities,
-      };
+      return resultSuccess(amenities);
     } catch (err) {
       return unhandledErrortoActionResultError(err);
     }

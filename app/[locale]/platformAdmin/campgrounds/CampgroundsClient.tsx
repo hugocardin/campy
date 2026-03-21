@@ -60,7 +60,9 @@ export default function CampgroundsClient({ campgrounds }: Props) {
                 </TableCell>
 
                 <TableCell>
-                  {campground.owner_full_name} [{campground.owner_email}]
+                  {campground.owner_full_name
+                    ? `${campground.owner_full_name} (${campground.owner_email})`
+                    : campground.owner_email}
                 </TableCell>
 
                 <TableCell>{campground.phone}</TableCell>

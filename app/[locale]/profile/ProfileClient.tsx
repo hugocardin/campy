@@ -44,7 +44,10 @@ export default function ProfileClient({ profile, user }: Props) {
             {/* Left: Avatar + quick actions */}
             <div className="flex flex-col items-center sm:items-start gap-4">
               <Avatar className="h-24 w-24 sm:h-28 sm:w-28 border-2 border-background shadow-md">
-                <AvatarImage src={undefined} alt={profile.full_name} />
+                <AvatarImage
+                  src={undefined}
+                  alt={profile.full_name ?? profile.email}
+                />
 
                 <AvatarFallback className="text-4xl bg-primary/10 text-primary font-semibold">
                   {initials}
