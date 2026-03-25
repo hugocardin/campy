@@ -1,9 +1,11 @@
-import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { UserProfileNoRole } from "@/entities/user-profile";
 import { USER_ROLE_OWNER } from "@/lib/constants";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
 import { supabaseAdmin } from "@/lib/supabase/admin_server";
+import {
+  handleDbResponse,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 
 type ProfileWithRoleNameRow = {
   id: string;
@@ -23,19 +25,21 @@ export const getOwners = async (): Promise<
   ActionResult<UserProfileNoRole[]>
 > => {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, email, user_roles!inner(code)")
-      .eq("user_roles.code", USER_ROLE_OWNER);
+    const result = await handleDbResponse(
+      supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, email, user_roles!inner(code)")
+        .eq("user_roles.code", USER_ROLE_OWNER),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (!result.success) {
+      return result;
     }
 
-    const ownerProfiles = data.map(toDomain);
+    const ownerProfiles = result.data.map(toDomain);
 
     return resultSuccess(ownerProfiles);
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 };

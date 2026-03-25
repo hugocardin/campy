@@ -1,9 +1,12 @@
 "use server";
 
-import { ActionResult, resultSuccess } from "@/entities/action-result";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult } from "@/lib/errors";
 import { routes } from "@/lib/routes";
+import {
+  handleDbNoData,
+  handleDbSingle,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -17,21 +20,21 @@ export async function createAmenityCategoryAction(
   try {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
-      .from("amenity_categories")
-      .insert({ code: input.code.toUpperCase().trim() })
-      .select("*")
-      .single();
+    const result = await handleDbSingle(
+      supabase
+        .from("amenity_categories")
+        .insert({ code: input.code.toUpperCase().trim() })
+        .select("*")
+        .single(),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (result.success) {
+      revalidatePath(routes.platformAdmin.amenityCategory());
     }
 
-    revalidatePath(routes.platformAdmin.amenityCategory());
-
-    return resultSuccess(data);
+    return result;
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 }
 
@@ -41,19 +44,16 @@ export async function deleteAmenityCategoryAction(
   try {
     const supabase = await createClient();
 
-    const { error } = await supabase
-      .from("amenity_categories")
-      .delete()
-      .eq("id", id);
+    const result = await handleDbNoData(
+      supabase.from("amenity_categories").delete().eq("id", id),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (result.success) {
+      revalidatePath(routes.platformAdmin.amenityCategory());
     }
 
-    revalidatePath(routes.platformAdmin.amenityCategory());
-
-    return resultSuccess();
+    return result;
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 }

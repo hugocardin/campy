@@ -73,7 +73,7 @@ export default function CampgroundAmenitiesClient({
       });
 
       if (!result.success) {
-        setError(result.error.code);
+        setError(result.errorCode);
         return;
       }
     });

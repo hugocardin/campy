@@ -1,7 +1,9 @@
 import { Campground } from "@/entities/campground";
-import { ActionResult, resultSuccess } from "@/entities/action-result";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
+import {
+  handleDbResponse,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -42,20 +44,19 @@ export const getCampgrounds = cache(
     try {
       const supabase = await createClient();
 
-      const { data, error } = await supabase
-        .from("v_campgrounds")
-        .select("*")
-        .order("name");
+      const result = await handleDbResponse(
+        supabase.from("v_campgrounds").select("*").order("name"),
+      );
 
-      if (error) {
-        return pgerrorToActionResultError(error);
+      if (!result.success) {
+        return result;
       }
 
-      const campgrounds = data.map(toDomain);
+      const campgrounds = result.data.map(toDomain);
 
       return resultSuccess(campgrounds);
     } catch (err) {
-      return unhandledErrortoActionResultError(err);
+      return handleUnexpectedError(err);
     }
   },
 );

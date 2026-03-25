@@ -1,7 +1,10 @@
-import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { Site } from "@/entities/sites";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
+import {
+  handleDbResponse,
+  handleDbSingle,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -34,10 +37,11 @@ export const getSitesOfCampground = cache(
     try {
       const supabase = await createClient();
 
-      const { data, error } = await supabase
-        .from("sites")
-        .select(
-          ` id,
+      const result = await handleDbResponse(
+        supabase
+          .from("sites")
+          .select(
+            ` id,
             name,
             site_type_id,
             max_rig_length,
@@ -46,20 +50,21 @@ export const getSitesOfCampground = cache(
             description,
             site_types!inner (code)
           `,
-        )
-        .eq("campground_id", campgroundId)
-        .order("name", { ascending: true });
+          )
+          .eq("campground_id", campgroundId)
+          .order("name", { ascending: true }),
+      );
 
-      if (error) {
-        return pgerrorToActionResultError(error);
+      if (!result.success) {
+        return result;
       }
 
       // @ts-expect-error — types are loose because of the join
-      const sites = data.map(toDomain);
+      const sites = result.data.map(toDomain);
 
       return resultSuccess(sites);
     } catch (err) {
-      return unhandledErrortoActionResultError(err);
+      return handleUnexpectedError(err);
     }
   },
 );
@@ -69,10 +74,11 @@ export const getSiteOfCampground = cache(
     try {
       const supabase = await createClient();
 
-      const { data, error } = await supabase
-        .from("sites")
-        .select(
-          ` id,
+      const result = await handleDbSingle(
+        supabase
+          .from("sites")
+          .select(
+            ` id,
             name,
             site_type_id,
             max_rig_length,
@@ -81,20 +87,21 @@ export const getSiteOfCampground = cache(
             description,
             site_types!inner (code)
           `,
-        )
-        .eq("id", siteId)
-        .single();
+          )
+          .eq("id", siteId)
+          .single(),
+      );
 
-      if (error) {
-        return pgerrorToActionResultError(error);
+      if (!result.success) {
+        return result;
       }
 
       // @ts-expect-error — types are loose because of the join
-      const site = toDomain(data);
+      const site = toDomain(result.data);
 
       return resultSuccess(site);
     } catch (err) {
-      return unhandledErrortoActionResultError(err);
+      return handleUnexpectedError(err);
     }
   },
 );

@@ -1,5 +1,5 @@
-import { ActionResult, resultSuccess } from "@/entities/action-result";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
+import { handleDbSingle, handleUnexpectedError } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -11,18 +11,23 @@ export async function getUserRoleName(
 ): Promise<ActionResult<string>> {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(`role_name:user_roles ( code )`)
-      .eq("id", userId)
-      .single();
 
-    if (error) {
-      return unhandledErrortoActionResultError(error);
+    const result = await handleDbSingle(
+      supabase
+        .from("profiles")
+        .select(`role_name:user_roles ( code )`)
+        .eq("id", userId)
+        .single(),
+    );
+
+    if (!result.success) {
+      return result;
     }
 
-    return resultSuccess((data.role_name as unknown as { code: string }).code);
+    return resultSuccess(
+      (result.data.role_name as unknown as { code: string }).code,
+    );
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 }

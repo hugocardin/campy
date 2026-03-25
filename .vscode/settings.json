@@ -4,5 +4,7 @@
     "source.fixAll.eslint": "explicit"
   },
   "eslint.format.enable": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "todo-tree.tree.showCountsInTree": true,
+  "todo-tree.tree.showBadges": true
 }

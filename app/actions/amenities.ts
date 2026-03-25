@@ -1,8 +1,12 @@
 "use server";
 
-import { ActionResult, resultSuccess } from "@/entities/action-result";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult } from "@/lib/errors";
 import { routes } from "@/lib/routes";
+import {
+  handleDbNoData,
+  handleDbSingle,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -17,24 +21,24 @@ export async function createAmenityAction(
   try {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
-      .from("amenities")
-      .insert({
-        code: input.code.toUpperCase().trim(),
-        category_id: input.category_id,
-      })
-      .select("*")
-      .single();
+    const result = await handleDbSingle(
+      supabase
+        .from("amenities")
+        .insert({
+          code: input.code.toUpperCase().trim(),
+          category_id: input.category_id,
+        })
+        .select()
+        .single(),
+    );
 
-    if (error) {
-      return unhandledErrortoActionResultError(error);
+    if (result.success) {
+      revalidatePath(routes.platformAdmin.amenities());
     }
 
-    revalidatePath(routes.platformAdmin.amenities());
-
-    return resultSuccess(data);
+    return result;
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 }
 
@@ -42,16 +46,16 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
   try {
     const supabase = await createClient();
 
-    const { error } = await supabase.from("amenities").delete().eq("id", id);
+    const result = await handleDbNoData(
+      supabase.from("amenities").delete().eq("id", id),
+    );
 
-    if (error) {
-      return unhandledErrortoActionResultError(error);
+    if (result.success) {
+      revalidatePath(routes.platformAdmin.amenities());
     }
 
-    revalidatePath(routes.platformAdmin.amenities());
-
-    return resultSuccess();
+    return result;
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 }

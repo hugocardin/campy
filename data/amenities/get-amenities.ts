@@ -1,7 +1,9 @@
-import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { Amenity } from "@/entities/amenity";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
+import {
+  handleDbResponse,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -25,28 +27,30 @@ export const getAllAmenities = cache(
     try {
       const supabase = await createClient();
 
-      const { data, error } = await supabase
-        .from("amenities")
-        .select(
-          `
+      const result = await handleDbResponse(
+        supabase
+          .from("amenities")
+          .select(
+            `
         id,
         code,
         category_id,
         amenity_categories!left (code)
       `,
-        )
-        .order("code");
+          )
+          .order("code"),
+      );
 
-      if (error) {
-        return pgerrorToActionResultError(error);
+      if (!result.success) {
+        return result;
       }
 
       // @ts-expect-error — types are loose because of the join
-      const amenities = data.map(toDomain);
+      const amenities = result.data.map(toDomain);
 
       return resultSuccess(amenities);
     } catch (err) {
-      return unhandledErrortoActionResultError(err);
+      return handleUnexpectedError(err);
     }
   },
 );

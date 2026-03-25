@@ -1,70 +1,53 @@
 "use server";
 
-import {
-  ActionResult,
-  resultFailure,
-  resultSuccess,
-} from "@/entities/action-result";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultError } from "@/lib/errors";
+import { CommonErrorCode } from "@/lib/errors/common";
 import { routes } from "@/lib/routes";
+import {
+  handleDbNoData,
+  handleDbSingle,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-export async function inactivateCampgroundAction(
-  id: string,
-): Promise<ActionResult> {
+async function changeCampgroundStatus(id: string, activeFlagToSet: boolean) {
   try {
     const supabase = await createClient();
 
-    const { error } = await supabase
-      .from("campgrounds")
-      .update({ active: false })
-      .eq("id", id)
-      .select()
-      .single();
+    const result = await handleDbSingle(
+      supabase
+        .from("campgrounds")
+        .update({ active: activeFlagToSet })
+        .eq("id", id)
+        .select()
+        .single(),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (result.success) {
+      revalidatePath(routes.platformAdmin.campgrounds());
+      revalidatePath(routes.platformAdmin.campgroundView(id));
+      revalidatePath(routes.platformAdmin.campgroundEdit(id));
     }
 
-    revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundView(id));
-    revalidatePath(routes.platformAdmin.campgroundEdit(id));
-
-    return resultSuccess();
+    return result;
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
+}
+
+export async function inactivateCampgroundAction(
+  id: string,
+): Promise<ActionResult> {
+  return changeCampgroundStatus(id, false);
 }
 
 export async function activateCampgroundAction(
   id: string,
 ): Promise<ActionResult> {
-  try {
-    const supabase = await createClient();
-
-    const { error } = await supabase
-      .from("campgrounds")
-      .update({ active: true })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      return pgerrorToActionResultError(error);
-    }
-
-    revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundView(id));
-    revalidatePath(routes.platformAdmin.campgroundEdit(id));
-
-    return resultSuccess();
-  } catch (err) {
-    return unhandledErrortoActionResultError(err);
-  }
+  return changeCampgroundStatus(id, true);
 }
 
 export async function updateCampgroundAction(
@@ -72,7 +55,7 @@ export async function updateCampgroundAction(
 ): Promise<ActionResult> {
   try {
     if (!input.id) {
-      return resultFailure("missing_id");
+      return resultError(CommonErrorCode.MISSING_ID);
     }
 
     const supabase = await createClient();
@@ -82,80 +65,82 @@ export async function updateCampgroundAction(
     // SRID 4326 = WGS 84 (standard for GPS coordinates)
     const locationWKT = `POINT(${input.location.lng} ${input.location.lat})`;
 
-    const { error } = await supabase
-      .from("campgrounds")
-      .update({
-        name: input.name,
-        owner_id: input.owner_id,
-        description: input.description || null,
-        address: input.address || null,
-        city: input.city || null,
-        province: input.province || null,
-        country: input.country || null,
-        website: input.website || null,
-        phone: input.phone || null,
-        updated_at: new Date().toISOString(),
+    const result = await handleDbNoData(
+      supabase
+        .from("campgrounds")
+        .update({
+          name: input.name,
+          owner_id: input.owner_id,
+          description: input.description || null,
+          address: input.address || null,
+          city: input.city || null,
+          province: input.province || null,
+          country: input.country || null,
+          website: input.website || null,
+          phone: input.phone || null,
+          updated_at: new Date().toISOString(),
 
-        // This is the important part: convert to geography type
-        location: `SRID=4326;${locationWKT}`,
-      })
-      .eq("id", input.id);
+          // This is the important part: convert to geography type
+          location: `SRID=4326;${locationWKT}`,
+        })
+        .eq("id", input.id),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (result.success) {
+      // Revalidate both list and detail page
+      revalidatePath(routes.platformAdmin.campgrounds());
+      revalidatePath(routes.platformAdmin.campgroundView(input.id));
+      revalidatePath(routes.platformAdmin.campgroundEdit(input.id));
     }
-
-    // Revalidate both list and detail page
-    revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundView(input.id));
-    revalidatePath(routes.platformAdmin.campgroundEdit(input.id));
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundView(input.id));
+  redirect(routes.platformAdmin.campgroundView(input.id)); // TODO redirect should be done from the client side.
 }
 
 export async function createCampgroundAction(
   input: CampgroundCreateUpdateInput,
 ): Promise<ActionResult> {
-  let newId: string;
+  let newCampgroundId;
 
   try {
     const locationWKT = `POINT(${input.location.lng} ${input.location.lat})`;
     const supabase = await createClient();
 
-    const { data, error } = await supabase
-      .from("campgrounds")
-      .insert({
-        name: input.name.trim(),
-        owner_id: input.owner_id,
-        description: input.description?.trim() || null,
-        address: input.address?.trim() || null,
-        city: input.city?.trim() || null,
-        province: input.province?.trim() || null,
-        country: input.country?.trim() || null,
-        website: input.website?.trim() || null,
-        phone: input.phone?.trim() || null,
-        location: `SRID=4326;${locationWKT}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
+    const result = await handleDbSingle(
+      supabase
+        .from("campgrounds")
+        .insert({
+          name: input.name.trim(),
+          owner_id: input.owner_id,
+          description: input.description?.trim() || null,
+          address: input.address?.trim() || null,
+          city: input.city?.trim() || null,
+          province: input.province?.trim() || null,
+          country: input.country?.trim() || null,
+          website: input.website?.trim() || null,
+          phone: input.phone?.trim() || null,
+          location: `SRID=4326;${locationWKT}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single(),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (!result.success) {
+      return result;
     }
 
-    newId = data.id;
+    newCampgroundId = result.data.id;
 
     revalidatePath(routes.platformAdmin.campgrounds());
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundView(newId));
+  redirect(routes.platformAdmin.campgroundView(newCampgroundId));
 }
 
 export async function updateCampgroundAmenitiesAction({
@@ -169,13 +154,15 @@ export async function updateCampgroundAmenitiesAction({
     const supabase = await createClient();
 
     // 1. Delete all existing links for this campground
-    const { error: deleteError } = await supabase
-      .from("campground_amenities")
-      .delete()
-      .eq("campground_id", campgroundId);
+    const resultDelete = await handleDbNoData(
+      supabase
+        .from("campground_amenities")
+        .delete()
+        .eq("campground_id", campgroundId),
+    );
 
-    if (deleteError) {
-      return pgerrorToActionResultError(deleteError);
+    if (!resultDelete.success) {
+      return resultDelete;
     }
 
     // 2. If there are new amenities to add → insert them
@@ -185,12 +172,12 @@ export async function updateCampgroundAmenitiesAction({
         amenity_id,
       }));
 
-      const { error: insertError } = await supabase
-        .from("campground_amenities")
-        .insert(inserts);
+      const resultInsert = await handleDbNoData(
+        supabase.from("campground_amenities").insert(inserts),
+      );
 
-      if (insertError) {
-        return pgerrorToActionResultError(insertError);
+      if (!resultInsert.success) {
+        return resultInsert;
       }
     }
 
@@ -199,7 +186,7 @@ export async function updateCampgroundAmenitiesAction({
     revalidatePath(routes.platformAdmin.campgroundEdit(campgroundId));
     revalidatePath(routes.platformAdmin.campgroundAmenities(campgroundId));
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 
   redirect(routes.platformAdmin.campgroundView(campgroundId));

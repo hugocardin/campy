@@ -16,9 +16,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { mapAuthError } from "@/lib/errors/supabase-auth-errors";
 import { routes } from "@/lib/routes";
 import Image from "next/image";
+import { mapAuthError } from "@/lib/errors";
 
 type AuthFormProps = {
   redirectTo: string;
@@ -54,7 +54,7 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
       }
 
       if (result.error) {
-        const { code, message } = mapAuthError(result.error);
+        const code = mapAuthError(result.error);
         console.error("Auth error:", message);
         setError(code);
         return;

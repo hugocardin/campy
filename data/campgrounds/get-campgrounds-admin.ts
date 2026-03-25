@@ -1,7 +1,10 @@
 import { CampgroundAdmin } from "@/entities/campground-admin";
-import { ActionResult, resultSuccess } from "@/entities/action-result";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
+import {
+  handleDbResponse,
+  handleDbSingle,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -50,22 +53,19 @@ export const getCampgroundsAdmin = cache(
     try {
       const supabase = await createClient();
 
-      const query = supabase
-        .from("v_campgrounds_admin")
-        .select("*")
-        .order("name");
+      const result = await handleDbResponse(
+        supabase.from("v_campgrounds_admin").select("*").order("name"),
+      );
 
-      const { data, error } = await query;
-
-      if (error) {
-        return pgerrorToActionResultError(error);
+      if (!result.success) {
+        return result;
       }
 
-      const campgrounds = data.map(toDomain);
+      const campgrounds = result.data.map(toDomain);
 
       return resultSuccess(campgrounds);
     } catch (err) {
-      return unhandledErrortoActionResultError(err);
+      return handleUnexpectedError(err);
     }
   },
 );
@@ -75,20 +75,18 @@ export const getCampgroundAdminById = cache(
     try {
       const supabase = await createClient();
 
-      const { data, error } = await supabase
-        .from("v_campgrounds_admin")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const result = await handleDbSingle(
+        supabase.from("v_campgrounds_admin").select("*").eq("id", id).single(),
+      );
 
-      if (error) {
-        return pgerrorToActionResultError(error);
+      if (!result.success) {
+        return result;
       }
-      const campground = toDomain(data);
+      const campground = toDomain(result.data);
 
       return resultSuccess(campground);
     } catch (err) {
-      return unhandledErrortoActionResultError(err);
+      return handleUnexpectedError(err);
     }
   },
 );

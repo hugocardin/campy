@@ -1,7 +1,9 @@
-import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { Amenity } from "@/entities/amenity";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
+import {
+  handleDbResponse,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -30,10 +32,11 @@ export const getAmenitiesForCampground = cache(
     try {
       const supabase = await createClient();
 
-      const { data, error } = await supabase
-        .from("campground_amenities")
-        .select(
-          `
+      const result = await handleDbResponse(
+        supabase
+          .from("campground_amenities")
+          .select(
+            `
         amenities!inner (
           id,
           code,
@@ -41,21 +44,25 @@ export const getAmenitiesForCampground = cache(
           amenity_categories!left (code)
         )
       `,
-        )
-        .eq("campground_id", campgroundId)
-        .order("category_id", { referencedTable: "amenities", ascending: true })
-        .order("code", { referencedTable: "amenities", ascending: true });
+          )
+          .eq("campground_id", campgroundId)
+          .order("category_id", {
+            referencedTable: "amenities",
+            ascending: true,
+          })
+          .order("code", { referencedTable: "amenities", ascending: true }),
+      );
 
-      if (error) {
-        return pgerrorToActionResultError(error);
+      if (!result.success) {
+        return result;
       }
 
       // @ts-expect-error — types are loose because of the join
-      const amenities = data.map(toDomain);
+      const amenities = result.data.map(toDomain);
 
       return resultSuccess(amenities);
     } catch (err) {
-      return unhandledErrortoActionResultError(err);
+      return handleUnexpectedError(err);
     }
   },
 );

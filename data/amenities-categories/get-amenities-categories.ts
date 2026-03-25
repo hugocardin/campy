@@ -1,7 +1,9 @@
-import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { AmenityCategory } from "@/entities/amenity-categories";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
+import {
+  handleDbResponse,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -21,20 +23,19 @@ export const getAllAmenityCategories = cache(
   async (): Promise<ActionResult<AmenityCategory[]>> => {
     try {
       const supabase = await createClient();
-      const { data, error } = await supabase
-        .from("amenity_categories")
-        .select("*")
-        .order("code");
+      const result = await handleDbResponse(
+        supabase.from("amenity_categories").select("*").order("code"),
+      );
 
-      if (error) {
-        return pgerrorToActionResultError(error);
+      if (!result.success) {
+        return result;
       }
 
-      const amenityCategories = data.map(toDomain);
+      const amenityCategories = result.data.map(toDomain);
 
       return resultSuccess(amenityCategories);
     } catch (err) {
-      return unhandledErrortoActionResultError(err);
+      return handleUnexpectedError(err);
     }
   },
 );

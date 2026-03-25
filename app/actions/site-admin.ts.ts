@@ -1,10 +1,13 @@
 "use server";
 
-import { ActionResult, resultFailure } from "@/entities/action-result";
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, CommonErrorCode, resultError } from "@/lib/errors";
 import { routes } from "@/lib/routes";
+import {
+  handleDbNoData,
+  handleDbSingle,
+  handleUnexpectedError,
+} from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -14,27 +17,29 @@ export async function updateSiteAction(
   input: SiteCreateUpdateInput,
 ): Promise<ActionResult> {
   if (!input.id) {
-    return resultFailure("missing_id");
+    return resultError(CommonErrorCode.MISSING_ID);
   }
 
   try {
     const supabase = await createClient();
 
-    const { error } = await supabase
-      .from("sites")
-      .update({
-        name: input.name,
-        site_type_id: input.site_type_id,
-        max_rig_length: input.max_rig_length,
-        price_per_night_base: input.price_per_night,
-        min_stay_nights: input.min_stay_nights,
-        description: input.description,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", input.id);
+    const result = await handleDbNoData(
+      supabase
+        .from("sites")
+        .update({
+          name: input.name,
+          site_type_id: input.site_type_id,
+          max_rig_length: input.max_rig_length,
+          price_per_night_base: input.price_per_night,
+          min_stay_nights: input.min_stay_nights,
+          description: input.description,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.id),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (!result.success) {
+      return result;
     }
 
     revalidatePath(routes.platformAdmin.campgroundSites(campgroundId));
@@ -42,7 +47,7 @@ export async function updateSiteAction(
       routes.platformAdmin.campgroundSiteView(campgroundId, input.id),
     );
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 
   redirect(routes.platformAdmin.campgroundSiteView(campgroundId, input.id));
@@ -52,38 +57,39 @@ export async function createSiteAction(
   campgroundId: string,
   input: SiteCreateUpdateInput,
 ): Promise<ActionResult> {
-  let newId: string;
-
+  let newSiteId;
   try {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
-      .from("sites")
-      .insert({
-        campground_id: campgroundId,
-        name: input.name,
-        site_type_id: input.site_type_id,
-        max_rig_length: input.max_rig_length ?? null,
-        price_per_night_base: input.price_per_night,
-        min_stay_nights: input.min_stay_nights,
-        description: input.description,
-      })
+    const result = await handleDbSingle(
+      supabase
+        .from("sites")
+        .insert({
+          campground_id: campgroundId,
+          name: input.name,
+          site_type_id: input.site_type_id,
+          max_rig_length: input.max_rig_length ?? null,
+          price_per_night_base: input.price_per_night,
+          min_stay_nights: input.min_stay_nights,
+          description: input.description,
+        })
 
-      .select("id")
-      .single();
+        .select("id")
+        .single(),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (!result.success) {
+      return result;
     }
 
-    newId = data.id;
+    newSiteId = result.data.id;
 
     revalidatePath(routes.platformAdmin.campgroundSites(campgroundId));
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundSiteView(campgroundId, newId));
+  redirect(routes.platformAdmin.campgroundSiteView(campgroundId, newSiteId));
 }
 
 export async function updateSiteAmenitiesAction({
@@ -99,13 +105,12 @@ export async function updateSiteAmenitiesAction({
     const supabase = await createClient();
 
     // 1. Delete all existing links for this campground
-    const { error: deleteError } = await supabase
-      .from("site_amenities")
-      .delete()
-      .eq("site_id", siteId);
+    const resultDelete = await handleDbNoData(
+      supabase.from("site_amenities").delete().eq("site_id", siteId),
+    );
 
-    if (deleteError) {
-      return pgerrorToActionResultError(deleteError);
+    if (!resultDelete.success) {
+      return resultDelete;
     }
 
     // 2. If there are new amenities to add → insert them
@@ -115,12 +120,12 @@ export async function updateSiteAmenitiesAction({
         amenity_id,
       }));
 
-      const { error: insertError } = await supabase
-        .from("site_amenities")
-        .insert(inserts);
+      const resultInsert = await handleDbNoData(
+        supabase.from("site_amenities").insert(inserts),
+      );
 
-      if (insertError) {
-        return pgerrorToActionResultError(insertError);
+      if (!resultInsert.success) {
+        return resultInsert;
       }
     }
 
@@ -132,7 +137,7 @@ export async function updateSiteAmenitiesAction({
       routes.platformAdmin.campgroundSiteEdit(campgroundId, siteId),
     );
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 
   redirect(routes.platformAdmin.campgroundSiteView(campgroundId, siteId));

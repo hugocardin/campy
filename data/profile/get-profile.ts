@@ -1,7 +1,6 @@
-import { ActionResult, resultSuccess } from "@/entities/action-result";
 import { UserProfile } from "@/entities/user-profile";
-import { pgerrorToActionResultError } from "@/lib/errors/supabase-errors";
-import { unhandledErrortoActionResultError } from "@/lib/errors/unhanded-errors";
+import { ActionResult, resultSuccess } from "@/lib/errors";
+import { handleDbSingle, handleUnexpectedError } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 
 type ProfileWithRoleNameRow = {
@@ -24,26 +23,29 @@ export const getUserProfile = async (
 ): Promise<ActionResult<UserProfile>> => {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(
-        `
+
+    const result = await handleDbSingle(
+      supabase
+        .from("profiles")
+        .select(
+          `
         full_name, email,
         role_name:user_roles ( code )
         `,
-      )
-      .eq("id", userId)
-      .single();
+        )
+        .eq("id", userId)
+        .single(),
+    );
 
-    if (error) {
-      return pgerrorToActionResultError(error);
+    if (!result.success) {
+      return result;
     }
 
     // @ts-expect-error — types are loose because of the join; improve later with generated types
-    const userProfile = toDomain(data, userId);
+    const userProfile = toDomain(result.data, userId);
 
     return resultSuccess(userProfile);
   } catch (err) {
-    return unhandledErrortoActionResultError(err);
+    return handleUnexpectedError(err);
   }
 };
