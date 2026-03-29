@@ -10,13 +10,13 @@ type ManageSitesButtonProps = {
 };
 
 export function ManageSitesButton({ href }: ManageSitesButtonProps) {
-  const t_site = useTranslations("entities.site");
+  const t_sites = useTranslations("sites");
 
   return (
     <Button asChild variant="outline">
       <Link href={href}>
         <Tent className="mr-2 h-4 w-4" />
-        {t_site("sites")}
+        {t_sites("plural")}
       </Link>
     </Button>
   );

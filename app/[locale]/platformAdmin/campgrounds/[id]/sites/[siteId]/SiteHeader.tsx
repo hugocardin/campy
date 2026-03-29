@@ -13,12 +13,12 @@ type SiteHeaderProps = {
 };
 
 export function SiteHeader({ site, campground }: SiteHeaderProps) {
-  const t = useTranslations("AdminSiteDetailsPage");
+  const t_page = useTranslations("sites.AdminSiteDetailsPage");
 
   return (
     <BackHeader
-      title={t("pageHeader.title", { name: site.name })}
-      description={t("pageHeader.description", {
+      title={t_page("pageHeader.title", { name: site.name })}
+      description={t_page("pageHeader.description", {
         name: campground.name,
       })}
       backTo={routes.platformAdmin.campgroundSites(campground.id)}

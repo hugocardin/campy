@@ -12,12 +12,15 @@ type CampgroundHeaderProps = {
 };
 
 export function CampgroundHeader({ campground }: CampgroundHeaderProps) {
-  const t = useTranslations("AdminCampgroundDetailsPage");
+  const t_campgrounds = useTranslations("campgrounds");
+  const t_page = useTranslations("campgrounds.AdminCampgroundDetailsPage");
 
   return (
     <BackHeader
-      title={t("pageHeader.title", { name: campground.name })}
-      description={t("pageHeader.description", {
+      title={t_page("pageHeader.title", {
+        name: campground.name,
+      })}
+      description={t_page("pageHeader.description", {
         ownerName: campground.owner_full_name,
         ownerEmail: campground.owner_email,
       })}
@@ -26,11 +29,11 @@ export function CampgroundHeader({ campground }: CampgroundHeaderProps) {
         <div className="flex items-center gap-4 flex-wrap">
           {campground.active ? (
             <Badge className="bg-primary-soft text-primary border-primary-border px-3 py-1 text-base font-medium">
-              {t("active")}
+              {t_campgrounds("form.active")}
             </Badge>
           ) : (
             <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-700/50 px-3 py-1 text-base font-medium">
-              {t("inactive")}
+              {t_campgrounds("form.inactive")}
             </Badge>
           )}
         </div>

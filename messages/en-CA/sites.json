@@ -1,0 +1,88 @@
+{
+  "singular": "Site",
+  "plural": "Sites",
+  "noResult": "No site",
+
+  "form": {
+    "nameLabel": "Name",
+    "namePlaceholder": "Enter site name",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Describe the site...",
+    "maxRigLengthLabel": "Max rig length (feet)",
+    "maxRigLengthPlaceholder": "e.g. 35",
+    "siteTypeLabel": "Site type",
+    "siteTypePlaceholder": "Select a type",
+    "pricePerNightLabel": "Price per night",
+    "pricePerNightPlaceholder": "e.g. 45.00",
+    "minStayNightLabel": "Minimal stay nights",
+    "minStayNightPlaceholder": "e.g. 2"
+  },
+
+  "errors": {
+    "nameRequired": "Name is required",
+    "typeRequired": "Type is required",
+    "priceRequired": "Price is required",
+    "invalidMaxLength": "Invalid max rig length",
+    "invalidPricePerNight": "Invalid price per night",
+    "invalidMinStayNights": "Invalid min stay nights"
+  },
+
+  "actions": {
+    "createSite": "Create Site"
+  },
+
+  "AdminSitesPage": {
+    "pageHeader": {
+      "title": "{name} - Manage campground's sites",
+      "description": "Owner: {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Manage Campground's sites | Admin | Campy",
+      "description": "Manage campground's sites"
+    }
+  },
+
+  "AdminSiteDetailsPage": {
+    "pageHeader": {
+      "title": "Site: {name}",
+      "description": "From campground : {name}"
+    },
+    "meta": {
+      "title": "Site details | Admin | Campy",
+      "description": "See site details"
+    }
+  },
+
+  "AdminSiteCreatePage": {
+    "pageHeader": {
+      "title": "{name} - Create site",
+      "description": "Owner: {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Create Campground's site | Admin | Campy",
+      "description": "Create campground's site"
+    }
+  },
+
+  "AdminSiteAmenitiesPage": {
+    "pageHeader": {
+      "title": "Manage site {name} amenities",
+      "description": "Site: {description}"
+    },
+    "meta": {
+      "title": "Manage site's amenities | Admin | Campy",
+      "description": "Manage a site's amenities"
+    }
+  },
+
+  "AdminSiteEditPage": {
+    "pageHeader": {
+      "title": "Edit site {name}",
+      "description": "Site: {description}"
+    },
+    "meta": {
+      "title": "Edit site's information | Admin | Campy",
+      "description": "Edit a site's information"
+    }
+  }
+}

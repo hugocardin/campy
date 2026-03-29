@@ -1,0 +1,20 @@
+{
+  "actions": "Actions",
+  "add": "Add",
+  "brand": "Campy",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "create": "Create",
+  "delete": "Delete",
+  "details": "Details",
+  "edit": "Edit",
+  "error": "Error",
+  "logoAlt": "Campy logo",
+  "save": "Save",
+  "processing": "Processing...",
+
+  "header": {
+    "profile": "Profile",
+    "plateformAdminDashboard": "Plateform Admin Dashboard"
+  }
+}

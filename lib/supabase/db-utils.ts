@@ -1,16 +1,32 @@
 import {
-  AuthError,
+  AuthResponse,
+  AuthTokenResponsePassword,
   PostgrestError,
   PostgrestResponse,
   PostgrestSingleResponse,
 } from "@supabase/supabase-js";
 import {
   ActionResult,
-  AuthErrorCode,
   DbErrorCode,
   resultError,
   resultSuccess,
 } from "../errors";
+import { mapAuthError } from "./auth-utils";
+
+type SupabaseAuthResult = AuthTokenResponsePassword | AuthResponse;
+
+export async function handleAuthResponse(
+  authFn: () => Promise<SupabaseAuthResult>,
+): Promise<ActionResult<void>> {
+  const result = await authFn();
+
+  if (result.error) {
+    const authErrorCode = mapAuthError(result.error);
+    return resultError(authErrorCode);
+  }
+
+  return resultSuccess();
+}
 
 export async function handleDbResponse<T>(
   query: PromiseLike<PostgrestResponse<T>>,
@@ -119,58 +135,4 @@ function isPostgrestError(err: unknown): err is PostgrestError {
 
   const e = err as Record<string, unknown>;
   return typeof e.code === "string" && typeof e.message === "string";
-}
-
-export function mapAuthError(error: AuthError | null): string {
-  if (!error) {
-    return AuthErrorCode.UNKNOWN_AUTH_ERROR;
-  }
-
-  const code = error.code;
-  const message = error.message?.toLowerCase() || "";
-
-  // ── Common Supabase Auth error patterns ────────────────────────
-  if (
-    code === "invalid_credentials" ||
-    message.includes("invalid login credentials")
-  ) {
-    return AuthErrorCode.INVALID_CREDENTIALS;
-  }
-
-  if (
-    code === "user_already_registered" ||
-    message.includes("already registered")
-  ) {
-    return AuthErrorCode.EMAIL_ALREADY_EXISTS;
-  }
-
-  if (message.includes("password") && message.includes("weak")) {
-    return AuthErrorCode.WEAK_PASSWORD;
-  }
-
-  if (message.includes("confirmed") || message.includes("verify")) {
-    return AuthErrorCode.EMAIL_NOT_CONFIRMED;
-  }
-
-  if (code === "too_many_requests" || message.includes("rate limit")) {
-    return AuthErrorCode.TOO_MANY_REQUESTS;
-  }
-
-  if (message.includes("email")) {
-    return AuthErrorCode.INVALID_EMAIL;
-  }
-
-  // Network / timeout / offline
-  if (
-    message.includes("network") ||
-    message.includes("timeout") ||
-    message.includes("fetch")
-  ) {
-    return AuthErrorCode.NETWORK_ERROR;
-  }
-
-  // Catch-all
-  console.warn("Unhandled auth error:", { code, message: error.message });
-
-  return AuthErrorCode.UNKNOWN_AUTH_ERROR;
 }

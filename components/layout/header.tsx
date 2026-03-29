@@ -26,12 +26,13 @@ import LocaleSwitcher from "../LocaleSwitcher";
 import ThemeToggle from "../ThemeToggle";
 
 export default function Header() {
+  const tc = useTranslations("common");
+  const t_auth = useTranslations("auth");
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const router = useRouter();
-  const t = useTranslations("header");
-  const tc = useTranslations("common");
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -139,13 +140,13 @@ export default function Header() {
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem asChild>
-                  <Link href={routes.profile()}>{t("profile")}</Link>
+                  <Link href={routes.profile()}>{tc("header.profile")}</Link>
                 </DropdownMenuItem>
 
                 {!roleLoading && roleName === USER_ROLE_PLATEFORMADMIN && (
                   <DropdownMenuItem asChild>
                     <Link href={routes.platformAdmin.root()}>
-                      {t("plateformAdminDashboard")}
+                      {tc("header.plateformAdminDashboard")}
                     </Link>
                   </DropdownMenuItem>
                 )}
@@ -156,14 +157,14 @@ export default function Header() {
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                   onClick={handleSignOut}
                 >
-                  {tc("signOut")}
+                  {t_auth("signOut")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <Button variant="default" size="sm" asChild>
               <Link href={routes.auth()}>
-                {tc("signIn")} / {tc("signOut")}
+                {t_auth("signIn")} / {t_auth("signOut")}
               </Link>
             </Button>
           )}

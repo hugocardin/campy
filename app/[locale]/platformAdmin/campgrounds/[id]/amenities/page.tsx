@@ -10,16 +10,16 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import CampgroundAmenitiesClient from "./CampgroundAmenitiesClient";
 
-const NAMESPACE = "AdminCampgroundAmenitiesPage" as const;
+const PAGE_NAMESPACE = "campgrounds.AdminCampgroundAmenitiesPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function CampgroundAmenitiesPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
 
   const params = await paramsPromise;
   const [campgroundResult, currentAmenitiesResult, allAmenitiesResult] =

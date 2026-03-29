@@ -12,16 +12,16 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-const NAMESPACE = "AdminSiteEditPage" as const;
+const PAGE_NAMESPACE = "sites.AdminSiteEditPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function SiteEditPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string; siteId: string }>;
 }) {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
 
   const params = await paramsPromise;
 
@@ -69,7 +69,6 @@ export default async function SiteEditPage({
           siteTypes={siteTypes}
           initialData={toSiteFormData(site)}
           onSubmit={updateSiteAction}
-          tNamespace={NAMESPACE}
         />
       </Suspense>
     </div>

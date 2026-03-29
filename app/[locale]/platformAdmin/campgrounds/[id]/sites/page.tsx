@@ -12,16 +12,17 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import SitesClient from "./SitesClient";
 
-const NAMESPACE = "AdminSitesPage" as const;
+const PAGE_NAMESPACE = "sites.AdminSitesPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function CampgroundEditPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
+  const t_sites = await getTranslations("sites");
 
   const params = await paramsPromise;
 
@@ -52,7 +53,7 @@ export default async function CampgroundEditPage({
               href={routes.platformAdmin.campgroundSiteCreate(campground.id)}
             >
               <Plus className="mr-2 h-4 w-4" />
-              {t("createSite")}
+              {t_sites("actions.createSite")}
             </Link>
           </Button>
         }

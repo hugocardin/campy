@@ -20,7 +20,7 @@ type CampgroundActionsProps = {
 };
 
 export function CampgroundActions({ campground }: CampgroundActionsProps) {
-  const t = useTranslations("AdminCampgroundDetailsPage");
+  const t_campgrounds = useTranslations("campgrounds");
 
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -30,8 +30,10 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     const action = campground.active
       ? inactivateCampgroundAction
       : activateCampgroundAction;
-    const actionName = campground.active ? "deactivate" : "activate";
-    const confirmMessage = t("confirmDeActivateAction", {
+    const actionName = campground.active
+      ? "actions.deactivate"
+      : "actions.activate";
+    const confirmMessage = t_campgrounds("actions.confirmDeActivateAction", {
       actionName,
       name: campground.name,
     });
@@ -43,7 +45,7 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     startTransition(async () => {
       const result = await action(campground.id);
       if (!result.success) {
-        setError(result.error_code);
+        setError(result.errorCode);
       } else {
         router.refresh();
       }
@@ -61,12 +63,12 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
           {campground.active ? (
             <>
               <PowerOff className="mr-2 h-4 w-4" />
-              {t("deactivate")}
+              {t_campgrounds("actions.deactivate")}
             </>
           ) : (
             <>
               <Power className="mr-2 h-4 w-4" />
-              {t("activate")}
+              {t_campgrounds("actions.activate")}
             </>
           )}
         </Button>

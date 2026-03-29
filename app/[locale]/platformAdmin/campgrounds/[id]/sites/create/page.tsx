@@ -10,16 +10,16 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-const NAMESPACE = "AdminSiteCreatePage" as const;
+const PAGE_NAMESPACE = "sites.AdminSiteCreatePage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function SiteCreatePage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
 
   const params = await paramsPromise;
 
@@ -61,7 +61,6 @@ export default async function SiteCreatePage({
           campgroundId={campground.id}
           siteTypes={siteTypes}
           onSubmit={createSiteAction}
-          tNamespace={NAMESPACE}
         />
       </Suspense>
     </div>

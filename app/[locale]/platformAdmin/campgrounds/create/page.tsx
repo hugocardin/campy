@@ -9,12 +9,12 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-const NAMESPACE = "AdminCampgroundCreatePage" as const;
+const PAGE_NAMESPACE = "campgrounds.AdminCampgroundCreatePage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function CampgroundCreatePage() {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
 
   const ownersresult = await getOwners();
 
@@ -42,7 +42,6 @@ export default async function CampgroundCreatePage() {
         <CampgroundFormClient
           owners={owners}
           onSubmit={createCampgroundAction}
-          tNamespace={NAMESPACE}
         />
       </Suspense>
     </div>

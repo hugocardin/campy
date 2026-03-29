@@ -1,31 +1,28 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { authAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { routes } from "@/lib/routes";
 import Image from "next/image";
-import { mapAuthError } from "@/lib/errors";
 
 type AuthFormProps = {
   redirectTo: string;
 };
 
 export default function AuthForm({ redirectTo }: AuthFormProps) {
-  const t = useTranslations("AuthPage");
+  const t_auth = useTranslations("auth");
   const tc = useTranslations("common");
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -36,27 +33,17 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const router = useRouter();
-  const supabase = createClient();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setMessage(null);
 
     startTransition(async () => {
-      let result;
+      const result = await authAction(mode, email, password, redirectTo);
 
-      if (mode === "signin") {
-        result = await supabase.auth.signInWithPassword({ email, password });
-      } else {
-        result = await supabase.auth.signUp({ email, password });
-      }
-
-      if (result.error) {
-        const code = mapAuthError(result.error);
-        console.error("Auth error:", message);
-        setError(code);
+      if (!result.success) {
+        console.error("Auth error:", result.errorCode);
+        setError(result.errorCode);
         return;
       }
 
@@ -64,9 +51,7 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
       setPassword("");
 
       if (mode === "signup") {
-        setMessage(t("signupSuccess"));
-      } else {
-        router.replace(redirectTo || routes.profile());
+        setMessage(t_auth("signupSuccess"));
       }
     });
   };
@@ -77,9 +62,11 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
     setMessage(null);
   };
 
-  const title = mode === "signin" ? t("signInTitle") : t("signUpTitle");
-  const submitText = mode === "signin" ? tc("signIn") : tc("signUp");
-  const switchText = mode === "signin" ? t("noAccount") : t("haveAccount");
+  const title =
+    mode === "signin" ? t_auth("signInTitle") : t_auth("signUpTitle");
+  const submitText = mode === "signin" ? t_auth("signIn") : t_auth("signUp");
+  const switchText =
+    mode === "signin" ? t_auth("noAccount") : t_auth("haveAccount");
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
@@ -96,9 +83,9 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
             />
           </div>
           <CardTitle className="text-3xl font-bold tracking-tight">
-            {t("welcome")}
+            {t_auth("welcome")}
           </CardTitle>
-          <CardDescription>{t("subtitle")}</CardDescription>
+          <CardDescription>{t_auth("subtitle")}</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -107,13 +94,13 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
 
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email">{t("emailLabel")}</Label>
+              <Label htmlFor="email">{t_auth("form.emailLabel")}</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={t("emailPlaceholder")}
+                placeholder={t_auth("form.emailPlaceholder")}
                 required
                 autoComplete="email"
               />
@@ -121,14 +108,14 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
 
             {/* Password */}
             <div className="space-y-2">
-              <Label htmlFor="password">{t("passwordLabel")}</Label>
+              <Label htmlFor="password">{t_auth("form.passwordLabel")}</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t("passwordPlaceholder")}
+                  placeholder={t_auth("form.passwordPlaceholder")}
                   required
                   minLength={8}
                   autoComplete={
@@ -146,7 +133,9 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{t(`errors.${error}`)}</p>
+              <p className="text-sm text-destructive">
+                {t_auth(`errors.${error}`)}
+              </p>
             )}
             {message && (
               <p className="text-sm text-green-600 dark:text-green-400">

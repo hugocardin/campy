@@ -10,12 +10,12 @@ import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 import ProfileClient from "./ProfileClient";
 
-const NAMESPACE = "ProfilePage" as const;
+const PAGE_NAMESPACE = "profile.ProfilePage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function ProfilePage() {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
 
   const supabase = await createClient();
   const {

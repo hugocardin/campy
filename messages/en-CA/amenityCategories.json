@@ -1,0 +1,26 @@
+{
+  "singular": "Category",
+  "plural": "Categories",
+  "noResult": "No category",
+
+  "form": {
+    "selectAmenityCategoryPlaceholder": "Select category",
+    "createCategoryPlaceholder": "e.g. Services, Facilities, Activities"
+  },
+
+  "actions": {
+    "deleteAmenityCategoryTitle": "Delete amenity category",
+    "confirmAmenityCategoryDeletion": "Delete amenity category \"{category}\"? This action cannot be undone."
+  },
+
+  "AdminAmenityCategoryPage": {
+    "pageHeader": {
+      "title": "Manage Amenity Categories",
+      "description": "Add, edit or remove amenity categories"
+    },
+    "meta": {
+      "title": "Amenity Categories | Admin | Campy",
+      "description": "Manage the available amenity categories."
+    }
+  }
+}

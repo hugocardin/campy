@@ -11,12 +11,13 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import CampgroundsClient from "./CampgroundsClient";
 
-const NAMESPACE = "AdminCampgroundsPage" as const;
+const PAGE_NAMESPACE = "campgrounds.AdminCampgroundsPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function CampgroundsAdminPage() {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
+  const t_campgrounds = await getTranslations("campgrounds");
 
   const campgroundsresult = await getCampgroundsAdmin();
 
@@ -36,7 +37,7 @@ export default async function CampgroundsAdminPage() {
           <Button asChild size="lg">
             <Link href={routes.platformAdmin.campgroundCreate()}>
               <Plus className="mr-2 h-4 w-4" />
-              {t("createCampground")}
+              {t_campgrounds("actions.createCampground")}
             </Link>
           </Button>
         }

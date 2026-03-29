@@ -20,7 +20,7 @@ type Props = {
 };
 
 export default function SitesClient({ campground, sites }: Props) {
-  const t_site = useTranslations("entities.site");
+  const t_sites = useTranslations("sites");
 
   const router = useRouter();
 
@@ -30,12 +30,12 @@ export default function SitesClient({ campground, sites }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t_site("nameLabel")}</TableHead>
-              <TableHead>{t_site("descriptionLabel")}</TableHead>
-              <TableHead>{t_site("siteTypeLabel")}</TableHead>
-              <TableHead>{t_site("maxRigLengthLabel")}</TableHead>
-              <TableHead>{t_site("pricePerNightLabel")}</TableHead>
-              <TableHead>{t_site("minStayNightLabel")}</TableHead>
+              <TableHead>{t_sites("form.nameLabel")}</TableHead>
+              <TableHead>{t_sites("form.descriptionLabel")}</TableHead>
+              <TableHead>{t_sites("form.siteTypeLabel")}</TableHead>
+              <TableHead>{t_sites("form.maxRigLengthLabel")}</TableHead>
+              <TableHead>{t_sites("form.pricePerNightLabel")}</TableHead>
+              <TableHead>{t_sites("form.minStayNightLabel")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -10,16 +10,16 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import SiteAmenitiesClient from "./SiteAmenitiesClient";
 
-const NAMESPACE = "AdminSiteAmenitiesPage" as const;
+const PAGE_NAMESPACE = "sites.AdminSiteAmenitiesPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function SiteAmenitiesPage({
   params: paramsPromise,
 }: {
   params: Promise<{ id: string; siteId: string }>;
 }) {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
 
   const params = await paramsPromise;
 

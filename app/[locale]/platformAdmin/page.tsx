@@ -9,12 +9,12 @@ import { DashboardCards } from "./DashboardCards";
 import { generatePageMetadata } from "@/lib/utils";
 import { getTranslations } from "next-intl/server";
 
-const NAMESPACE = "AdminDashboardPage" as const;
+const PAGE_NAMESPACE = "adminDashboard.AdminDashboardPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function AdminDashboard() {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
 
   const supabase = await createClient();
 

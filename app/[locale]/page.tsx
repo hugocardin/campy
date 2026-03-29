@@ -6,9 +6,9 @@ import CampgroundListControls from "../../components/search/list/CampgroundListC
 import { getCampgrounds } from "../../data/campgrounds/get-campgrounds";
 import { generatePageMetadata } from "@/lib/utils";
 
-const NAMESPACE = "SearchPage" as const;
+const PAGE_NAMESPACE = "search.SearchPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function Home() {
   const campgroundsResult = await getCampgrounds();
@@ -21,7 +21,7 @@ export default async function Home() {
           Something went wrong
         </h1>
         <p className="text-lg text-muted-foreground max-w-md mb-8">
-          {campgroundsResult.error_code}
+          {campgroundsResult.errorCode}
         </p>
       </div>
     );

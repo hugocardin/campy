@@ -22,7 +22,7 @@ export default function CampgroundAmenitiesClient({
   currentAmenities,
 }: Props) {
   const tc = useTranslations("common");
-  const t_amenity = useTranslations("entities.amenity");
+  const t_amenities = useTranslations("amenities");
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -83,13 +83,13 @@ export default function CampgroundAmenitiesClient({
     <div className="space-y-10">
       <Card>
         <CardHeader>
-          <CardTitle>{t_amenity("amenities")}</CardTitle>
+          <CardTitle>{t_amenities("plural")}</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-8">
           {allAmenities.length === 0 ? (
             <p className="text-muted-foreground italic">
-              {t_amenity("noAmenity")}
+              {t_amenities("noResult")}
             </p>
           ) : (
             <div className="space-y-8">

@@ -1,0 +1,26 @@
+{
+  "singular": "Amenity",
+  "plural": "Amenities",
+  "noResult": "No amenity",
+
+  "form": {
+    "amenityLabel": "Amenity Name",
+    "amenityPlaceholder": "e.g. WiFi, Pet friendly, Fire pit"
+  },
+
+  "actions": {
+    "confirmAmenityDeletion": "Delete amenity \"{code}\"? This action cannot be undone.",
+    "deleteAmenityTitle": "Delete amenity"
+  },
+
+  "AdminAmenitiesPage": {
+    "pageHeader": {
+      "title": "Manage Amenities",
+      "description": "Add, edit or remove amenities"
+    },
+    "meta": {
+      "title": "Amenities | Admin | Campy",
+      "description": "Manage the available amenities."
+    }
+  }
+}

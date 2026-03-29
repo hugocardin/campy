@@ -1,0 +1,16 @@
+{
+  "amenitiesDescription": "Manage the list of available amenities",
+  "amenityCategoriesDescription": "Organize amenities into groups (Services, Facilities, etc.)",
+  "campgroundDescription": "Organize campgrounds",
+
+  "AdminDashboardPage": {
+    "pageHeader": {
+      "title": "Admin Dashboard",
+      "description": "Quick access to admin management tools"
+    },
+    "meta": {
+      "title": "Admin Dashboard | Admin | Campy",
+      "description": "Manage data as Admin"
+    }
+  }
+}

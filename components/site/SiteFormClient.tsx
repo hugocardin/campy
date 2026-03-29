@@ -16,11 +16,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ActionResult } from "@/entities/action-result";
 import { SiteType } from "@/entities/site-type";
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
+import { ActionResult } from "@/lib/errors";
 
 type SiteFormProps = {
   campgroundId: string;
@@ -30,7 +30,6 @@ type SiteFormProps = {
     campgroundId: string,
     site: SiteCreateUpdateInput,
   ) => Promise<ActionResult>;
-  tNamespace: string;
 };
 
 export default function SiteFormClient({
@@ -38,11 +37,9 @@ export default function SiteFormClient({
   siteTypes,
   initialData,
   onSubmit,
-  tNamespace,
 }: SiteFormProps) {
   const tc = useTranslations("common");
-  const t = useTranslations(tNamespace);
-  const t_site = useTranslations("entities.site");
+  const t_sites = useTranslations("sites");
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -73,20 +70,20 @@ export default function SiteFormClient({
     const minStayNightsNum = parseFloat(form.min_stay_nights);
     const siteTypeIdNum = parseInt(form.site_type_id, 10);
 
-    if (!form.name.trim()) return setError(t("nameRequired"));
-    if (!form.site_type_id) return setError(t("typeRequired"));
-    if (!form.price_per_night) return setError(t("priceRequired"));
+    if (!form.name.trim()) return setError(t_sites("errors.nameRequired"));
+    if (!form.site_type_id) return setError(t_sites("errors.typeRequired"));
+    if (!form.price_per_night) return setError(t_sites("errors.priceRequired"));
     if (!isNaN(maxRigLengthNum) && maxRigLengthNum < 0) {
-      return setError(t("invalidMaxLength"));
+      return setError(t_sites("errors.invalidMaxLength"));
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
-      return setError(t("invalidPricePerNight"));
+      return setError(t_sites("errors.invalidPricePerNight"));
     }
     if (!isNaN(minStayNightsNum) && minStayNightsNum < 0) {
-      return setError(t("invalidMinStayNights"));
+      return setError(t_sites("errors.invalidMinStayNights"));
     }
     if (isNaN(siteTypeIdNum)) {
-      return setError(t("typeRequired"));
+      return setError(t_sites("typeRequired"));
     }
 
     const payload: SiteCreateUpdateInput = {
@@ -103,7 +100,7 @@ export default function SiteFormClient({
       const result = await onSubmit(campgroundId, payload);
 
       if (!result.success) {
-        setError(result.error_code);
+        setError(result.errorCode);
       }
     });
   };
@@ -135,7 +132,8 @@ export default function SiteFormClient({
           <div className="space-y-6">
             <div>
               <Label htmlFor="name">
-                {t_site("nameLabel")} <span className="text-red-500">*</span>
+                {t_sites("form.nameLabel")}{" "}
+                <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
@@ -144,12 +142,14 @@ export default function SiteFormClient({
                 onChange={handleChange}
                 required
                 className="mt-1.5"
-                placeholder={t_site("namePlaceholder")}
+                placeholder={t_sites("form.namePlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="description">{t_site("descriptionLabel")}</Label>
+              <Label htmlFor="description">
+                {t_sites("form.descriptionLabel")}
+              </Label>
               <Textarea
                 id="description"
                 name="description"
@@ -157,13 +157,13 @@ export default function SiteFormClient({
                 onChange={handleChange}
                 rows={5}
                 className="mt-1.5 resize-y"
-                placeholder={t_site("descriptionPlaceholder")}
+                placeholder={t_sites("form.descriptionPlaceholder")}
               />
             </div>
 
             <div>
               <Label htmlFor="max_rig_length">
-                {t_site("maxRigLengthLabel")}
+                {t_sites("form.maxRigLengthLabel")}
               </Label>
               <Input
                 id="max_rig_length"
@@ -172,7 +172,7 @@ export default function SiteFormClient({
                 value={form.max_rig_length}
                 onChange={handleChange}
                 className="mt-1.5"
-                placeholder={t_site("maxRigLengthPlaceholder")}
+                placeholder={t_sites("form.maxRigLengthPlaceholder")}
               />
             </div>
           </div>
@@ -181,7 +181,7 @@ export default function SiteFormClient({
           <div className="space-y-6">
             <div>
               <Label htmlFor="site_type_id">
-                {t_site("siteTypeLabel")}{" "}
+                {t_sites("form.siteTypeLabel")}{" "}
                 <span className="text-red-500">*</span>
               </Label>
               <Select
@@ -190,7 +190,9 @@ export default function SiteFormClient({
                 required
               >
                 <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder={t_site("siteTypePlaceholder")} />
+                  <SelectValue
+                    placeholder={t_sites("form.siteTypePlaceholder")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {sortedSiteTypes.map((siteType) => (
@@ -204,7 +206,7 @@ export default function SiteFormClient({
 
             <div>
               <Label htmlFor="price_per_night">
-                {t_site("pricePerNightLabel")}{" "}
+                {t_sites("form.pricePerNightLabel")}{" "}
                 <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -215,13 +217,13 @@ export default function SiteFormClient({
                 value={form.price_per_night}
                 onChange={handleChange}
                 className="mt-1.5"
-                placeholder={t_site("pricePerNightPlaceholder")}
+                placeholder={t_sites("form.pricePerNightPlaceholder")}
               />
             </div>
 
             <div>
               <Label htmlFor="min_stay_nights">
-                {t_site("minStayNightLabel")}
+                {t_sites("form.minStayNightLabel")}
               </Label>
               <Input
                 id="min_stay_nights"
@@ -231,7 +233,7 @@ export default function SiteFormClient({
                 value={form.min_stay_nights}
                 onChange={handleChange}
                 className="mt-1.5"
-                placeholder={t_site("minStayNightPlaceholder")}
+                placeholder={t_sites("form.minStayNightPlaceholder")}
               />
             </div>
 

@@ -8,12 +8,12 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import AmenityCategoriesClient from "./AmenityCategoriesClient";
 
-const NAMESPACE = "AdminAmenityCategoryPage" as const;
+const PAGE_NAMESPACE = "amenityCategories.AdminAmenityCategoryPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function AmenityCategoriesAdminPage() {
-  const t = await getTranslations(NAMESPACE);
+  const t = await getTranslations(PAGE_NAMESPACE);
 
   const initialCategoriesResult = await getAllAmenityCategories();
 

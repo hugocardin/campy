@@ -8,9 +8,9 @@ import { Suspense } from "react";
 import CampgroundClient from "./CampgroundClient";
 import { CampgroundHeader } from "./CampgroundHeader";
 
-const NAMESPACE = "AdminCampgroundDetailsPage" as const;
+const PAGE_NAMESPACE = "campgrounds.AdminCampgroundDetailsPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function CampgroundDetailPage({
   params: paramsPromise,

@@ -29,8 +29,7 @@ type Props = {
 
 export default function AmenityCategoriesClient({ initialCategories }: Props) {
   const tc = useTranslations("common");
-  const t = useTranslations("AdminAmenityCategoryPage");
-  const t_amenityCategory = useTranslations("entities.amenityCategory");
+  const t_amenityCategories = useTranslations("amenityCategories");
 
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +47,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     const result = await createAmenityCategoryAction({ code: code.trim() });
 
     if (!result.success) {
-      setError(result.error_code);
+      setError(result.errorCode);
     } else {
       setCode("");
       router.refresh();
@@ -64,7 +63,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     const result = await deleteAmenityCategoryAction(categoryId);
 
     if (!result.success) {
-      setError(result.error_code);
+      setError(result.errorCode);
     } else {
       router.refresh();
     }
@@ -81,14 +80,16 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
       <form onSubmit={handleCreate} className="space-y-4 max-w-xl">
         <div className="space-y-2">
           <Label htmlFor="category-name">
-            {t_amenityCategory("amenityCategory")}
+            {t_amenityCategories("singular")}
           </Label>
           <div className="flex flex-col sm:flex-row gap-3">
             <Input
               id="category-name"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder={t_amenityCategory("createCategoryPlaceholder")}
+              placeholder={t_amenityCategories(
+                "form.createCategoryPlaceholder",
+              )}
               disabled={submitting}
               required
               className="flex-1"
@@ -104,7 +105,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
       {initialCategories.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center">
           <p className="text-muted-foreground text-lg font-medium">
-            {t_amenityCategory("noAmenityCategory")}
+            {t_amenityCategories("noResult")}
           </p>
         </div>
       ) : (
@@ -112,8 +113,8 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t_amenityCategory("amenityCategory")}</TableHead>
-                <TableHead className="text-right">{t("actions")}</TableHead>
+                <TableHead>{t_amenityCategories("singular")}</TableHead>
+                <TableHead className="text-right">{tc("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -122,10 +123,15 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
                   <TableCell className="font-medium">{category.code}</TableCell>
                   <TableCell className="text-right">
                     <DeleteButtonWithConfirmation
-                      title={t("deleteAmenityCategoryTitle")}
-                      description={t("confirmAmenityCategoryDeletion", {
-                        category: category.code,
-                      })}
+                      title={t_amenityCategories(
+                        "actions.deleteAmenityCategoryTitle",
+                      )}
+                      description={t_amenityCategories(
+                        "actions.confirmAmenityCategoryDeletion",
+                        {
+                          category: category.code,
+                        },
+                      )}
                       onConfirm={() => handleDelete(category.id)}
                       disabled={submitting}
                     ></DeleteButtonWithConfirmation>

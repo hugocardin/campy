@@ -15,8 +15,8 @@ type Props = {
 
 export default function SiteViewClient({ site, amenities }: Props) {
   const tc = useTranslations("common");
-  const t_site = useTranslations("entities.site");
-  const t_amenity = useTranslations("entities.amenity");
+  const t_sites = useTranslations("sites");
+  const t_amenities = useTranslations("amenities");
 
   const groupedAndSorted = amenities.reduce(
     (acc, amenity) => {
@@ -52,7 +52,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  {t_site("nameLabel")}
+                  {t_sites("form.nameLabel")}
                 </h3>
                 <p className="whitespace-pre-wrap leading-relaxed">
                   {site.name}
@@ -61,7 +61,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  {t_site("descriptionLabel")}
+                  {t_sites("form.descriptionLabel")}
                 </h3>
                 <p className="whitespace-pre-wrap leading-relaxed">
                   {site.description}
@@ -70,7 +70,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  {t_site("siteTypeLabel")}
+                  {t_sites("form.siteTypeLabel")}
                 </h3>
                 <p className="whitespace-pre-wrap leading-relaxed">
                   {site.site_type_code}
@@ -83,13 +83,13 @@ export default function SiteViewClient({ site, amenities }: Props) {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    {t_site("pricePerNightLabel")}
+                    {t_sites("form.pricePerNightLabel")}
                   </h3>
                   <p>{site.price_per_night}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    {t_site("minStayNightLabel")}
+                    {t_sites("form.minStayNightLabel")}
                   </h3>
                   <p>{site.min_stay_nights}</p>
                 </div>
@@ -97,7 +97,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  {t_site("maxRigLengthLabel")}
+                  {t_sites("form.maxRigLengthLabel")}
                 </h3>
                 <p>{site.max_rig_length}</p>
               </div>
@@ -109,12 +109,12 @@ export default function SiteViewClient({ site, amenities }: Props) {
       {/* Amenities Section */}
       <Card>
         <CardHeader>
-          <CardTitle>{t_amenity("amenities")}</CardTitle>
+          <CardTitle>{t_amenities("plural")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-8 pt-2">
           {amenities.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">
-              {t_amenity("noAmenity")}
+              {t_amenities("noResult")}
             </p>
           ) : (
             <div className="space-y-6">

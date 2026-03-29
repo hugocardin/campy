@@ -1,0 +1,22 @@
+{
+  "cardTitle": "Account Information",
+  "cardDescription": "Basic details about your account",
+
+  "form": {
+    "fullname": "Full Name",
+    "email": "Email",
+    "role": "Role",
+    "joined": "Joined"
+  },
+
+  "ProfilePage": {
+    "pageHeader": {
+      "title": "Your Profile",
+      "description": "Manage your account information and preferences"
+    },
+    "meta": {
+      "title": "Profile | Campy",
+      "description": "Manage your bookings, preferences and account settings on Campy."
+    }
+  }
+}

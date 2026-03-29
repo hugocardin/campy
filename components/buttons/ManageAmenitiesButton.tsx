@@ -10,13 +10,13 @@ type ManageAmenitiesButtonProps = {
 };
 
 export function ManageAmenitiesButton({ href }: ManageAmenitiesButtonProps) {
-  const t_amenity = useTranslations("entities.amenity");
+  const t_amenities = useTranslations("amenities");
 
   return (
     <Button asChild variant="outline">
       <Link href={href}>
         <ListChecks className="mr-2 h-4 w-4" />
-        {t_amenity("amenities")}
+        {t_amenities("plural")}
       </Link>
     </Button>
   );

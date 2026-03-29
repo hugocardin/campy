@@ -9,9 +9,9 @@ import { Suspense } from "react";
 import { SiteHeader } from "./SiteHeader";
 import SiteViewClient from "./SiteViewClient";
 
-const NAMESPACE = "AdminSiteDetailsPage" as const;
+const PAGE_NAMESPACE = "sites.AdminSiteDetailsPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function SiteViewPage({
   params: paramsPromise,

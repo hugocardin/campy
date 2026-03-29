@@ -15,7 +15,7 @@ type Props = {
 };
 
 export default function ProfileClient({ profile, user }: Props) {
-  const t = useTranslations("ProfilePage");
+  const t_profile = useTranslations("profile");
 
   const initials = profile.full_name
     ? profile.full_name
@@ -82,7 +82,7 @@ export default function ProfileClient({ profile, user }: Props) {
                 <div className="space-y-1">
                   <dt className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
                     <Calendar className="h-4 w-4" />
-                    {t("joined")}
+                    {t_profile("form.joined")}
                   </dt>
                   <dd className="text-base font-medium">{joinedDate}</dd>
                 </div>

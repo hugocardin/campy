@@ -19,7 +19,7 @@ type Props = {
 };
 
 export default function CampgroundsClient({ campgrounds }: Props) {
-  const t_campground = useTranslations("entities.campground");
+  const t_campgrounds = useTranslations("campgrounds");
 
   const router = useRouter();
 
@@ -29,10 +29,10 @@ export default function CampgroundsClient({ campgrounds }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t_campground("nameLabel")}</TableHead>
-              <TableHead>{t_campground("locationLabel")}</TableHead>
-              <TableHead>{t_campground("ownerLabel")}</TableHead>
-              <TableHead>{t_campground("phoneLabel")}</TableHead>
+              <TableHead>{t_campgrounds("form.nameLabel")}</TableHead>
+              <TableHead>{t_campgrounds("form.locationLabel")}</TableHead>
+              <TableHead>{t_campgrounds("form.ownerLabel")}</TableHead>
+              <TableHead>{t_campgrounds("form.phoneLabel")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

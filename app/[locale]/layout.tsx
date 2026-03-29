@@ -8,6 +8,7 @@ import "@fontsource/geist-mono";
 import "@fontsource/geist-sans";
 
 import Header from "@/components/layout/header";
+import { getMessages } from "next-intl/server";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -25,13 +26,7 @@ export default async function LocaleLayout({
     notFound();
   }
 
-  // Load messages for this locale (from your messages/ folder)
-  let messages;
-  try {
-    messages = (await import(`../../messages/${locale}.json`)).default;
-  } catch {
-    notFound();
-  }
+  const messages = await getMessages();
 
   return (
     <html
@@ -49,10 +44,6 @@ export default async function LocaleLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {/* 
-            This provider makes useLocale(), useTranslations(), etc. work in ALL Client Components below 
-            (Header, LocaleSwitcher, any form/button/etc. using next-intl hooks)
-          */}
           <NextIntlClientProvider locale={locale} messages={messages}>
             <Header />
 

@@ -4,9 +4,9 @@ import { generatePageMetadata } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import AuthForm from "./AuthForm";
 
-const NAMESPACE = "AuthPage" as const;
+const PAGE_NAMESPACE = "auth.AuthPage" as const;
 
-export const generateMetadata = () => generatePageMetadata(NAMESPACE);
+export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 export default async function AuthPage({
   searchParams,

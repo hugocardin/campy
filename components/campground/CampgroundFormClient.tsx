@@ -4,6 +4,7 @@ import { Save } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
+import { CampgroundFormData } from "@/components/campground/campground-form-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,29 +16,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ActionResult } from "@/entities/action-result";
+import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { UserProfileNoRole } from "@/entities/user-profile";
+import { ActionResult } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
-import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
-import { CampgroundFormData } from "@/components/campground/campground-form-utils";
 
 type CampgroundFormProps = {
   owners: UserProfileNoRole[];
   initialData?: CampgroundFormData;
   onSubmit: (data: CampgroundCreateUpdateInput) => Promise<ActionResult>;
-  tNamespace: string;
 };
 
 export default function CampgroundFormClient({
   owners,
   initialData,
   onSubmit,
-  tNamespace,
 }: CampgroundFormProps) {
   const tc = useTranslations("common");
-  const t = useTranslations(tNamespace);
-  const t_campground = useTranslations("entities.campground");
+  const t_campgrounds = useTranslations("campgrounds");
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -74,12 +71,13 @@ export default function CampgroundFormClient({
     const latNum = parseFloat(form.location.lat);
     const lngNum = parseFloat(form.location.lng);
 
-    if (!form.name.trim()) return setError(t("errors.nameRequired"));
-    if (!form.owner_id) return setError(t("errors.ownerRequired"));
+    if (!form.name.trim())
+      return setError(t_campgrounds("errors.nameRequired"));
+    if (!form.owner_id) return setError(t_campgrounds("errors.ownerRequired"));
     if (isNaN(latNum) || latNum < -90 || latNum > 90)
-      return setError(t("errors.latitudeInvalid"));
+      return setError(t_campgrounds("errors.latitudeInvalid"));
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180)
-      return setError(t("errors.longitudeInvalid"));
+      return setError(t_campgrounds("errors.longitudeInvalid"));
 
     const payload: CampgroundCreateUpdateInput = {
       id: initialData?.id,
@@ -102,7 +100,7 @@ export default function CampgroundFormClient({
       const result = await onSubmit(payload);
 
       if (!result.success) {
-        setError(result.error_code);
+        setError(result.errorCode);
       }
     });
   };
@@ -146,7 +144,7 @@ export default function CampgroundFormClient({
           <div className="space-y-6">
             <div>
               <Label htmlFor="name">
-                {t_campground("nameLabel")}{" "}
+                {t_campgrounds("form.nameLabel")}{" "}
                 <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -156,13 +154,13 @@ export default function CampgroundFormClient({
                 onChange={handleChange}
                 required
                 className="mt-1.5"
-                placeholder={t_campground("namePlaceholder")}
+                placeholder={t_campgrounds("form.namePlaceholder")}
               />
             </div>
 
             <div>
               <Label htmlFor="owner_id">
-                {t_campground("ownerLabel")}{" "}
+                {t_campgrounds("form.ownerLabel")}{" "}
                 <span className="text-red-500">*</span>
               </Label>
               <Select
@@ -171,7 +169,9 @@ export default function CampgroundFormClient({
                 required
               >
                 <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder={t_campground("ownerPlaceholder")} />
+                  <SelectValue
+                    placeholder={t_campgrounds("form.ownerPlaceholder")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {sortedOwners.map((owner) => (
@@ -187,7 +187,7 @@ export default function CampgroundFormClient({
 
             <div>
               <Label htmlFor="description">
-                {t_campground("descriptionLabel")}
+                {t_campgrounds("form.descriptionLabel")}
               </Label>
               <Textarea
                 id="description"
@@ -196,32 +196,34 @@ export default function CampgroundFormClient({
                 onChange={handleChange}
                 rows={5}
                 className="mt-1.5 resize-y"
-                placeholder={t_campground("descriptionPlaceholder")}
+                placeholder={t_campgrounds("form.descriptionPlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="website">{t_campground("websiteLabel")}</Label>
+              <Label htmlFor="website">
+                {t_campgrounds("form.websiteLabel")}
+              </Label>
               <Input
                 id="website"
                 name="website"
                 type="url"
                 value={form.website}
                 onChange={handleChange}
-                placeholder={t_campground("websitePlaceholder")}
+                placeholder={t_campgrounds("form.websitePlaceholder")}
                 className="mt-1.5"
               />
             </div>
 
             <div>
-              <Label htmlFor="phone">{t_campground("phoneLabel")}</Label>
+              <Label htmlFor="phone">{t_campgrounds("form.phoneLabel")}</Label>
               <Input
                 id="phone"
                 name="phone"
                 type="tel"
                 value={form.phone}
                 onChange={handleChange}
-                placeholder={t_campground("phonePlaceholder")}
+                placeholder={t_campgrounds("form.phonePlaceholder")}
                 className="mt-1.5"
               />
             </div>
@@ -230,60 +232,64 @@ export default function CampgroundFormClient({
           {/* Right column */}
           <div className="space-y-6">
             <div>
-              <Label htmlFor="address">{t_campground("addressLabel")}</Label>
+              <Label htmlFor="address">
+                {t_campgrounds("form.addressLabel")}
+              </Label>
               <Input
                 id="address"
                 name="address"
                 value={form.address}
                 onChange={handleChange}
                 className="mt-1.5"
-                placeholder={t_campground("addressPlaceholder")}
+                placeholder={t_campgrounds("form.addressPlaceholder")}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="city">{t_campground("cityLabel")}</Label>
+                <Label htmlFor="city">{t_campgrounds("form.cityLabel")}</Label>
                 <Input
                   id="city"
                   name="city"
                   value={form.city}
                   onChange={handleChange}
-                  placeholder={t_campground("cityPlaceholder")}
+                  placeholder={t_campgrounds("form.cityPlaceholder")}
                   className="mt-1.5"
                 />
               </div>
               <div>
                 <Label htmlFor="province">
-                  {t_campground("provinceLabel")}
+                  {t_campgrounds("form.provinceLabel")}
                 </Label>
                 <Input
                   id="province"
                   name="province"
                   value={form.province}
                   onChange={handleChange}
-                  placeholder={t_campground("provincePlaceholder")}
+                  placeholder={t_campgrounds("form.provincePlaceholder")}
                   className="mt-1.5"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="country">{t_campground("countryLabel")}</Label>
+              <Label htmlFor="country">
+                {t_campgrounds("form.countryLabel")}
+              </Label>
               <Input
                 id="country"
                 name="country"
                 value={form.country}
                 onChange={handleChange}
                 className="mt-1.5"
-                placeholder={t_campground("countryPlaceholder")}
+                placeholder={t_campgrounds("form.countryPlaceholder")}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="lat">
-                  {t_campground("latitudeLabel")}{" "}
+                  {t_campgrounds("form.latitudeLabel")}{" "}
                   <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -297,16 +303,16 @@ export default function CampgroundFormClient({
                   onChange={handleLocationChange}
                   required
                   className="mt-1.5"
-                  placeholder={t_campground("latitudePlaceholder")}
+                  placeholder={t_campgrounds("form.latitudePlaceholder")}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {t_campground("latitudeRange")}
+                  {t_campgrounds("form.latitudeRange")}
                 </p>
               </div>
 
               <div>
                 <Label htmlFor="lng">
-                  {t_campground("longitudeLabel")}{" "}
+                  {t_campgrounds("form.longitudeLabel")}{" "}
                   <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -320,10 +326,10 @@ export default function CampgroundFormClient({
                   onChange={handleLocationChange}
                   required
                   className="mt-1.5"
-                  placeholder={t_campground("longitudePlaceholder")}
+                  placeholder={t_campgrounds("form.longitudePlaceholder")}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {t_campground("longitudeRange")}
+                  {t_campgrounds("form.longitudeRange")}
                 </p>
               </div>
             </div>

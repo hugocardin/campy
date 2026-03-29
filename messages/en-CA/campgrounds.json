@@ -1,0 +1,104 @@
+{
+  "singular": "Campground",
+  "plural": "Campgrounds",
+  "noResult": "No campground",
+
+  "form": {
+    "nameLabel": "Name",
+    "namePlaceholder": "Enter campground name",
+    "ownerLabel": "Owner",
+    "ownerPlaceholder": "Select an owner",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Describe the campground...",
+    "websiteLabel": "Website",
+    "websitePlaceholder": "https://...",
+    "phoneLabel": "Phone",
+    "phonePlaceholder": "e.g. 555-555-5555",
+    "addressLabel": "Address",
+    "addressPlaceholder": "e.g. 123 Street Name",
+    "cityLabel": "City",
+    "cityPlaceholder": "e.g. Montreal, Ottawa, Vancouver...",
+    "provinceLabel": "Province / State",
+    "provincePlaceholder": "e.g. Quebec, Ontario, British Columbia...",
+    "countryLabel": "Country",
+    "countryPlaceholder": "e.g. Canada, United States...",
+    "latitudeLabel": "Latitude",
+    "latitudePlaceholder": "e.g. 45.4215",
+    "latitudeRange": "Range: -90° to +90°",
+    "longitudeLabel": "Longitude",
+    "longitudePlaceholder": "e.g. -75.6972",
+    "longitudeRange": "Range: -180° to +180°",
+    "locationLabel": "Location",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+
+  "errors": {
+    "nameRequired": "Campground name is required",
+    "ownerRequired": "Campground owner is required",
+    "latitudeInvalid": "Latitude must be between -90 and +90",
+    "longitudeInvalid": "Longitude must be between -180 and +180"
+  },
+
+  "actions": {
+    "createCampground": "Create Campground",
+    "confirmDeActivateAction": "Are you sure you want to {actionName} \"{name}\"?",
+    "activate": "Activate",
+    "deactivate": "Deactivate"
+  },
+
+  "AdminCampgroundsPage": {
+    "pageHeader": {
+      "title": "Manage campgrounds",
+      "description": "Add, edit or remove campgrounds"
+    },
+    "meta": {
+      "title": "Campgrounds | Admin | Campy",
+      "description": "Manage the campgrounds."
+    }
+  },
+
+  "AdminCampgroundCreatePage": {
+    "pageHeader": {
+      "title": "Create new campground",
+      "description": "Create a new campground"
+    },
+    "meta": {
+      "title": "Create Campground | Admin | Campy",
+      "description": "Create campground."
+    }
+  },
+
+  "AdminCampgroundDetailsPage": {
+    "pageHeader": {
+      "title": "Campground : {name}",
+      "description": "Owner: {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Manage Campground | Admin | Campy",
+      "description": "Manage campground."
+    }
+  },
+
+  "AdminCampgroundAmenitiesPage": {
+    "pageHeader": {
+      "title": "{name} - Manage campground's amenities",
+      "description": "Owner: {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Manage Campground's amenities | Admin | Campy",
+      "description": "Manage campground."
+    }
+  },
+
+  "AdminCampgroundEditPage": {
+    "pageHeader": {
+      "title": "Edit {name}",
+      "description": "Owner: {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Edit Campground | Admin | Campy",
+      "description": "Edit campground."
+    }
+  }
+}
