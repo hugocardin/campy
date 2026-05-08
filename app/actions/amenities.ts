@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResult } from "@/lib/errors";
+import { ActionResult, CommonErrorCode, resultError } from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import {
   handleDbNoData,
@@ -19,6 +19,17 @@ export async function createAmenityAction(
   input: AmenityCreateInput,
 ): Promise<ActionResult> {
   try {
+    if (!input.code) {
+      return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
+        field: "code",
+      });
+    }
+    if (!input.category_id) {
+      return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
+        field: "category",
+      });
+    }
+
     const supabase = await createClient();
 
     const result = await handleDbSingle(
@@ -44,6 +55,10 @@ export async function createAmenityAction(
 
 export async function deleteAmenityAction(id: string): Promise<ActionResult> {
   try {
+    if (id) {
+      return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
+    }
+
     const supabase = await createClient();
 
     const result = await handleDbNoData(

@@ -1,0 +1,24 @@
+{
+  "GENERIC_SERVER_ERROR": "Something went wrong. Please try again later.",
+
+  "COMMON_MISSING_FIELD": "{} is required but was not provided.",
+
+  "DB_DUPLICATE_VALUE": "This value already exists. Please choose a different one.",
+  "DB_INVALID_REFERENCE": "The referenced record does not exist.",
+  "DB_NOT_NULL_VIOLATION": "This field is required and cannot be empty.",
+  "DB_CHECK_VIOLATION": "The value you entered does not meet the required conditions.",
+  "DB_NOT_FOUND": "The requested item was not found.",
+  "DB_PERMISSION_DENIED": "You don't have permission to perform this action.",
+  "DB_SESSION_EXPIRED": "Your session has expired. Please log in again.",
+  "DB_UNHANDLED_DATABASE_ERROR": "A database error occurred. Please try again.",
+  "DB_CONNECTION_ERROR": "Unable to connect to the server. Please check your internet connection.",
+
+  "AUTH_INVALID_CREDENTIALS": "The email or password you entered is incorrect.",
+  "AUTH_EMAIL_ALREADY_EXISTS": "An account with this email address already exists.",
+  "AUTH_WEAK_PASSWORD": "Your password is too weak. Please make it stronger (at least 8 characters with numbers and symbols).",
+  "AUTH_EMAIL_NOT_CONFIRMED": "Please check your email and confirm your account before logging in.",
+  "AUTH_TOO_MANY_REQUESTS": "Too many failed attempts. Please wait a few minutes before trying again.",
+  "AUTH_INVALID_EMAIL": "Please enter a valid email address.",
+  "AUTH_NETWORK_ERROR": "Network error. Please check your connection and try again.",
+  "AUTH_UNKNOWN_AUTH_ERROR": "An authentication error occurred. Please try again."
+}

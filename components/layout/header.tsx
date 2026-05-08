@@ -164,7 +164,7 @@ export default function Header() {
           ) : (
             <Button variant="default" size="sm" asChild>
               <Link href={routes.auth()}>
-                {t_auth("signIn")} / {t_auth("signOut")}
+                {t_auth("signIn")} / {t_auth("signUp")}
               </Link>
             </Button>
           )}

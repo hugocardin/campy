@@ -10,30 +10,30 @@ export function mapAuthError(error: AuthError): AuthErrorCodeType {
     code === "invalid_credentials" ||
     message.includes("invalid login credentials")
   ) {
-    return AuthErrorCode.INVALID_CREDENTIALS;
+    return AuthErrorCode.AUTH_INVALID_CREDENTIALS;
   }
 
   if (
     code === "user_already_registered" ||
     message.includes("already registered")
   ) {
-    return AuthErrorCode.EMAIL_ALREADY_EXISTS;
+    return AuthErrorCode.AUTH_EMAIL_ALREADY_EXISTS;
   }
 
   if (message.includes("password") && message.includes("weak")) {
-    return AuthErrorCode.WEAK_PASSWORD;
+    return AuthErrorCode.AUTH_WEAK_PASSWORD;
   }
 
   if (message.includes("confirmed") || message.includes("verify")) {
-    return AuthErrorCode.EMAIL_NOT_CONFIRMED;
+    return AuthErrorCode.AUTH_EMAIL_NOT_CONFIRMED;
   }
 
   if (code === "too_many_requests" || message.includes("rate limit")) {
-    return AuthErrorCode.TOO_MANY_REQUESTS;
+    return AuthErrorCode.AUTH_TOO_MANY_REQUESTS;
   }
 
   if (message.includes("email")) {
-    return AuthErrorCode.INVALID_EMAIL;
+    return AuthErrorCode.AUTH_INVALID_EMAIL;
   }
 
   // Network / timeout / offline
@@ -42,11 +42,11 @@ export function mapAuthError(error: AuthError): AuthErrorCodeType {
     message.includes("timeout") ||
     message.includes("fetch")
   ) {
-    return AuthErrorCode.NETWORK_ERROR;
+    return AuthErrorCode.AUTH_NETWORK_ERROR;
   }
 
   // Catch-all
   console.warn("Unhandled auth error:", { code, message: error.message });
 
-  return AuthErrorCode.UNKNOWN_AUTH_ERROR;
+  return AuthErrorCode.AUTH_UNKNOWN_AUTH_ERROR;
 }

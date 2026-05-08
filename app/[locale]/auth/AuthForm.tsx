@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
+import { AUTH_MODES, AuthMode } from "@/lib/types/auth";
 
 type AuthFormProps = {
   redirectTo: string;
@@ -24,8 +25,9 @@ type AuthFormProps = {
 export default function AuthForm({ redirectTo }: AuthFormProps) {
   const t_auth = useTranslations("auth");
   const tc = useTranslations("common");
+  const t_errors = useTranslations("errors");
 
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<AuthMode>(AUTH_MODES.SIGNIN);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,31 +44,33 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
       const result = await authAction(mode, email, password, redirectTo);
 
       if (!result.success) {
-        console.error("Auth error:", result.errorCode);
-        setError(result.errorCode);
+        console.log("Auth error:", result);
+        setError(t_errors(result.errorCode!));
         return;
       }
 
       setEmail("");
       setPassword("");
 
-      if (mode === "signup") {
+      if (AUTH_MODES.SIGNUP) {
         setMessage(t_auth("signupSuccess"));
       }
     });
   };
 
   const toggleMode = () => {
-    setMode((prev) => (prev === "signin" ? "signup" : "signin"));
+    setMode((prev) =>
+      prev === AUTH_MODES.SIGNIN ? AUTH_MODES.SIGNUP : AUTH_MODES.SIGNIN,
+    );
     setError(null);
     setMessage(null);
   };
 
-  const title =
-    mode === "signin" ? t_auth("signInTitle") : t_auth("signUpTitle");
-  const submitText = mode === "signin" ? t_auth("signIn") : t_auth("signUp");
-  const switchText =
-    mode === "signin" ? t_auth("noAccount") : t_auth("haveAccount");
+  const isSignin = mode === AUTH_MODES.SIGNIN;
+
+  const title = isSignin ? t_auth("signInTitle") : t_auth("signUpTitle");
+  const submitText = isSignin ? t_auth("signIn") : t_auth("signUp");
+  const switchText = isSignin ? t_auth("noAccount") : t_auth("haveAccount");
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
@@ -118,9 +122,7 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
                   placeholder={t_auth("form.passwordPlaceholder")}
                   required
                   minLength={8}
-                  autoComplete={
-                    mode === "signin" ? "current-password" : "new-password"
-                  }
+                  autoComplete={isSignin ? "current-password" : "new-password"}
                 />
                 <button
                   type="button"
@@ -132,11 +134,7 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
               </div>
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">
-                {t_auth(`errors.${error}`)}
-              </p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             {message && (
               <p className="text-sm text-green-600 dark:text-green-400">
                 {message}

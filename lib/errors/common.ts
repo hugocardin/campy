@@ -1,5 +1,5 @@
 export const CommonErrorCode = {
-  MISSING_ID: "MISSING_ID",
+  COMMON_MISSING_FIELD: "COMMON_MISSING_FIELD",
 } as const;
 
 export type CommonErrorCodeType =

@@ -55,7 +55,7 @@ export async function updateCampgroundAction(
 ): Promise<ActionResult> {
   try {
     if (!input.id) {
-      return resultError(CommonErrorCode.MISSING_ID);
+      return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
     }
 
     const supabase = await createClient();

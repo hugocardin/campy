@@ -17,7 +17,7 @@ export async function updateSiteAction(
   input: SiteCreateUpdateInput,
 ): Promise<ActionResult> {
   if (!input.id) {
-    return resultError(CommonErrorCode.MISSING_ID);
+    return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
   }
 
   try {

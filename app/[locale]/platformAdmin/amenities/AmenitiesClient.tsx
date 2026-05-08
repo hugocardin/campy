@@ -40,6 +40,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
   const tc = useTranslations("common");
   const t_amenities = useTranslations("amenities");
   const t_amenityCategories = useTranslations("amenityCategories");
+  const t_errors = useTranslations("errors");
 
   const [code, setCode] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
@@ -50,7 +51,9 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || !categoryId) return;
+    if (!code.trim() || !categoryId) {
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -61,7 +64,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     });
 
     if (!result.success) {
-      setError(result.errorCode);
+      setError(t_errors(result.errorCode!));
     } else {
       setCode("");
       setCategoryId("");
@@ -78,7 +81,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     const result = await deleteAmenityAction(id);
 
     if (!result.success) {
-      setError(result.errorCode);
+      setError(t_errors(result.errorCode!));
     } else {
       router.refresh();
     }

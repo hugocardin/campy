@@ -50,7 +50,7 @@ export async function handleDbSingle<T>(
   }
 
   if (data === null) {
-    return resultError(DbErrorCode.NOT_FOUND);
+    return resultError(DbErrorCode.DB_NOT_FOUND);
   }
 
   return resultSuccess(data);
@@ -88,7 +88,7 @@ export function handleUnexpectedError(err: unknown): ActionResult<never> {
   // Otherwise it's an unexpected JS error (network, createClient failure, etc.)
   console.error("Unexpected database-related error:", err);
 
-  return resultError(DbErrorCode.UNHANDLED_DATABASE_ERROR, {
+  return resultError(DbErrorCode.DB_UNHANDLED_DATABASE_ERROR, {
     message: err instanceof Error ? err.message : "Unknown error",
     ...{
       stack: err instanceof Error ? err.stack : undefined,
@@ -100,27 +100,27 @@ export function handleUnexpectedError(err: unknown): ActionResult<never> {
 function mapPostgrestError(error: PostgrestError): ActionResult<never> {
   switch (error.code) {
     case "23505": // unique_violation
-      return resultError(DbErrorCode.DUPLICATE_VALUE, { ...error });
+      return resultError(DbErrorCode.DB_DUPLICATE_VALUE, { ...error });
 
     case "23503": // foreign_key_violation
-      return resultError(DbErrorCode.INVALID_REFERENCE, { ...error });
+      return resultError(DbErrorCode.DB_INVALID_REFERENCE, { ...error });
 
     case "23502": // not_null_violation
-      return resultError(DbErrorCode.NOT_NULL_VIOLATION, { ...error });
+      return resultError(DbErrorCode.DB_NOT_NULL_VIOLATION, { ...error });
 
     case "23514": // check_violation
-      return resultError(DbErrorCode.CHECK_VIOLATION, { ...error });
+      return resultError(DbErrorCode.DB_CHECK_VIOLATION, { ...error });
 
     case "42501": // insufficient_privilege
-      return resultError(DbErrorCode.PERMISSION_DENIED, { ...error });
+      return resultError(DbErrorCode.DB_PERMISSION_DENIED, { ...error });
 
     case "PGRST301": // JWT expired / invalid (PostgREST specific)
     case "PGRST302": // other JWT issues
-      return resultError(DbErrorCode.SESSION_EXPIRED, { ...error });
+      return resultError(DbErrorCode.DB_SESSION_EXPIRED, { ...error });
 
     default:
       console.warn("Unhandled Postgrest error code:", error);
-      return resultError(DbErrorCode.UNHANDLED_DATABASE_ERROR, { ...error });
+      return resultError(DbErrorCode.DB_UNHANDLED_DATABASE_ERROR, { ...error });
   }
 }
 

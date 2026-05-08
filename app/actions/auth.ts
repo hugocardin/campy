@@ -4,10 +4,9 @@ import { ActionResult, resultSuccess } from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import { handleAuthResponse } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
+import { AUTH_MODES, AuthMode } from "@/lib/types/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
-type AuthMode = "signin" | "signup";
 
 export async function authAction(
   mode: AuthMode,
@@ -19,7 +18,7 @@ export async function authAction(
 
   let result: ActionResult<void>;
 
-  if (mode === "signin") {
+  if (mode === AUTH_MODES.SIGNIN) {
     result = await handleAuthResponse(() =>
       supabase.auth.signInWithPassword({ email, password }),
     );
@@ -33,7 +32,7 @@ export async function authAction(
     return result;
   }
 
-  if (mode === "signup") {
+  if (mode === AUTH_MODES.SIGNUP) {
     return resultSuccess();
   }
 

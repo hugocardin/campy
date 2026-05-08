@@ -18,7 +18,7 @@ export type ActionResult<T = void> =
     }
   | {
       success: false;
-      errorCode: ErrorCode;
+      errorCode?: ErrorCode;
       details?: Record<string, unknown>;
     };
 
@@ -28,7 +28,7 @@ export function resultSuccess<T = void>(data?: T): ActionResult<T> {
 }
 
 export function resultError(
-  errorCode: ErrorCode,
+  errorCode?: ErrorCode,
   details?: Record<string, unknown>,
 ): ActionResult<never> {
   return {
