@@ -10,7 +10,7 @@
   "DB_NOT_FOUND": "The requested item was not found.",
   "DB_PERMISSION_DENIED": "You don't have permission to perform this action.",
   "DB_SESSION_EXPIRED": "Your session has expired. Please log in again.",
-  "DB_RESOURCE_IN_USE": "This amenity is still linked to a campground or site. Unlink it before deleting.",
+  "DB_RESOURCE_IN_USE": "This item is still in use and can't be deleted.",
   "DB_UNHANDLED_DATABASE_ERROR": "A database error occurred. Please try again.",
   "DB_CONNECTION_ERROR": "Unable to connect to the server. Please check your internet connection.",
 

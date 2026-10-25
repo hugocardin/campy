@@ -87,9 +87,7 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
     if (error) {
       if (error.code === "23503") {
         return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
-          reason: "amenity_in_use",
-          message:
-            "This amenity is still linked to a campground or site. Unlink it before deleting.",
+          reason: "resource_in_use",
         });
       }
       return mapPostgrestError(error);
@@ -97,9 +95,7 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
 
     if (!data || data.length === 0) {
       return resultError(DbErrorCode.DB_NOT_FOUND, {
-        reason: "amenity_not_deleted",
-        message:
-          "Amenity was not deleted (not found or insufficient permission).",
+        reason: "not_deleted",
       });
     }
 
