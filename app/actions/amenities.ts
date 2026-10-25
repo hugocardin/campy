@@ -55,7 +55,7 @@ export async function createAmenityAction(
 
 export async function deleteAmenityAction(id: string): Promise<ActionResult> {
   try {
-    if (id) {
+    if (!id) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
     }
 

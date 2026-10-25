@@ -1,6 +1,6 @@
 "use client";
 
-import { updateSiteAmenitiesAction } from "@/app/actions/site-admin.ts";
+import { updateSiteAmenitiesAction } from "@/app/actions/site-admin";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";

@@ -1,4 +1,4 @@
-import { updateSiteAction } from "@/app/actions/site-admin.ts";
+import { updateSiteAction } from "@/app/actions/site-admin";
 import { BackHeader } from "@/components/layout/back-header";
 import SiteFormClient from "@/components/site/SiteFormClient";
 import { toSiteFormData } from "@/components/site/site-form-utils";
