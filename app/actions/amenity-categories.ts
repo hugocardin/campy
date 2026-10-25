@@ -1,12 +1,18 @@
 "use server";
 
-import { ActionResult } from "@/lib/errors";
+import {
+  ActionResult,
+  DbErrorCode,
+  resultError,
+  resultSuccess,
+} from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import {
-  handleDbNoData,
   handleDbSingle,
   handleUnexpectedError,
+  mapPostgrestError,
 } from "@/lib/supabase/db-utils";
+import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -17,6 +23,11 @@ export interface AmenityCategoryCreateInput {
 export async function createAmenityCategoryAction(
   input: AmenityCategoryCreateInput,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     const supabase = await createClient();
 
@@ -41,18 +52,41 @@ export async function createAmenityCategoryAction(
 export async function deleteAmenityCategoryAction(
   id: number,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
-    const supabase = await createClient();
-
-    const result = await handleDbNoData(
-      supabase.from("amenity_categories").delete().eq("id", id),
-    );
-
-    if (result.success) {
-      revalidatePath(routes.platformAdmin.amenityCategory());
+    if (!id) {
+      return resultError(DbErrorCode.DB_NOT_FOUND, { reason: "missing_id" });
     }
 
-    return result;
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("amenity_categories")
+      .delete()
+      .eq("id", id)
+      .select("id");
+
+    if (error) {
+      if (error.code === "23503") {
+        return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
+          reason: "resource_in_use",
+        });
+      }
+      return mapPostgrestError(error);
+    }
+
+    if (!data || data.length === 0) {
+      return resultError(DbErrorCode.DB_NOT_FOUND, {
+        reason: "not_deleted",
+      });
+    }
+
+    revalidatePath(routes.platformAdmin.amenityCategory());
+    return resultSuccess();
   } catch (err) {
     return handleUnexpectedError(err);
   }

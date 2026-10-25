@@ -1,4 +1,4 @@
-import { createSiteAction } from "@/app/actions/site-admin.ts";
+import { createSiteAction } from "@/app/actions/site-admin";
 import { BackHeader } from "@/components/layout/back-header";
 import SiteFormClient from "@/components/site/SiteFormClient";
 import { Skeleton } from "@/components/ui/skeleton";

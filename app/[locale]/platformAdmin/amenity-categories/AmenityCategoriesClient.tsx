@@ -30,6 +30,7 @@ type Props = {
 export default function AmenityCategoriesClient({ initialCategories }: Props) {
   const tc = useTranslations("common");
   const t_amenityCategories = useTranslations("amenityCategories");
+  const t_errors = useTranslations("errors");
 
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -47,7 +48,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     const result = await createAmenityCategoryAction({ code: code.trim() });
 
     if (!result.success) {
-      setError(result.errorCode);
+      setError(t_errors(result.errorCode!));
     } else {
       setCode("");
       router.refresh();
@@ -63,7 +64,7 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     const result = await deleteAmenityCategoryAction(categoryId);
 
     if (!result.success) {
-      setError(result.errorCode);
+      setError(t_errors(result.errorCode!));
     } else {
       router.refresh();
     }
