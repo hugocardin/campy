@@ -68,8 +68,8 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Admin-only routes
-  if (pathname.startsWith(routes.platformAdmin.root())) {
+  // Admin-only routes (compare without locale — paths are /en-CA/platformAdmin/...)
+  if (pathnameWithoutLocale.startsWith(routes.platformAdmin.root())) {
     const result = await getUserRoleName(user.id);
 
     if (!result.success || result.data !== USER_ROLE_PLATEFORMADMIN) {

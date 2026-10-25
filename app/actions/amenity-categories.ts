@@ -7,6 +7,7 @@ import {
   handleDbSingle,
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
+import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -17,6 +18,11 @@ export interface AmenityCategoryCreateInput {
 export async function createAmenityCategoryAction(
   input: AmenityCategoryCreateInput,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     const supabase = await createClient();
 
@@ -41,6 +47,11 @@ export async function createAmenityCategoryAction(
 export async function deleteAmenityCategoryAction(
   id: number,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     const supabase = await createClient();
 

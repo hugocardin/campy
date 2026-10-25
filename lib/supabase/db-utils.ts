@@ -97,7 +97,7 @@ export function handleUnexpectedError(err: unknown): ActionResult<never> {
 }
 
 // ── Returns domain error code + rich details for client ───────────────────────
-function mapPostgrestError(error: PostgrestError): ActionResult<never> {
+export function mapPostgrestError(error: PostgrestError): ActionResult<never> {
   switch (error.code) {
     case "23505": // unique_violation
       return resultError(DbErrorCode.DB_DUPLICATE_VALUE, { ...error });

@@ -1,12 +1,19 @@
 "use server";
 
-import { ActionResult, CommonErrorCode, resultError } from "@/lib/errors";
+import {
+  ActionResult,
+  CommonErrorCode,
+  DbErrorCode,
+  resultError,
+  resultSuccess,
+} from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import {
-  handleDbNoData,
   handleDbSingle,
   handleUnexpectedError,
+  mapPostgrestError,
 } from "@/lib/supabase/db-utils";
+import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -18,6 +25,11 @@ export interface AmenityCreateInput {
 export async function createAmenityAction(
   input: AmenityCreateInput,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     if (!input.code) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
@@ -54,6 +66,11 @@ export async function createAmenityAction(
 }
 
 export async function deleteAmenityAction(id: string): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     if (!id) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
@@ -61,15 +78,33 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
 
     const supabase = await createClient();
 
-    const result = await handleDbNoData(
-      supabase.from("amenities").delete().eq("id", id),
-    );
+    const { data, error } = await supabase
+      .from("amenities")
+      .delete()
+      .eq("id", id)
+      .select("id");
 
-    if (result.success) {
-      revalidatePath(routes.platformAdmin.amenities());
+    if (error) {
+      if (error.code === "23503") {
+        return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
+          reason: "amenity_in_use",
+          message:
+            "This amenity is still linked to a campground or site. Unlink it before deleting.",
+        });
+      }
+      return mapPostgrestError(error);
     }
 
-    return result;
+    if (!data || data.length === 0) {
+      return resultError(DbErrorCode.DB_NOT_FOUND, {
+        reason: "amenity_not_deleted",
+        message:
+          "Amenity was not deleted (not found or insufficient permission).",
+      });
+    }
+
+    revalidatePath(routes.platformAdmin.amenities());
+    return resultSuccess();
   } catch (err) {
     return handleUnexpectedError(err);
   }

@@ -9,11 +9,17 @@ import {
   handleDbSingle,
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
+import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 async function changeCampgroundStatus(id: string, activeFlagToSet: boolean) {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     const supabase = await createClient();
 
@@ -53,6 +59,11 @@ export async function activateCampgroundAction(
 export async function updateCampgroundAction(
   input: CampgroundCreateUpdateInput,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     if (!input.id) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
@@ -102,6 +113,11 @@ export async function updateCampgroundAction(
 export async function createCampgroundAction(
   input: CampgroundCreateUpdateInput,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   let newCampgroundId;
 
   try {
@@ -150,6 +166,11 @@ export async function updateCampgroundAmenitiesAction({
   campgroundId: string;
   amenityIds: string[];
 }): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     const supabase = await createClient();
 

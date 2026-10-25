@@ -8,6 +8,7 @@ import {
   handleDbSingle,
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
+import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -16,6 +17,11 @@ export async function updateSiteAction(
   campgroundId: string,
   input: SiteCreateUpdateInput,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   if (!input.id) {
     return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
   }
@@ -57,6 +63,11 @@ export async function createSiteAction(
   campgroundId: string,
   input: SiteCreateUpdateInput,
 ): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   let newSiteId;
   try {
     const supabase = await createClient();
@@ -101,6 +112,11 @@ export async function updateSiteAmenitiesAction({
   siteId: string;
   amenityIds: string[];
 }): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
   try {
     const supabase = await createClient();
 

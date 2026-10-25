@@ -9,6 +9,7 @@ export const DbErrorCode = {
   // Auth / permission related
   DB_PERMISSION_DENIED: "DB_PERMISSION_DENIED",
   DB_SESSION_EXPIRED: "DB_SESSION_EXPIRED", // JWT expired etc.
+  DB_RESOURCE_IN_USE: "DB_RESOURCE_IN_USE",
 
   // Fallbacks
   DB_UNHANDLED_DATABASE_ERROR: "DB_UNHANDLED_ERROR",
