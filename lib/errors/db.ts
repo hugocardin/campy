@@ -11,8 +11,8 @@ export const DbErrorCode = {
   DB_SESSION_EXPIRED: "DB_SESSION_EXPIRED", // JWT expired etc.
   DB_RESOURCE_IN_USE: "DB_RESOURCE_IN_USE",
 
-  // Fallbacks
-  DB_UNHANDLED_DATABASE_ERROR: "DB_UNHANDLED_ERROR",
+  // Fallbacks — values must match messages/*/errors.json keys (used by t_errors)
+  DB_UNHANDLED_DATABASE_ERROR: "DB_UNHANDLED_DATABASE_ERROR",
   DB_CONNECTION_ERROR: "DB_CONNECTION_ERROR",
 } as const;
 
