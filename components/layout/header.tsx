@@ -87,10 +87,21 @@ export default function Header() {
         unstable_rethrow(error);
         toast.error(t_auth("errors.signOutPartialRevoke"));
       } finally {
-        await supabase.auth.signOut({ scope: "local" });
-        authSyncId.current += 1;
-        setUser(null);
-        setLoading(false);
+        // Isolated so a throw here cannot replace NEXT_REDIRECT from catch.
+        try {
+          const { error } = await supabase.auth.signOut({ scope: "local" });
+          if (error) {
+            console.error("Local sign-out failed:", error);
+            toast.error(t_auth("errors.signOutLocalClearFailed"));
+            return;
+          }
+          authSyncId.current += 1;
+          setUser(null);
+          setLoading(false);
+        } catch (localError) {
+          console.error("Local sign-out threw:", localError);
+          toast.error(t_auth("errors.signOutLocalClearFailed"));
+        }
       }
     });
   };
