@@ -93,11 +93,15 @@ function joinPath(parentPath: string, segment: string): string {
 
 /**
  * CLDR plural categories vary by locale (fr-CA adds `many`). Nested ICU under
- * those branches must not create locale-only structural paths. We only descend
- * into `other` (always required) for category nesting, using a normalized
- * `:category` segment; `=N` exact branches are still descended (en keys must
- * exist in fr). Locale-only category bodies like fr `many` are covered by
- * `assertFrPluralCoverage` but do not contribute nested paths.
+ * locale-only category bodies must not create required structural paths, but
+ * every branch is still walked for argument/select collection.
+ *
+ * Structural paths are recorded for: this plural, nests under `other`
+ * (normalized `:category`), and nests under `=N`. Path compare is one-way
+ * (every en path ⊆ fr) so fr-only `=N` / `many` nests may add extra fr paths.
+ *
+ * Sibling `#n` indices follow encounter order under a parent; keep the same
+ * relative order of same-signature sibling plurals across locales.
  */
 function walkIcu(
   elements: MessageFormatElement[],
@@ -106,6 +110,7 @@ function walkIcu(
   pluralsOut: PluralInfo[],
   parentPath = "",
   siblingCounters: Map<string, number> = new Map(),
+  recordStructuralPaths = true,
 ): void {
   for (const element of elements) {
     switch (element.type) {
@@ -126,8 +131,11 @@ function walkIcu(
             argumentsOut,
             selectOptionsOut,
             pluralsOut,
-            joinPath(parentPath, `select:${select.value}:${optionKey}`),
+            recordStructuralPaths
+              ? joinPath(parentPath, `select:${select.value}:${optionKey}`)
+              : parentPath,
             siblingCounters,
+            recordStructuralPaths,
           );
         }
         break;
@@ -138,42 +146,71 @@ function walkIcu(
         argumentsOut.add(plural.value);
         const optionKeys = Object.keys(plural.options);
         const baseSegment = `plural:${plural.value}:${pluralType}`;
-        const siblingKey = `${parentPath}\0${baseSegment}`;
-        const siblingIndex = siblingCounters.get(siblingKey) ?? 0;
-        siblingCounters.set(siblingKey, siblingIndex + 1);
-        const structuralPath = joinPath(
-          parentPath,
-          `${baseSegment}#${siblingIndex}`,
-        );
-        pluralsOut.push({
-          structuralPath,
-          name: plural.value,
-          pluralType,
-          categories: optionKeys.filter((key) => !isExactPluralKey(key)).sort(),
-          exactKeys: optionKeys.filter(isExactPluralKey).sort(),
-        });
+        let structuralPath = parentPath;
+
+        if (recordStructuralPaths) {
+          const siblingKey = `${parentPath}\0${baseSegment}`;
+          const siblingIndex = siblingCounters.get(siblingKey) ?? 0;
+          siblingCounters.set(siblingKey, siblingIndex + 1);
+          structuralPath = joinPath(parentPath, `${baseSegment}#${siblingIndex}`);
+          pluralsOut.push({
+            structuralPath,
+            name: plural.value,
+            pluralType,
+            categories: optionKeys
+              .filter((key) => !isExactPluralKey(key))
+              .sort(),
+            exactKeys: optionKeys.filter(isExactPluralKey).sort(),
+          });
+        }
 
         for (const [optionKey, option] of Object.entries(plural.options)) {
-          if (!isExactPluralKey(optionKey)) continue;
+          if (isExactPluralKey(optionKey)) {
+            walkIcu(
+              option.value,
+              argumentsOut,
+              selectOptionsOut,
+              pluralsOut,
+              recordStructuralPaths
+                ? joinPath(
+                    structuralPath,
+                    `plural:${plural.value}:${optionKey}`,
+                  )
+                : parentPath,
+              siblingCounters,
+              recordStructuralPaths,
+            );
+            continue;
+          }
+
+          if (optionKey === "other") {
+            walkIcu(
+              option.value,
+              argumentsOut,
+              selectOptionsOut,
+              pluralsOut,
+              recordStructuralPaths
+                ? joinPath(
+                    structuralPath,
+                    `plural:${plural.value}:category`,
+                  )
+                : parentPath,
+              siblingCounters,
+              recordStructuralPaths,
+            );
+            continue;
+          }
+
+          // Locale-varying categories (`one` / `many` / …): always collect
+          // arguments + selects, but do not record nested structural paths.
           walkIcu(
             option.value,
             argumentsOut,
             selectOptionsOut,
             pluralsOut,
-            joinPath(structuralPath, `plural:${plural.value}:${optionKey}`),
+            parentPath,
             siblingCounters,
-          );
-        }
-
-        const otherOption = plural.options.other;
-        if (otherOption) {
-          walkIcu(
-            otherOption.value,
-            argumentsOut,
-            selectOptionsOut,
-            pluralsOut,
-            joinPath(structuralPath, `plural:${plural.value}:category`),
-            siblingCounters,
+            false,
           );
         }
         break;
@@ -186,6 +223,7 @@ function walkIcu(
           pluralsOut,
           parentPath,
           siblingCounters,
+          recordStructuralPaths,
         );
         break;
       case TYPE.literal:
@@ -304,11 +342,15 @@ function assertIcuParity(
     `${label}: select option keys must match exactly across locales`,
   );
 
-  assert.deepEqual(
-    frShape.plurals.map(pluralSignature).sort(),
-    enShape.plurals.map(pluralSignature).sort(),
-    `${label}: plural structural paths must match (select/plural option chains + name:pluralType)`,
-  );
+  // One-way: every en path must exist in fr. Extra fr paths (nests under
+  // fr-only `=N`, etc.) are allowed; en must not lose shared structure.
+  const frPaths = new Set(frShape.plurals.map(pluralSignature));
+  for (const enPath of enShape.plurals.map(pluralSignature)) {
+    assert.ok(
+      frPaths.has(enPath),
+      `${label}: missing fr-CA plural path "${enPath}" (fr may add paths under locale-only =N nests, but must keep every en path)`,
+    );
+  }
 
   // Category branches are locale-specific (fr-CA needs `many`); =N from en must remain.
   assertFrPluralCoverage(label, frShape.plurals);
@@ -344,7 +386,8 @@ describe("ICU plural structural pairing", () => {
 
   it("allows a nested plural under fr-only many without path mismatch", () => {
     const en = `{count, plural, one {# site} other {# sites}}`;
-    const fr = `{count, plural, one {# site} many {{guests, plural, one {# invité} many {# invités} other {# invités}}} other {# sites}}`;
+    // Nested plural reuses `count` so args still match; path must not require en counterpart.
+    const fr = `{count, plural, one {# site} many {{count, plural, one {beaucoup} many {énormément} other {énormément}}} other {# sites}}`;
 
     assert.doesNotThrow(() =>
       assertIcuParity("fixture", "manyOnlyNested", en, fr),
@@ -362,6 +405,30 @@ describe("ICU plural structural pairing", () => {
     );
     assert.doesNotThrow(() =>
       assertIcuParity("fixture", "siblingOk", en, frOk),
+    );
+  });
+
+  it("allows a nested plural under fr-only =1 without path mismatch", () => {
+    const en = `{count, plural, =0 {none} one {# site} other {# sites}}`;
+    const fr = `{count, plural, =0 {aucun} =1 {{count, plural, one {pile un} many {pile un} other {pile un}}} one {# site} many {# sites} other {# sites}}`;
+
+    assert.doesNotThrow(() =>
+      assertIcuParity("fixture", "exactOneOnlyNested", en, fr),
+    );
+  });
+
+  it("fails when a skipped category branch introduces an unknown argument", () => {
+    const en = `{count, plural, one {# site for {name}} other {# sites for {name}}}`;
+    const frTypoInOne = `{count, plural, one {# site pour {nom}} many {# sites pour {name}} other {# sites pour {name}}}`;
+    const frExtraInMany = `{count, plural, one {# site pour {name}} many {# sites pour {name} ({extra})} other {# sites pour {name}}}`;
+
+    assert.throws(
+      () => assertIcuParity("fixture", "typoInOne", en, frTypoInOne),
+      /argument names must match/,
+    );
+    assert.throws(
+      () => assertIcuParity("fixture", "extraInMany", en, frExtraInMany),
+      /argument names must match/,
     );
   });
 });
