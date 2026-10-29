@@ -1,5 +1,4 @@
 import { redirect } from "@/i18n/navigation";
-import { routes } from "@/lib/routes";
 import { toSafeInternalHref } from "@/lib/safe-internal-href";
 import { createClient } from "@/lib/supabase/server";
 import { generatePageMetadata } from "@/lib/utils";

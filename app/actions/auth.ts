@@ -60,7 +60,8 @@ export async function authAction(
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.auth.signOut();
+  // scope: "local" revokes this session's refresh token only (not all devices).
+  const { error } = await supabase.auth.signOut({ scope: "local" });
 
   if (error) {
     // Surface to the client so Header can toast instead of assuming revoke worked.

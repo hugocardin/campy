@@ -22,7 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
 import { useUserRole } from "@/lib/hooks/use-user-role";
 import { routes } from "@/lib/routes";
-import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { unstable_rethrow } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import LocaleSwitcher from "../LocaleSwitcher";
@@ -80,16 +80,12 @@ export default function Header() {
   const handleSignOut = () => {
     startSignOut(async () => {
       // Revoke while cookies still exist, then always clear local session.
-      // redirect() from the action throws NEXT_REDIRECT on success — rethrow it
-      // after finally so the router can navigate.
+      // redirect()/notFound throw — unstable_rethrow lets the router handle them.
       try {
         await signOutAction();
       } catch (error) {
-        if (!isRedirectError(error)) {
-          toast.error(t_auth("errors.network_error"));
-        } else {
-          throw error;
-        }
+        unstable_rethrow(error);
+        toast.error(t_auth("errors.signOutPartialRevoke"));
       } finally {
         await supabase.auth.signOut({ scope: "local" });
         authSyncId.current += 1;

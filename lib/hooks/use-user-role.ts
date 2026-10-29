@@ -7,23 +7,28 @@ import { useEffect, useState } from "react";
  * Fetch the signed-in user's role. Pass `userId` from Header auth state so the
  * role refetches after soft-nav sign-in/sign-out (Header stays mounted).
  *
- * `roleName` is only returned when it was fetched for the current `userId`,
- * so a direct A→B user switch never paints A's role on B for a frame.
- * Cache is cleared on sign-out so a returning user cannot flash a stale role.
+ * Cache is reset during render when `userId` changes (not in an effect) so
+ * sign-out / A→B / A→null→A never paints a stale role, and we avoid
+ * `react-hooks/set-state-in-effect`.
  */
 export function useUserRole(userId: string | null | undefined) {
   const [cache, setCache] = useState<{
     userId: string;
     roleName: string | null;
   } | null>(null);
+  const [seenUserId, setSeenUserId] = useState(userId);
+
+  if (userId !== seenUserId) {
+    setSeenUserId(userId);
+    setCache(null);
+  }
 
   useEffect(() => {
-    let ignore = false;
-
     if (!userId) {
-      setCache(null);
       return;
     }
+
+    let ignore = false;
 
     const fetchRole = async () => {
       const supabase = createClient();
@@ -54,7 +59,7 @@ export function useUserRole(userId: string | null | undefined) {
     };
   }, [userId]);
 
-  const roleName = cache?.userId === userId ? cache.roleName : null;
+  const roleName = userId && cache?.userId === userId ? cache.roleName : null;
   const isLoading = Boolean(userId) && cache?.userId !== userId;
 
   return { roleName, isLoading };
