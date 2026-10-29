@@ -426,10 +426,16 @@ function icuShape(message: string, label: string): IcuShape {
   }
 }
 
-/** Exact key (`=0`) from a path segment like `plural:count:=0`, or null. */
+/**
+ * Exact key from a path segment like `plural:count:=0` / `plural:x:=1.5`.
+ * Uses the same `=`-prefix rule as `isExactPluralKey` so non-integer exact
+ * keys cannot drift from walk/path recording.
+ */
 function exactKeyFromSegment(segment: string): string | null {
-  const match = /^plural:[^:]+:(=\d+)$/.exec(segment);
-  return match ? match[1]! : null;
+  const colon = segment.lastIndexOf(":");
+  if (colon < 0 || !segment.startsWith("plural:")) return null;
+  const tail = segment.slice(colon + 1);
+  return isExactPluralKey(tail) ? tail : null;
 }
 
 /**
@@ -740,6 +746,39 @@ describe("ICU plural structural pairing", () => {
 
     assert.doesNotThrow(() =>
       assertIcuParity("fixture", "exactOneOnlyNested", en, fr),
+    );
+  });
+
+  it("exactKeyFromSegment matches isExactPluralKey for non-integer =N", () => {
+    // formatjs rejects `=1.5` in source, but path segments can still carry it
+    // if another producer records it — keep parse aligned with isExactPluralKey.
+    assert.equal(exactKeyFromSegment("plural:count:=0"), "=0");
+    assert.equal(exactKeyFromSegment("plural:count:=1.5"), "=1.5");
+    assert.equal(exactKeyFromSegment("plural:count:=-1"), "=-1");
+    assert.equal(exactKeyFromSegment("plural:count:one"), null);
+    assert.equal(exactKeyFromSegment("plural:count:category"), null);
+
+    const enPluralsByPath = new Map<string, PluralInfo>([
+      [
+        "plural:count:cardinal#0",
+        {
+          structuralPath: "plural:count:cardinal#0",
+          name: "count",
+          pluralType: "cardinal",
+          categories: ["one", "other"],
+          exactKeys: ["=0"],
+          otherArgs: [],
+          categoryArgs: {},
+          exactArgs: {},
+        },
+      ],
+    ]);
+    assert.equal(
+      isAllowedExtraFrPath(
+        "plural:count:cardinal#0/plural:count:=1.5/plural:count:cardinal#0",
+        enPluralsByPath,
+      ),
+      true,
     );
   });
 
