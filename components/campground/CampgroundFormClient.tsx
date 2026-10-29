@@ -107,7 +107,7 @@ export default function CampgroundFormClient({
       if (!result.success) {
         setError(
           withErrorReference(
-            translateErrorCode(result.errorCode, t_errors, tc("error")),
+            translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
             result.details,
             (errorId) => tc("errorReference", { errorId }),
           ),

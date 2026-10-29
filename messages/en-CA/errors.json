@@ -1,7 +1,7 @@
 {
   "GENERIC_SERVER_ERROR": "Something went wrong. Please try again later.",
 
-  "COMMON_MISSING_FIELD": "{} is required but was not provided.",
+  "COMMON_MISSING_FIELD": "{field} is required but was not provided.",
 
   "DB_DUPLICATE_VALUE": "This value already exists. Please choose a different one.",
   "DB_INVALID_REFERENCE": "The referenced record does not exist.",

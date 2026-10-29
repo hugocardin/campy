@@ -48,7 +48,7 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
         console.log("Auth error:", result);
         setError(
           withErrorReference(
-            translateErrorCode(result.errorCode, t_errors, tc("error")),
+            translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
             result.details,
             (errorId) => tc("errorReference", { errorId }),
           ),

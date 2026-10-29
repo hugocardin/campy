@@ -23,6 +23,7 @@ export default async function Home() {
       campgroundsResult.errorCode,
       tErrors,
       tc("error"),
+      campgroundsResult.details,
     );
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center">
