@@ -7,6 +7,8 @@ import {
   parse,
   TYPE,
   type MessageFormatElement,
+  type PluralElement,
+  type SelectElement,
 } from "@formatjs/icu-messageformat-parser";
 
 const messagesRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "messages");
@@ -19,22 +21,30 @@ const messagesRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "messag
 const EXISTING_FR_CA_FILES = ["auth.json", "common.json"] as const;
 
 /**
- * Keys (dot paths) that may legitimately share the same string across en-CA/fr-CA
- * (brand tokens, unchanged loanwords, non-linguistic placeholders).
+ * Full `${namespace}.${path}` keys that may legitimately share the same string
+ * across en-CA/fr-CA (brand tokens, unchanged loanwords, non-linguistic masks).
  */
 const IDENTICAL_VALUE_ALLOWLIST = new Set([
-  "actions",
-  "brand",
-  "logoAlt",
-  "form.passwordPlaceholder",
+  "common.actions",
+  "common.brand",
+  "common.logoAlt",
+  "auth.form.passwordPlaceholder",
 ]);
 
 type LeafMap = Map<string, string>;
 
+type PluralInfo = {
+  name: string;
+  pluralType: NonNullable<Intl.PluralRulesOptions["type"]>;
+  /** CLDR categories present (excludes `=N` exact matches) */
+  categories: string[];
+};
+
 type IcuShape = {
   arguments: string[];
-  /** `${argumentName}:${optionKey}` for plural/select branches */
-  optionKeys: string[];
+  /** App-defined select branches — must match across locales */
+  selectOptions: string[];
+  plurals: PluralInfo[];
 };
 
 function collectLeaves(value: unknown, prefix = "", out: LeafMap = new Map()): LeafMap {
@@ -57,10 +67,15 @@ function collectLeaves(value: unknown, prefix = "", out: LeafMap = new Map()): L
   return out;
 }
 
+function isExactPluralKey(key: string): boolean {
+  return key.startsWith("=");
+}
+
 function walkIcu(
   elements: MessageFormatElement[],
   argumentsOut: Set<string>,
-  optionKeysOut: Set<string>,
+  selectOptionsOut: Set<string>,
+  pluralsOut: PluralInfo[],
 ): void {
   for (const element of elements) {
     switch (element.type) {
@@ -70,16 +85,32 @@ function walkIcu(
       case TYPE.time:
         argumentsOut.add(element.value);
         break;
-      case TYPE.plural:
-      case TYPE.select:
-        argumentsOut.add(element.value);
-        for (const [optionKey, option] of Object.entries(element.options)) {
-          optionKeysOut.add(`${element.value}:${optionKey}`);
-          walkIcu(option.value, argumentsOut, optionKeysOut);
+      case TYPE.select: {
+        const select = element as SelectElement;
+        argumentsOut.add(select.value);
+        const keys = Object.keys(select.options).sort();
+        selectOptionsOut.add(`${select.value}:${keys.join(",")}`);
+        for (const option of Object.values(select.options)) {
+          walkIcu(option.value, argumentsOut, selectOptionsOut, pluralsOut);
         }
         break;
+      }
+      case TYPE.plural: {
+        const plural = element as PluralElement;
+        argumentsOut.add(plural.value);
+        const optionKeys = Object.keys(plural.options);
+        pluralsOut.push({
+          name: plural.value,
+          pluralType: plural.pluralType ?? "cardinal",
+          categories: optionKeys.filter((key) => !isExactPluralKey(key)).sort(),
+        });
+        for (const option of Object.values(plural.options)) {
+          walkIcu(option.value, argumentsOut, selectOptionsOut, pluralsOut);
+        }
+        break;
+      }
       case TYPE.tag:
-        walkIcu(element.children, argumentsOut, optionKeysOut);
+        walkIcu(element.children, argumentsOut, selectOptionsOut, pluralsOut);
         break;
       case TYPE.literal:
       case TYPE.pound:
@@ -90,14 +121,77 @@ function walkIcu(
   }
 }
 
-function icuShape(message: string): IcuShape {
-  const argumentsOut = new Set<string>();
-  const optionKeysOut = new Set<string>();
-  walkIcu(parse(message), argumentsOut, optionKeysOut);
-  return {
-    arguments: [...argumentsOut].sort(),
-    optionKeys: [...optionKeysOut].sort(),
-  };
+function icuShape(message: string, label: string): IcuShape {
+  try {
+    const argumentsOut = new Set<string>();
+    const selectOptionsOut = new Set<string>();
+    const pluralsOut: PluralInfo[] = [];
+    walkIcu(parse(message), argumentsOut, selectOptionsOut, pluralsOut);
+    return {
+      arguments: [...argumentsOut].sort(),
+      selectOptions: [...selectOptionsOut].sort(),
+      plurals: pluralsOut,
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`${label}: ICU parse failed — ${detail}`, { cause: error });
+  }
+}
+
+function pluralSignature(plurals: PluralInfo[]): string[] {
+  return plurals.map((plural) => `${plural.name}:${plural.pluralType}`).sort();
+}
+
+function assertFrPluralCoverage(label: string, plurals: PluralInfo[]): void {
+  for (const plural of plurals) {
+    assert.ok(
+      plural.categories.includes("other"),
+      `${label}: plural "${plural.name}" (${plural.pluralType}) must include an "other" branch`,
+    );
+
+    const required = new Intl.PluralRules("fr-CA", {
+      type: plural.pluralType,
+    }).resolvedOptions().pluralCategories;
+
+    for (const category of required) {
+      assert.ok(
+        plural.categories.includes(category),
+        `${label}: plural "${plural.name}" (${plural.pluralType}) missing fr-CA category "${category}" (have: ${plural.categories.join(", ")})`,
+      );
+    }
+  }
+}
+
+function assertIcuParity(
+  namespace: string,
+  path: string,
+  enValue: string,
+  frValue: string,
+): void {
+  const label = `${namespace}.${path}`;
+  const enShape = icuShape(enValue, `${label} (en-CA)`);
+  const frShape = icuShape(frValue, `${label} (fr-CA)`);
+
+  assert.deepEqual(
+    frShape.arguments,
+    enShape.arguments,
+    `${label}: ICU argument names must match (en=${JSON.stringify(enValue)} fr=${JSON.stringify(frValue)})`,
+  );
+
+  assert.deepEqual(
+    frShape.selectOptions,
+    enShape.selectOptions,
+    `${label}: select option keys must match exactly across locales`,
+  );
+
+  assert.deepEqual(
+    pluralSignature(frShape.plurals),
+    pluralSignature(enShape.plurals),
+    `${label}: plural/selectordinal argument names and pluralType must match`,
+  );
+
+  // Plural branches are locale-specific (fr-CA may add `many`, `=N` may differ).
+  assertFrPluralCoverage(label, frShape.plurals);
 }
 
 function loadNamespace(locale: string, namespace: string): Record<string, unknown> {
@@ -135,15 +229,11 @@ describe("fr-CA message parity (existing namespaces only)", () => {
           `${namespace}.${path}: fr-CA value must be non-empty`,
         );
 
-        assert.deepEqual(
-          icuShape(frValue),
-          icuShape(enValue),
-          `${namespace}.${path}: ICU argument names and plural/select option keys must match (en=${JSON.stringify(enValue)} fr=${JSON.stringify(frValue)})`,
-        );
+        assertIcuParity(namespace, path, enValue, frValue);
 
         if (
           frTrimmed === enTrimmed &&
-          !IDENTICAL_VALUE_ALLOWLIST.has(path)
+          !IDENTICAL_VALUE_ALLOWLIST.has(`${namespace}.${path}`)
         ) {
           assert.fail(
             `${namespace}.${path}: fr-CA value is identical to en-CA after trim — not on the identical-value allowlist: ${JSON.stringify(enTrimmed)}`,
