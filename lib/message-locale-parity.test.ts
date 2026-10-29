@@ -91,12 +91,21 @@ function joinPath(parentPath: string, segment: string): string {
   return parentPath ? `${parentPath}/${segment}` : segment;
 }
 
+/**
+ * CLDR plural categories vary by locale (fr-CA adds `many`). Nested ICU under
+ * those branches must not create locale-only structural paths. We only descend
+ * into `other` (always required) for category nesting, using a normalized
+ * `:category` segment; `=N` exact branches are still descended (en keys must
+ * exist in fr). Locale-only category bodies like fr `many` are covered by
+ * `assertFrPluralCoverage` but do not contribute nested paths.
+ */
 function walkIcu(
   elements: MessageFormatElement[],
   argumentsOut: Set<string>,
   selectOptionsOut: Set<string>,
   pluralsOut: PluralInfo[],
   parentPath = "",
+  siblingCounters: Map<string, number> = new Map(),
 ): void {
   for (const element of elements) {
     switch (element.type) {
@@ -118,6 +127,7 @@ function walkIcu(
             selectOptionsOut,
             pluralsOut,
             joinPath(parentPath, `select:${select.value}:${optionKey}`),
+            siblingCounters,
           );
         }
         break;
@@ -127,9 +137,13 @@ function walkIcu(
         const pluralType = plural.pluralType ?? "cardinal";
         argumentsOut.add(plural.value);
         const optionKeys = Object.keys(plural.options);
+        const baseSegment = `plural:${plural.value}:${pluralType}`;
+        const siblingKey = `${parentPath}\0${baseSegment}`;
+        const siblingIndex = siblingCounters.get(siblingKey) ?? 0;
+        siblingCounters.set(siblingKey, siblingIndex + 1);
         const structuralPath = joinPath(
           parentPath,
-          `plural:${plural.value}:${pluralType}`,
+          `${baseSegment}#${siblingIndex}`,
         );
         pluralsOut.push({
           structuralPath,
@@ -138,13 +152,28 @@ function walkIcu(
           categories: optionKeys.filter((key) => !isExactPluralKey(key)).sort(),
           exactKeys: optionKeys.filter(isExactPluralKey).sort(),
         });
+
         for (const [optionKey, option] of Object.entries(plural.options)) {
+          if (!isExactPluralKey(optionKey)) continue;
           walkIcu(
             option.value,
             argumentsOut,
             selectOptionsOut,
             pluralsOut,
             joinPath(structuralPath, `plural:${plural.value}:${optionKey}`),
+            siblingCounters,
+          );
+        }
+
+        const otherOption = plural.options.other;
+        if (otherOption) {
+          walkIcu(
+            otherOption.value,
+            argumentsOut,
+            selectOptionsOut,
+            pluralsOut,
+            joinPath(structuralPath, `plural:${plural.value}:category`),
+            siblingCounters,
           );
         }
         break;
@@ -156,6 +185,7 @@ function walkIcu(
           selectOptionsOut,
           pluralsOut,
           parentPath,
+          siblingCounters,
         );
         break;
       case TYPE.literal:
@@ -220,6 +250,17 @@ function assertExactPluralKeysPreserved(
   enPlurals: PluralInfo[],
   frPlurals: PluralInfo[],
 ): void {
+  assert.equal(
+    new Set(frPlurals.map((plural) => plural.structuralPath)).size,
+    frPlurals.length,
+    `${label}: duplicate fr-CA plural structural paths (sibling index bug)`,
+  );
+  assert.equal(
+    new Set(enPlurals.map((plural) => plural.structuralPath)).size,
+    enPlurals.length,
+    `${label}: duplicate en-CA plural structural paths (sibling index bug)`,
+  );
+
   const frByPath = new Map(
     frPlurals.map((plural) => [plural.structuralPath, plural]),
   );
@@ -297,7 +338,30 @@ describe("ICU plural structural pairing", () => {
 
     assert.throws(
       () => assertIcuParity("fixture", "droppedExact", enNested, frDropped),
-      /select:role:admin\/plural:count:cardinal[\s\S]*=0/,
+      /select:role:admin\/plural:count:cardinal#0[\s\S]*=0/,
+    );
+  });
+
+  it("allows a nested plural under fr-only many without path mismatch", () => {
+    const en = `{count, plural, one {# site} other {# sites}}`;
+    const fr = `{count, plural, one {# site} many {{guests, plural, one {# invité} many {# invités} other {# invités}}} other {# sites}}`;
+
+    assert.doesNotThrow(() =>
+      assertIcuParity("fixture", "manyOnlyNested", en, fr),
+    );
+  });
+
+  it("keeps sibling plurals distinct so =N cannot collapse across them", () => {
+    const en = `{count, plural, =0 {No sites} other {# sites}} ({count, plural, one {# site} other {# sites}} free)`;
+    const frMissingFirst = `{count, plural, one {aucun} many {#} other {# sites}} ({count, plural, =0 {aucun} one {# site} many {#} other {# sites}} libres)`;
+    const frOk = `{count, plural, =0 {Aucun site} one {#} many {#} other {# sites}} ({count, plural, one {# site} many {#} other {# sites}} libres)`;
+
+    assert.throws(
+      () => assertIcuParity("fixture", "siblingDropped", en, frMissingFirst),
+      /plural:count:cardinal#0[\s\S]*=0/,
+    );
+    assert.doesNotThrow(() =>
+      assertIcuParity("fixture", "siblingOk", en, frOk),
     );
   });
 });
