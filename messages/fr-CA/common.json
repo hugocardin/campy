@@ -1,122 +1,20 @@
 {
-  "common": {
-    "add": "Ajouter",
-    "brand": "Campy",
-    "create": "Créer",
-    "delete": "Supprimer",
-    "logoAlt": "Logo Campy",
-    "signIn": "Connexion",
-    "signOut": "Déconnexion",
-    "signUp": "Inscription",
-    "processing": "Traitement en cours..."
-  },
+  "actions": "Actions",
+  "add": "Ajouter",
+  "brand": "Campy",
+  "cancel": "Annuler",
+  "confirm": "Confirmer",
+  "create": "Créer",
+  "delete": "Supprimer",
+  "details": "Détails",
+  "edit": "Modifier",
+  "error": "Erreur",
+  "logoAlt": "Logo Campy",
+  "save": "Enregistrer",
+  "processing": "Traitement en cours...",
 
   "header": {
     "profile": "Profil",
     "plateformAdminDashboard": "Tableau de bord administrateur de la plateforme"
-  },
-
-  "HomePage": {
-    "meta": {
-      "title": "Campy – Réservez des terrains de camping",
-      "description": "Trouvez et réservez vos voyages au Canada. Commencez votre aventure dès aujourd'hui."
-    }
-  },
-
-  "ProfilePage": {
-    "meta": {
-      "title": "Profil | Campy",
-      "description": "Gérez vos réservations, préférences et paramètres de compte sur Campy."
-    }
-  },
-
-  "AdminDashboard": {
-    "meta": {
-      "title": "Admin | Campy",
-      "description": "Gérez les utilisateurs, terrains de camping, réservations et paramètres de la plateforme."
-    }
-  },
-  "AdminAmenitiesPage": {
-    "title": "Gestion des commodités",
-    "description": "Ajout, modification ou retrait des commidités",
-    "meta": {
-      "title": "Commodités | Admin | Campy",
-      "description": "Gérez les commodités disponibles."
-    },
-    "actions": "Actions",
-    "amenityName": "Nom",
-    "amenityPlaceholder": "ex. Wi-Fi, Animaux acceptés, Feu de camp",
-    "categoryName": "Catégorie",
-    "categoryPlaceholder": "Choisissez une catégorie",
-    "confirmAmenityDeletion": "Supprimer la commodité '{code}'? Cette action est irréversible.",
-    "noAmenity": "Aucune commodité",
-    "noCategory": "Aucune catégorie"
-  },
-  "AdminAmenityCategoryPage": {
-    "title": "Gestion des catégories de commodités",
-    "description": "Ajout, modification ou retrait des catégories de commidités",
-    "meta": {
-      "title": "Catégories de Commodités | Admin | Campy",
-      "description": "Gérer les catégories de commodités."
-    },
-    "actions": "Actions",
-    "categoryName": "Catégorie",
-    "confirmAmenityCategoryDeletion": "Supprimer la catégorie de commodité '{category}'? Cette action est irréversible.",
-    "noCategory": "Aucune catégorie",
-    "placeholder": "ex. Services, Installations, Activités"
-  },
-  "AdminCampgroundsPage": {
-    "title": "Gérer les campings",
-    "description": "Ajouter, modifier ou supprimer des campings",
-    "meta": {
-      "title": "Campings | Admin | Campy",
-      "description": "Gérer les campings."
-    },
-    "createCampground": "Créer un camping",
-    "name": "Nom",
-    "location": "Emplacement",
-    "owner": "Propriétaire",
-    "phone": "Téléphone"
-  },
-
-  "AdminCampgroundCreatePage": {
-    "title": "Créer un nouveau camping",
-    "description": "Ajouter un nouveau camping",
-    "meta": {
-      "title": "Créer un camping | Admin | Campy",
-      "description": "Création d'un camping."
-    },
-    "errors": {
-      "nameRequired": "Le nom du camping est requis",
-      "ownerRequired": "Le propriétaire du camping est requis",
-      "latitudeInvalid": "La latitude doit être entre -90 et +90",
-      "longitudeInvalid": "La longitude doit être entre -180 et +180"
-    },
-    "form": {
-      "nameLabel": "Nom",
-      "namePlaceholder": "Entrez le nom du camping",
-      "ownerLabel": "Propriétaire",
-      "ownerPlaceholder": "Sélectionnez un propriétaire",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "Décrivez le camping...",
-      "websiteLabel": "Site web",
-      "websitePlaceholder": "https://...",
-      "phoneLabel": "Téléphone",
-      "phonePlaceholder": "(555) 123-4567",
-      "addressLabel": "Adresse",
-      "addressPlaceholder": "123 Rue Principale",
-      "cityLabel": "Ville",
-      "cityPlaceholder": "Montréal, Ottawa, Vancouver...",
-      "provinceLabel": "Province / État",
-      "provincePlaceholder": "Québec, Ontario, Colombie-Britannique...",
-      "countryLabel": "Pays",
-      "countryPlaceholder": "Canada, États-Unis...",
-      "latitudeLabel": "Latitude",
-      "latitudePlaceholder": "ex. 45.4215",
-      "latitudeRange": "Intervalle : -90° à +90°",
-      "longitudeLabel": "Longitude",
-      "longitudePlaceholder": "ex. -75.6972",
-      "longitudeRange": "Intervalle : -180° à +180°"
-    }
   }
 }
