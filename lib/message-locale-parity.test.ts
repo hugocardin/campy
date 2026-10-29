@@ -31,6 +31,18 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "auth.form.passwordPlaceholder",
 ]);
 
+/**
+ * Expected fr-CA plural categories (CLDR 38+). Cardinal `many` covers large round
+ * numbers (e.g. 1_000_000) and is required so translators don't rely on silent
+ * fallback to `other`. Hardcoded (not read solely from the runtime) so a
+ * small-icu / older Node build can't quietly weaken the catalogue check —
+ * `assertRuntimePluralRulesAgree` fails loudly if Intl disagrees.
+ */
+const FR_CA_PLURAL_CATEGORIES = {
+  cardinal: ["many", "one", "other"],
+  ordinal: ["one", "other"],
+} as const;
+
 type LeafMap = Map<string, string>;
 
 type PluralInfo = {
@@ -38,6 +50,8 @@ type PluralInfo = {
   pluralType: NonNullable<Intl.PluralRulesOptions["type"]>;
   /** CLDR categories present (excludes `=N` exact matches) */
   categories: string[];
+  /** Exact-match branches like `=0` */
+  exactKeys: string[];
 };
 
 type IcuShape = {
@@ -103,6 +117,7 @@ function walkIcu(
           name: plural.value,
           pluralType: plural.pluralType ?? "cardinal",
           categories: optionKeys.filter((key) => !isExactPluralKey(key)).sort(),
+          exactKeys: optionKeys.filter(isExactPluralKey).sort(),
         });
         for (const option of Object.values(plural.options)) {
           walkIcu(option.value, argumentsOut, selectOptionsOut, pluralsOut);
@@ -138,25 +153,60 @@ function icuShape(message: string, label: string): IcuShape {
   }
 }
 
-function pluralSignature(plurals: PluralInfo[]): string[] {
-  return plurals.map((plural) => `${plural.name}:${plural.pluralType}`).sort();
+function pluralSignature(plural: PluralInfo): string {
+  return `${plural.name}:${plural.pluralType}`;
+}
+
+function sortPlurals(plurals: PluralInfo[]): PluralInfo[] {
+  return [...plurals].sort((a, b) =>
+    pluralSignature(a).localeCompare(pluralSignature(b)),
+  );
+}
+
+function assertRuntimePluralRulesAgree(): void {
+  for (const pluralType of ["cardinal", "ordinal"] as const) {
+    const actual = [
+      ...new Intl.PluralRules("fr-CA", { type: pluralType }).resolvedOptions()
+        .pluralCategories,
+    ].sort();
+    const expected = [...FR_CA_PLURAL_CATEGORIES[pluralType]].sort();
+    assert.deepEqual(
+      actual,
+      expected,
+      `Intl.PluralRules("fr-CA", { type: "${pluralType}" }) categories [${actual.join(", ")}] do not match the hardcoded CLDR 38+ expectation [${expected.join(", ")}] — Node ICU data may be incomplete (small-icu / old runtime). Fix the runtime or update FR_CA_PLURAL_CATEGORIES deliberately.`,
+    );
+  }
 }
 
 function assertFrPluralCoverage(label: string, plurals: PluralInfo[]): void {
   for (const plural of plurals) {
-    assert.ok(
-      plural.categories.includes("other"),
-      `${label}: plural "${plural.name}" (${plural.pluralType}) must include an "other" branch`,
-    );
-
-    const required = new Intl.PluralRules("fr-CA", {
-      type: plural.pluralType,
-    }).resolvedOptions().pluralCategories;
-
+    const required = FR_CA_PLURAL_CATEGORIES[plural.pluralType];
     for (const category of required) {
       assert.ok(
         plural.categories.includes(category),
-        `${label}: plural "${plural.name}" (${plural.pluralType}) missing fr-CA category "${category}" (have: ${plural.categories.join(", ")})`,
+        `${label}: plural "${plural.name}" (${plural.pluralType}) missing required fr-CA category "${category}" (have: ${plural.categories.join(", ") || "(none)"}). Cardinal "many" is required (CLDR 38+) for large round numbers — do not rely on fallback to "other".`,
+      );
+    }
+  }
+}
+
+function assertExactPluralKeysPreserved(
+  label: string,
+  enPlurals: PluralInfo[],
+  frPlurals: PluralInfo[],
+): void {
+  const enSorted = sortPlurals(enPlurals);
+  const frSorted = sortPlurals(frPlurals);
+
+  for (let index = 0; index < enSorted.length; index++) {
+    const enPlural = enSorted[index]!;
+    const frPlural = frSorted[index]!;
+    const frExact = new Set(frPlural.exactKeys);
+
+    for (const exactKey of enPlural.exactKeys) {
+      assert.ok(
+        frExact.has(exactKey),
+        `${label}: plural "${enPlural.name}" (${enPlural.pluralType}) is missing en-CA exact branch "${exactKey}" in fr-CA (fr has: ${frPlural.exactKeys.join(", ") || "(none)"}). French may add extra =N keys, but must not drop English ones.`,
       );
     }
   }
@@ -185,13 +235,14 @@ function assertIcuParity(
   );
 
   assert.deepEqual(
-    pluralSignature(frShape.plurals),
-    pluralSignature(enShape.plurals),
+    sortPlurals(frShape.plurals).map(pluralSignature),
+    sortPlurals(enShape.plurals).map(pluralSignature),
     `${label}: plural/selectordinal argument names and pluralType must match`,
   );
 
-  // Plural branches are locale-specific (fr-CA may add `many`, `=N` may differ).
+  // Category branches are locale-specific (fr-CA needs `many`); =N from en must remain.
   assertFrPluralCoverage(label, frShape.plurals);
+  assertExactPluralKeysPreserved(label, enShape.plurals, frShape.plurals);
 }
 
 function loadNamespace(locale: string, namespace: string): Record<string, unknown> {
@@ -207,6 +258,24 @@ describe("fr-CA message parity (existing namespaces only)", () => {
 
   it("documents which fr-CA namespaces exist (missing ones are issue #2, not failures)", () => {
     assert.deepEqual(frFiles, [...EXISTING_FR_CA_FILES]);
+  });
+
+  it("hardcoded fr-CA PluralRules categories agree with this Node runtime", () => {
+    assertRuntimePluralRulesAgree();
+  });
+
+  it("identical-value allowlist entries exist in en-CA leaves", () => {
+    for (const key of IDENTICAL_VALUE_ALLOWLIST) {
+      const dot = key.indexOf(".");
+      assert.ok(dot > 0, `allowlist key must be namespace.path, got ${key}`);
+      const namespace = key.slice(0, dot);
+      const path = key.slice(dot + 1);
+      const leaves = collectLeaves(loadNamespace("en-CA", namespace));
+      assert.ok(
+        leaves.has(path),
+        `allowlist entry "${key}" is stale — not present in messages/en-CA/${namespace}.json`,
+      );
+    }
   });
 
   for (const file of EXISTING_FR_CA_FILES) {
