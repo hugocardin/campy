@@ -81,26 +81,36 @@ export default function Header() {
     startSignOut(async () => {
       // Revoke while cookies still exist, then always clear local session.
       // redirect()/notFound throw — unstable_rethrow lets the router handle them.
+      // Never return/throw from finally: that cancels a pending NEXT_REDIRECT
+      // (ESLint no-unsafe-finally).
+      let revokeFailed = false;
       try {
         await signOutAction();
       } catch (error) {
         unstable_rethrow(error);
-        toast.error(t_auth("errors.signOutPartialRevoke"));
+        revokeFailed = true;
       } finally {
-        // Isolated so a throw here cannot replace NEXT_REDIRECT from catch.
+        let localCleared = false;
         try {
           const { error } = await supabase.auth.signOut({ scope: "local" });
           if (error) {
             console.error("Local sign-out failed:", error);
-            toast.error(t_auth("errors.signOutLocalClearFailed"));
-            return;
+          } else {
+            localCleared = true;
+            authSyncId.current += 1;
+            setUser(null);
+            setLoading(false);
           }
-          authSyncId.current += 1;
-          setUser(null);
-          setLoading(false);
         } catch (localError) {
           console.error("Local sign-out threw:", localError);
+        }
+
+        // One toast max: local-clear failure is the more accurate message when
+        // both fail (partial-revoke copy claims this device is signed out).
+        if (!localCleared) {
           toast.error(t_auth("errors.signOutLocalClearFailed"));
+        } else if (revokeFailed) {
+          toast.error(t_auth("errors.signOutPartialRevoke"));
         }
       }
     });
