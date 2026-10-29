@@ -54,6 +54,14 @@ type PluralInfo = {
   categories: string[];
   /** Exact-match branches like `=0` */
   exactKeys: string[];
+  /** Sorted arg names used in the `other` branch (deep). */
+  otherArgs: string[];
+  /**
+   * Sorted arg names per non-`other` category branch (deep). Compared against
+   * `otherArgs` in the same locale — `#` (pound) is not an arg, so `#`-only
+   * wording diffs are allowed.
+   */
+  categoryArgs: Record<string, string[]>;
 };
 
 type IcuShape = {
@@ -61,7 +69,21 @@ type IcuShape = {
   /** App-defined select branches — must match across locales */
   selectOptions: string[];
   plurals: PluralInfo[];
+  /**
+   * Nested plurals under locale-only category bodies (`many`/`few`/`two`/`zero`).
+   * Not paired across locales; only fed to `assertFrPluralCoverage` (and
+   * same-locale category-vs-other arg checks).
+   */
+  coveragePlurals: PluralInfo[];
 };
+
+/** Categories that differ by locale; nests under them are not structural. */
+const LOCALE_ONLY_PLURAL_CATEGORIES = new Set([
+  "many",
+  "few",
+  "two",
+  "zero",
+]);
 
 function collectLeaves(value: unknown, prefix = "", out: LeafMap = new Map()): LeafMap {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -92,13 +114,61 @@ function joinPath(parentPath: string, segment: string): string {
 }
 
 /**
+ * Collect interpolation placeholders (argument / number / date / time) from an
+ * element tree, including every select/plural branch. Plural/select *binding*
+ * names are omitted so a nested `{count, plural, …}` under `many` does not
+ * look like an extra arg vs `other`. Used for same-locale category-vs-`other`
+ * checks (`#` / pound is not an arg).
+ */
+function collectInterpolationArgsDeep(
+  elements: MessageFormatElement[],
+): string[] {
+  const args = new Set<string>();
+
+  function visit(nodes: MessageFormatElement[]): void {
+    for (const element of nodes) {
+      switch (element.type) {
+        case TYPE.argument:
+        case TYPE.number:
+        case TYPE.date:
+        case TYPE.time:
+          args.add(element.value);
+          break;
+        case TYPE.select:
+        case TYPE.plural: {
+          const branched = element as SelectElement | PluralElement;
+          for (const option of Object.values(branched.options)) {
+            visit(option.value);
+          }
+          break;
+        }
+        case TYPE.tag:
+          visit(element.children);
+          break;
+        case TYPE.literal:
+        case TYPE.pound:
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  visit(elements);
+  return [...args].sort();
+}
+
+/**
  * CLDR plural categories vary by locale (fr-CA adds `many`). Nested ICU under
- * locale-only category bodies must not create required structural paths, but
- * every branch is still walked for argument/select collection.
+ * locale-only category bodies (`many`/`few`/`two`/`zero`) must not create
+ * required structural paths. `one` is shared by en-CA and fr-CA, so nests under
+ * it use a shared `:one` segment (like `other`'s `:category`).
  *
  * Structural paths are recorded for: this plural, nests under `other`
- * (normalized `:category`), and nests under `=N`. Path compare is one-way
- * (every en path ⊆ fr) so fr-only `=N` / `many` nests may add extra fr paths.
+ * (`:category`), nests under `one` (`:one`), and nests under `=N`. Path compare
+ * is one-way (every en path ⊆ fr); extra fr paths are only allowed when their
+ * chain contains an `=N` segment (fr-only exact nests). Locale-only nests go to
+ * `coveragePlurals` for `assertFrPluralCoverage` only.
  *
  * Sibling `#n` indices follow encounter order under a parent; keep the same
  * relative order of same-signature sibling plurals across locales.
@@ -108,6 +178,7 @@ function walkIcu(
   argumentsOut: Set<string>,
   selectOptionsOut: Set<string>,
   pluralsOut: PluralInfo[],
+  coveragePluralsOut: PluralInfo[],
   parentPath = "",
   siblingCounters: Map<string, number> = new Map(),
   recordStructuralPaths = true,
@@ -131,6 +202,7 @@ function walkIcu(
             argumentsOut,
             selectOptionsOut,
             pluralsOut,
+            coveragePluralsOut,
             recordStructuralPaths
               ? joinPath(parentPath, `select:${select.value}:${optionKey}`)
               : parentPath,
@@ -148,6 +220,16 @@ function walkIcu(
         const baseSegment = `plural:${plural.value}:${pluralType}`;
         let structuralPath = parentPath;
 
+        const otherOption = plural.options.other;
+        const otherArgs = otherOption
+          ? collectInterpolationArgsDeep(otherOption.value)
+          : [];
+        const categoryArgs: Record<string, string[]> = {};
+        for (const [optionKey, option] of Object.entries(plural.options)) {
+          if (isExactPluralKey(optionKey) || optionKey === "other") continue;
+          categoryArgs[optionKey] = collectInterpolationArgsDeep(option.value);
+        }
+
         if (recordStructuralPaths) {
           const siblingKey = `${parentPath}\0${baseSegment}`;
           const siblingIndex = siblingCounters.get(siblingKey) ?? 0;
@@ -161,6 +243,8 @@ function walkIcu(
               .filter((key) => !isExactPluralKey(key))
               .sort(),
             exactKeys: optionKeys.filter(isExactPluralKey).sort(),
+            otherArgs,
+            categoryArgs,
           });
         }
 
@@ -171,6 +255,7 @@ function walkIcu(
               argumentsOut,
               selectOptionsOut,
               pluralsOut,
+              coveragePluralsOut,
               recordStructuralPaths
                 ? joinPath(
                     structuralPath,
@@ -189,6 +274,7 @@ function walkIcu(
               argumentsOut,
               selectOptionsOut,
               pluralsOut,
+              coveragePluralsOut,
               recordStructuralPaths
                 ? joinPath(
                     structuralPath,
@@ -201,13 +287,47 @@ function walkIcu(
             continue;
           }
 
-          // Locale-varying categories (`one` / `many` / …): always collect
-          // arguments + selects, but do not record nested structural paths.
+          // Shared across en-CA / fr-CA cardinal + ordinal rules.
+          if (optionKey === "one") {
+            walkIcu(
+              option.value,
+              argumentsOut,
+              selectOptionsOut,
+              pluralsOut,
+              coveragePluralsOut,
+              recordStructuralPaths
+                ? joinPath(structuralPath, `plural:${plural.value}:one`)
+                : parentPath,
+              siblingCounters,
+              recordStructuralPaths,
+            );
+            continue;
+          }
+
+          // Locale-only categories (`many` / `few` / `two` / `zero`): always
+          // collect arguments + selects; nested plurals go to coverage-only
+          // (fr category coverage) without inventing structural paths.
+          if (LOCALE_ONLY_PLURAL_CATEGORIES.has(optionKey)) {
+            walkIcu(
+              option.value,
+              argumentsOut,
+              selectOptionsOut,
+              coveragePluralsOut,
+              coveragePluralsOut,
+              "",
+              new Map(),
+              true,
+            );
+            continue;
+          }
+
+          // Unknown category: collect args/selects, no structural paths.
           walkIcu(
             option.value,
             argumentsOut,
             selectOptionsOut,
             pluralsOut,
+            coveragePluralsOut,
             parentPath,
             siblingCounters,
             false,
@@ -221,6 +341,7 @@ function walkIcu(
           argumentsOut,
           selectOptionsOut,
           pluralsOut,
+          coveragePluralsOut,
           parentPath,
           siblingCounters,
           recordStructuralPaths,
@@ -240,16 +361,37 @@ function icuShape(message: string, label: string): IcuShape {
     const argumentsOut = new Set<string>();
     const selectOptionsOut = new Set<string>();
     const pluralsOut: PluralInfo[] = [];
-    walkIcu(parse(message), argumentsOut, selectOptionsOut, pluralsOut);
+    const coveragePluralsOut: PluralInfo[] = [];
+    walkIcu(
+      parse(message),
+      argumentsOut,
+      selectOptionsOut,
+      pluralsOut,
+      coveragePluralsOut,
+    );
     return {
       arguments: [...argumentsOut].sort(),
       selectOptions: [...selectOptionsOut].sort(),
       plurals: pluralsOut,
+      coveragePlurals: coveragePluralsOut,
     };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`${label}: ICU parse failed — ${detail}`, { cause: error });
   }
+}
+
+/** True when a structural path segment is an exact-match plural branch (`=N`). */
+function isExactPluralPathSegment(segment: string): boolean {
+  return /^plural:[^:]+:=\d+$/.test(segment);
+}
+
+/**
+ * Extra fr paths are only legitimate under an `=N` segment (typically a
+ * fr-only exact nest). Extras under `other` / `one` / shared selects fail.
+ */
+function isAllowedExtraFrPath(frPath: string): boolean {
+  return frPath.split("/").some(isExactPluralPathSegment);
 }
 
 function pluralSignature(plural: PluralInfo): string {
@@ -320,6 +462,25 @@ function assertExactPluralKeysPreserved(
   }
 }
 
+/**
+ * Each non-`other` category branch must use the same named args as `other` in
+ * the same locale (`#` is not an arg, so pound-only wording diffs are fine).
+ */
+function assertCategoryArgsMatchOther(
+  label: string,
+  plurals: PluralInfo[],
+): void {
+  for (const plural of plurals) {
+    for (const [category, args] of Object.entries(plural.categoryArgs)) {
+      assert.deepEqual(
+        args,
+        plural.otherArgs,
+        `${label}: plural "${plural.structuralPath}" category "${category}" args ${JSON.stringify(args)} must match other ${JSON.stringify(plural.otherArgs)} (same-locale; #-only diffs allowed)`,
+      );
+    }
+  }
+}
+
 function assertIcuParity(
   namespace: string,
   path: string,
@@ -342,19 +503,39 @@ function assertIcuParity(
     `${label}: select option keys must match exactly across locales`,
   );
 
-  // One-way: every en path must exist in fr. Extra fr paths (nests under
-  // fr-only `=N`, etc.) are allowed; en must not lose shared structure.
-  const frPaths = new Set(frShape.plurals.map(pluralSignature));
-  for (const enPath of enShape.plurals.map(pluralSignature)) {
+  // One-way: every en path must exist in fr. Extra fr paths are only allowed
+  // when the chain contains an `=N` segment (fr-only exact nests). Extras under
+  // `other` / `one` / shared selects are structural drift.
+  const enPaths = new Set(enShape.plurals.map(pluralSignature));
+  const frPathList = frShape.plurals.map(pluralSignature);
+  const frPaths = new Set(frPathList);
+  for (const enPath of enPaths) {
     assert.ok(
       frPaths.has(enPath),
-      `${label}: missing fr-CA plural path "${enPath}" (fr may add paths under locale-only =N nests, but must keep every en path)`,
+      `${label}: missing fr-CA plural path "${enPath}" (fr may add paths under fr-only =N nests, but must keep every en path)`,
+    );
+  }
+  for (const frPath of frPathList) {
+    if (enPaths.has(frPath)) continue;
+    assert.ok(
+      isAllowedExtraFrPath(frPath),
+      `${label}: unexpected extra fr-CA plural path "${frPath}" (only nests under fr-only =N segments are allowed; extras under other/one/shared selects fail)`,
     );
   }
 
   // Category branches are locale-specific (fr-CA needs `many`); =N from en must remain.
-  assertFrPluralCoverage(label, frShape.plurals);
+  // Coverage-only nests under locale-only categories still need fr categories.
+  assertFrPluralCoverage(label, [
+    ...frShape.plurals,
+    ...frShape.coveragePlurals,
+  ]);
   assertExactPluralKeysPreserved(label, enShape.plurals, frShape.plurals);
+  assertCategoryArgsMatchOther(label, [
+    ...enShape.plurals,
+    ...enShape.coveragePlurals,
+    ...frShape.plurals,
+    ...frShape.coveragePlurals,
+  ]);
 }
 
 function loadNamespace(locale: string, namespace: string): Record<string, unknown> {
@@ -429,6 +610,38 @@ describe("ICU plural structural pairing", () => {
     assert.throws(
       () => assertIcuParity("fixture", "extraInMany", en, frExtraInMany),
       /argument names must match/,
+    );
+  });
+
+  it("fails when a nested plural under one drops =0", () => {
+    const en = `{count, plural, one {{guests, plural, =0 {no guests} one {# guest} other {# guests}}} other {{guests, plural, =0 {no guests} one {# guest} other {# guests}}}}`;
+    // Nested guests under fr `one` drops =0 (and has many); under `other` keeps =0.
+    const fr = `{count, plural, one {{guests, plural, one {# invité} many {# invités} other {# invités}}} many {{guests, plural, =0 {aucun} one {# invité} many {# invités} other {# invités}}} other {{guests, plural, =0 {aucun} one {# invité} many {# invités} other {# invités}}}}`;
+
+    assert.throws(
+      () => assertIcuParity("fixture", "nestedOneDroppedExact", en, fr),
+      /plural:count:cardinal#0\/plural:count:one\/plural:guests:cardinal#0[\s\S]*=0/,
+    );
+  });
+
+  it("fails when fr one drops an argument that other keeps", () => {
+    const en = `{count, plural, one {# site for {name}} other {# sites for {name}}}`;
+    const fr = `{count, plural, one {# site} many {# sites pour {name}} other {# sites pour {name}}}`;
+
+    assert.throws(
+      () => assertIcuParity("fixture", "oneDropsName", en, fr),
+      /category "one" args/,
+    );
+  });
+
+  it("fails when fr adds an extra plural under other", () => {
+    const en = `{count, plural, one {# site} other {# sites}}`;
+    // Reuses `count` so the overall arg set still matches — only the path drifts.
+    const fr = `{count, plural, one {# site} many {# sites} other {# sites ({count, plural, one {a} many {b} other {c}})}}`;
+
+    assert.throws(
+      () => assertIcuParity("fixture", "extraUnderOther", en, fr),
+      /unexpected extra fr-CA plural path/,
     );
   });
 });
