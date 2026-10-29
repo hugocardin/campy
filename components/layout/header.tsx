@@ -1,11 +1,12 @@
 "use client";
 
+import { signOutAction } from "@/app/actions/auth";
+import { usePathname } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -21,47 +22,101 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
 import { useUserRole } from "@/lib/hooks/use-user-role";
 import { routes } from "@/lib/routes";
+import { unstable_rethrow } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import LocaleSwitcher from "../LocaleSwitcher";
 import ThemeToggle from "../ThemeToggle";
 
 export default function Header() {
   const tc = useTranslations("common");
   const t_auth = useTranslations("auth");
+  const pathname = usePathname();
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSigningOut, startSignOut] = useTransition();
   const supabase = createClient();
-  const router = useRouter();
+  // Monotonic id so a late getSession / auth event cannot overwrite a newer one.
+  const authSyncId = useRef(0);
+
+  const applyUser = (next: User | null, syncId: number) => {
+    if (syncId !== authSyncId.current) return;
+    setUser(next);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-      setLoading(false);
-    };
-
-    fetchUser();
-
+    // Display-only source of truth: session + auth events (no network getUser).
+    // INITIAL_SESSION fires on subscribe and covers the first paint.
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
+        applyUser(session?.user ?? null, ++authSyncId.current);
       },
     );
 
     return () => {
+      authSyncId.current += 1;
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push(routes.home());
-    router.refresh();
+  useEffect(() => {
+    // After server-action auth soft-navigates, sync from local session cookies
+    // without re-subscribing the auth listener or hitting Auth over the network.
+    const syncId = ++authSyncId.current;
+
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        applyUser(data.session?.user ?? null, syncId);
+      })
+      .catch(() => {
+        // Storage/cookie parse failures: treat as signed out for this sync.
+        applyUser(null, syncId);
+      });
+  }, [supabase, pathname]);
+
+  const handleSignOut = () => {
+    startSignOut(async () => {
+      // Revoke while cookies still exist, then always clear local session.
+      // redirect()/notFound throw — unstable_rethrow lets the router handle them.
+      // Never return/throw from finally: that cancels a pending NEXT_REDIRECT
+      // (ESLint no-unsafe-finally).
+      let revokeFailed = false;
+      try {
+        await signOutAction();
+      } catch (error) {
+        unstable_rethrow(error);
+        revokeFailed = true;
+      } finally {
+        let localCleared = false;
+        try {
+          const { error } = await supabase.auth.signOut({ scope: "local" });
+          if (error) {
+            console.error("Local sign-out failed:", error);
+          } else {
+            localCleared = true;
+            authSyncId.current += 1;
+            setUser(null);
+            setLoading(false);
+          }
+        } catch (localError) {
+          console.error("Local sign-out threw:", localError);
+        }
+
+        // One toast max: local-clear failure is the more accurate message when
+        // both fail (partial-revoke copy claims this device is signed out).
+        if (!localCleared) {
+          toast.error(t_auth("errors.signOutLocalClearFailed"));
+        } else if (revokeFailed) {
+          toast.error(t_auth("errors.signOutPartialRevoke"));
+        }
+      }
+    });
   };
 
-  const { roleName, isLoading: roleLoading } = useUserRole();
+  const { roleName, isLoading: roleLoading } = useUserRole(user?.id);
 
   if (loading) {
     return (
@@ -155,6 +210,7 @@ export default function Header() {
 
                 <DropdownMenuItem
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  disabled={isSigningOut}
                   onClick={handleSignOut}
                 >
                   {t_auth("signOut")}

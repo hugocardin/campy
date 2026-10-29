@@ -1,8 +1,10 @@
 "use server";
 
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
+import { redirect } from "@/i18n/navigation";
 import { ActionResult, resultError } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
+import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
   handleDbNoData,
@@ -11,8 +13,16 @@ import {
 } from "@/lib/supabase/db-utils";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+
+function revalidateCampgroundPublicAndAdmin(id: string) {
+  revalidateLocalizedPath(routes.home());
+  revalidateLocalizedPath(routes.campgroundDetail(id));
+  revalidateLocalizedPath(routes.platformAdmin.root());
+  revalidateLocalizedPath(routes.platformAdmin.campgrounds());
+  revalidateLocalizedPath(routes.platformAdmin.campgroundView(id));
+  revalidateLocalizedPath(routes.platformAdmin.campgroundEdit(id));
+}
 
 async function changeCampgroundStatus(id: string, activeFlagToSet: boolean) {
   const auth = await requirePlatformAdmin();
@@ -33,9 +43,7 @@ async function changeCampgroundStatus(id: string, activeFlagToSet: boolean) {
     );
 
     if (result.success) {
-      revalidatePath(routes.platformAdmin.campgrounds());
-      revalidatePath(routes.platformAdmin.campgroundView(id));
-      revalidatePath(routes.platformAdmin.campgroundEdit(id));
+      revalidateCampgroundPublicAndAdmin(id);
     }
 
     return result;
@@ -98,16 +106,17 @@ export async function updateCampgroundAction(
     );
 
     if (result.success) {
-      // Revalidate both list and detail page
-      revalidatePath(routes.platformAdmin.campgrounds());
-      revalidatePath(routes.platformAdmin.campgroundView(input.id));
-      revalidatePath(routes.platformAdmin.campgroundEdit(input.id));
+      revalidateCampgroundPublicAndAdmin(input.id);
     }
   } catch (err) {
     return handleUnexpectedError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundView(input.id)); // TODO redirect should be done from the client side.
+  const locale = await getLocale();
+  return redirect({
+    href: routes.platformAdmin.campgroundView(input.id),
+    locale,
+  });
 }
 
 export async function createCampgroundAction(
@@ -151,12 +160,19 @@ export async function createCampgroundAction(
 
     newCampgroundId = result.data.id;
 
-    revalidatePath(routes.platformAdmin.campgrounds());
+    revalidateLocalizedPath(routes.home());
+    revalidateLocalizedPath(routes.campgroundDetail(newCampgroundId));
+    revalidateLocalizedPath(routes.platformAdmin.root());
+    revalidateLocalizedPath(routes.platformAdmin.campgrounds());
   } catch (err) {
     return handleUnexpectedError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundView(newCampgroundId));
+  const locale = await getLocale();
+  return redirect({
+    href: routes.platformAdmin.campgroundView(newCampgroundId),
+    locale,
+  });
 }
 
 export async function updateCampgroundAmenitiesAction({
@@ -202,13 +218,17 @@ export async function updateCampgroundAmenitiesAction({
       }
     }
 
-    revalidatePath(routes.platformAdmin.campgrounds());
-    revalidatePath(routes.platformAdmin.campgroundView(campgroundId));
-    revalidatePath(routes.platformAdmin.campgroundEdit(campgroundId));
-    revalidatePath(routes.platformAdmin.campgroundAmenities(campgroundId));
+    revalidateCampgroundPublicAndAdmin(campgroundId);
+    revalidateLocalizedPath(
+      routes.platformAdmin.campgroundAmenities(campgroundId),
+    );
   } catch (err) {
     return handleUnexpectedError(err);
   }
 
-  redirect(routes.platformAdmin.campgroundView(campgroundId));
+  const locale = await getLocale();
+  return redirect({
+    href: routes.platformAdmin.campgroundView(campgroundId),
+    locale,
+  });
 }

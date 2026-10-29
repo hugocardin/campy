@@ -1,12 +1,27 @@
 "use server";
 
-import { ActionResult, resultSuccess } from "@/lib/errors";
+import { redirect } from "@/i18n/navigation";
+import { ActionResult, resultError, resultSuccess } from "@/lib/errors";
+import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
+import { toSafeInternalHref } from "@/lib/safe-internal-href";
+import { mapAuthError } from "@/lib/supabase/auth-utils";
 import { handleAuthResponse } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { AUTH_MODES, AuthMode } from "@/lib/types/auth";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+
+async function finishAuthenticatedRedirect(redirectTo: string): Promise<never> {
+  // Refresh the whole localized tree so auth-dependent UI can update after
+  // soft navigation; Header also syncs via getSession on pathname change.
+  revalidateLocalizedPath("/", "layout");
+
+  const locale = await getLocale();
+  return redirect({
+    href: toSafeInternalHref(redirectTo),
+    locale,
+  });
+}
 
 export async function authAction(
   mode: AuthMode,
@@ -16,27 +31,45 @@ export async function authAction(
 ): Promise<ActionResult<void>> {
   const supabase = await createClient();
 
-  let result: ActionResult<void>;
-
   if (mode === AUTH_MODES.SIGNIN) {
-    result = await handleAuthResponse(() =>
+    const result = await handleAuthResponse(() =>
       supabase.auth.signInWithPassword({ email, password }),
     );
-  } else {
-    result = await handleAuthResponse(() =>
-      supabase.auth.signUp({ email, password }),
-    );
+
+    if (!result.success) {
+      return result;
+    }
+
+    return finishAuthenticatedRedirect(redirectTo);
   }
 
-  if (!result.success) {
-    return result;
+  const { data, error } = await supabase.auth.signUp({ email, password });
+
+  if (error) {
+    return resultError(mapAuthError(error));
   }
 
-  if (mode === AUTH_MODES.SIGNUP) {
-    return resultSuccess();
+  // Email confirmation disabled → immediate session; treat like sign-in.
+  if (data.session) {
+    return finishAuthenticatedRedirect(redirectTo);
   }
 
-  // For signin → redirect to the initial page
-  revalidatePath("/");
-  redirect(redirectTo);
+  // Confirmation required → stay on the form and show "check your email".
+  return resultSuccess();
+}
+
+export async function signOutAction(): Promise<void> {
+  const supabase = await createClient();
+  // scope: "local" revokes this session's refresh token only (not all devices).
+  const { error } = await supabase.auth.signOut({ scope: "local" });
+
+  if (error) {
+    // Surface to the client so Header can toast instead of assuming revoke worked.
+    throw new Error(error.message);
+  }
+
+  revalidateLocalizedPath("/", "layout");
+
+  const locale = await getLocale();
+  return redirect({ href: routes.home(), locale });
 }

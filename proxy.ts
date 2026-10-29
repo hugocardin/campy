@@ -4,6 +4,7 @@ import { routing } from "./i18n/routing";
 import { createServerClient } from "@supabase/ssr";
 import { getUserRoleName } from "@/data/users/get-user-role";
 import { USER_ROLE_PLATEFORMADMIN } from "./lib/constants";
+import { stripLocalePrefix } from "./lib/locale-path";
 import { routes } from "./lib/routes";
 
 const handleI18nRouting = createMiddleware(routing);
@@ -18,8 +19,7 @@ export default async function middleware(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname;
-  const pathnameWithoutLocale =
-    pathname.replace(/^\/(?:en-CA|fr-CA)(?=\/|$)/, "") || "/";
+  const pathnameWithoutLocale = stripLocalePrefix(pathname);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
