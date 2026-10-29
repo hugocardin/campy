@@ -37,10 +37,11 @@ export default function Header() {
   const supabase = createClient();
 
   useEffect(() => {
-    // Re-read cookies on route change so server-action sign-in/sign-out
-    // (which set cookies + soft-navigate) refresh Header without a hard reload.
+    let ignore = false;
+
     const fetchUser = async () => {
       const { data } = await supabase.auth.getUser();
+      if (ignore) return;
       setUser(data.user);
       setLoading(false);
     };
@@ -49,13 +50,34 @@ export default function Header() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_, session) => {
+        if (ignore) return;
         setUser(session?.user ?? null);
         setLoading(false);
       },
     );
 
     return () => {
+      ignore = true;
       authListener.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    // After server-action auth soft-navigates, sync from local session
+    // (cookie read — no network) without re-subscribing the auth listener.
+    let ignore = false;
+
+    const syncFromSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (ignore) return;
+      setUser(data.session?.user ?? null);
+      setLoading(false);
+    };
+
+    void syncFromSession();
+
+    return () => {
+      ignore = true;
     };
   }, [supabase, pathname]);
 
