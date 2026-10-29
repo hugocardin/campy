@@ -10,6 +10,7 @@
   "edit": "Modifier",
   "error": "Erreur",
   "errorReference": "Référence : {errorId}",
+  "somethingWentWrong": "Une erreur s'est produite",
   "logoAlt": "Logo Campy",
   "save": "Enregistrer",
   "processing": "Traitement en cours...",

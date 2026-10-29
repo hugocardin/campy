@@ -9,7 +9,7 @@ import { ManageAmenitiesButton } from "@/components/buttons/ManageAmenitiesButto
 import { ManageSitesButton } from "@/components/buttons/ManageSitesButton";
 import { Button } from "@/components/ui/button";
 import { CampgroundAdmin } from "@/entities/campground-admin";
-import { withErrorReference } from "@/lib/errors";
+import { translateErrorCode, withErrorReference } from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import { Power, PowerOff } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -22,6 +22,7 @@ type CampgroundActionsProps = {
 
 export function CampgroundActions({ campground }: CampgroundActionsProps) {
   const tc = useTranslations("common");
+  const t_errors = useTranslations("errors");
   const t_campgrounds = useTranslations("campgrounds");
 
   const router = useRouter();
@@ -49,7 +50,7 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
       if (!result.success) {
         setError(
           withErrorReference(
-            result.errorCode ?? tc("error"),
+            translateErrorCode(result.errorCode, t_errors, tc("error")),
             result.details,
             (errorId) => tc("errorReference", { errorId }),
           ),

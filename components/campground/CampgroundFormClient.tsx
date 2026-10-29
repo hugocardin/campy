@@ -18,7 +18,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { UserProfileNoRole } from "@/entities/user-profile";
-import { ActionResult, withErrorReference } from "@/lib/errors";
+import {
+  ActionResult,
+  translateErrorCode,
+  withErrorReference,
+} from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 
@@ -34,6 +38,7 @@ export default function CampgroundFormClient({
   onSubmit,
 }: CampgroundFormProps) {
   const tc = useTranslations("common");
+  const t_errors = useTranslations("errors");
   const t_campgrounds = useTranslations("campgrounds");
 
   const [isPending, startTransition] = useTransition();
@@ -102,7 +107,7 @@ export default function CampgroundFormClient({
       if (!result.success) {
         setError(
           withErrorReference(
-            result.errorCode ?? tc("error"),
+            translateErrorCode(result.errorCode, t_errors, tc("error")),
             result.details,
             (errorId) => tc("errorReference", { errorId }),
           ),

@@ -8,7 +8,7 @@ import {
   deleteAmenityAction,
 } from "@/app/actions/amenities";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
-import { withErrorReference } from "@/lib/errors";
+import { translateErrorCode, withErrorReference } from "@/lib/errors";
 import { DeleteButtonWithConfirmation } from "@/components/dialogs/DeleteButtonWithConfirmation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,8 +66,10 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
 
     if (!result.success) {
       setError(
-        withErrorReference(t_errors(result.errorCode!), result.details, (errorId) =>
-          tc("errorReference", { errorId }),
+        withErrorReference(
+          translateErrorCode(result.errorCode, t_errors, tc("error")),
+          result.details,
+          (errorId) => tc("errorReference", { errorId }),
         ),
       );
     } else {
@@ -87,8 +89,10 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
 
     if (!result.success) {
       setError(
-        withErrorReference(t_errors(result.errorCode!), result.details, (errorId) =>
-          tc("errorReference", { errorId }),
+        withErrorReference(
+          translateErrorCode(result.errorCode, t_errors, tc("error")),
+          result.details,
+          (errorId) => tc("errorReference", { errorId }),
         ),
       );
     } else {

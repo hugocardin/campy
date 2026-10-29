@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
-import { withErrorReference } from "@/lib/errors";
+import { translateErrorCode, withErrorReference } from "@/lib/errors";
 import { AUTH_MODES, AuthMode } from "@/lib/types/auth";
 
 type AuthFormProps = {
@@ -47,8 +47,10 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
       if (!result.success) {
         console.log("Auth error:", result);
         setError(
-          withErrorReference(t_errors(result.errorCode!), result.details, (errorId) =>
-            tc("errorReference", { errorId }),
+          withErrorReference(
+            translateErrorCode(result.errorCode, t_errors, tc("error")),
+            result.details,
+            (errorId) => tc("errorReference", { errorId }),
           ),
         );
         return;

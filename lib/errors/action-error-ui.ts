@@ -1,9 +1,30 @@
+/** next-intl translator shape we need (`t` + `t.has`). */
+export type ErrorTranslator = {
+  (key: string): string;
+  has: (key: string) => boolean;
+};
+
 /** Pull the support correlation id from an ActionResult `details` payload. */
 export function getActionErrorId(
   details?: Record<string, unknown>,
 ): string | undefined {
   const id = details?.errorId;
   return typeof id === "string" && id.length > 0 ? id : undefined;
+}
+
+/**
+ * Translate an ActionResult `errorCode` via the errors namespace.
+ * Falls back when the code is missing or untranslated (e.g. fr-CA without errors.json keys).
+ */
+export function translateErrorCode(
+  errorCode: string | undefined,
+  tErrors: ErrorTranslator,
+  fallback: string,
+): string {
+  if (!errorCode || !tErrors.has(errorCode)) {
+    return fallback;
+  }
+  return tErrors(errorCode);
 }
 
 /**

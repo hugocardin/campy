@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Amenity } from "@/entities/amenity";
-import { withErrorReference } from "@/lib/errors";
+import { translateErrorCode, withErrorReference } from "@/lib/errors";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
@@ -23,6 +23,7 @@ export default function CampgroundAmenitiesClient({
   currentAmenities,
 }: Props) {
   const tc = useTranslations("common");
+  const t_errors = useTranslations("errors");
   const t_amenities = useTranslations("amenities");
 
   const [isPending, startTransition] = useTransition();
@@ -76,7 +77,7 @@ export default function CampgroundAmenitiesClient({
       if (!result.success) {
         setError(
           withErrorReference(
-            result.errorCode ?? tc("error"),
+            translateErrorCode(result.errorCode, t_errors, tc("error")),
             result.details,
             (errorId) => tc("errorReference", { errorId }),
           ),

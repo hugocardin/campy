@@ -1,6 +1,6 @@
 import CampgroundCardSkeleton from "@/components/search/CampgroundCardSkeleton";
 import CampgroundList from "@/components/search/CampgroundList";
-import { getActionErrorId } from "@/lib/errors";
+import { getActionErrorId, translateErrorCode } from "@/lib/errors";
 import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -17,16 +17,20 @@ export default async function Home() {
 
   if (!campgroundsResult.success) {
     const tc = await getTranslations("common");
+    const tErrors = await getTranslations("errors");
     const errorId = getActionErrorId(campgroundsResult.details);
+    const message = translateErrorCode(
+      campgroundsResult.errorCode,
+      tErrors,
+      tc("error"),
+    );
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center">
         <AlertCircle className="h-16 w-16 text-destructive mb-6" />
         <h1 className="text-3xl font-bold tracking-tight mb-4">
-          Something went wrong
+          {tc("somethingWentWrong")}
         </h1>
-        <p className="text-lg text-muted-foreground max-w-md mb-2">
-          {campgroundsResult.errorCode}
-        </p>
+        <p className="text-lg text-muted-foreground max-w-md mb-2">{message}</p>
         {errorId ? (
           <p className="text-sm text-muted-foreground max-w-md mb-8">
             {tc("errorReference", { errorId })}
