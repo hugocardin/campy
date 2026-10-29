@@ -120,36 +120,48 @@ function joinPath(parentPath: string, segment: string): string {
  * look like an extra arg vs `other`. Used for same-locale category-vs-`other`
  * checks (`#` / pound is not an arg).
  *
- * `omitValue` drops the enclosing plural's own variable so `{count}` is treated
- * like `#` inside a `count` plural.
+ * `omitNames` drops plural variables so `{count}` / `{guests}` are treated like
+ * `#` inside their own plural. Nested plurals add their own `value` to the set
+ * while visiting their options.
  */
 function collectInterpolationArgsDeep(
   elements: MessageFormatElement[],
-  omitValue?: string,
+  omitNames: ReadonlySet<string> = new Set(),
 ): string[] {
   const args = new Set<string>();
 
-  function visit(nodes: MessageFormatElement[]): void {
+  function visit(
+    nodes: MessageFormatElement[],
+    omit: ReadonlySet<string>,
+  ): void {
     for (const element of nodes) {
       switch (element.type) {
         case TYPE.argument:
         case TYPE.number:
         case TYPE.date:
         case TYPE.time:
-          if (element.value !== omitValue) {
+          if (!omit.has(element.value)) {
             args.add(element.value);
           }
           break;
-        case TYPE.select:
         case TYPE.plural: {
-          const branched = element as SelectElement | PluralElement;
-          for (const option of Object.values(branched.options)) {
-            visit(option.value);
+          const plural = element as PluralElement;
+          const nestedOmit = new Set(omit);
+          nestedOmit.add(plural.value);
+          for (const option of Object.values(plural.options)) {
+            visit(option.value, nestedOmit);
+          }
+          break;
+        }
+        case TYPE.select: {
+          const select = element as SelectElement;
+          for (const option of Object.values(select.options)) {
+            visit(option.value, omit);
           }
           break;
         }
         case TYPE.tag:
-          visit(element.children);
+          visit(element.children, omit);
           break;
         case TYPE.literal:
         case TYPE.pound:
@@ -160,7 +172,7 @@ function collectInterpolationArgsDeep(
     }
   }
 
-  visit(elements);
+  visit(elements, omitNames);
   return [...args].sort();
 }
 
@@ -172,10 +184,11 @@ function collectInterpolationArgsDeep(
  *
  * Structural paths are recorded for: this plural, nests under `other`
  * (`:category`), nests under `one` (`:one`), and nests under `=N`. Path compare
- * is one-way (every en path ⊆ fr); extra fr paths are only allowed when the
- * prefix through their first `=N` is absent from every en path (that `=N` is
- * fr-only). Locale-only nests go to `coveragePlurals` for coverage asserts,
- * with a real parent path including the `:many` (etc.) segment.
+ * is one-way (every en path ⊆ fr); extra fr paths are allowed when *any*
+ * prefix ending at an `=N` is absent from every en path (that `=N` is
+ * fr-only — including fr-only `=1` under a shared `=0`). Locale-only nests go
+ * to `coveragePlurals` for coverage asserts, with a real parent path including
+ * the `:many` (etc.) segment.
  *
  * Sibling `#n` indices follow encounter order under a parent; keep the same
  * relative order of same-signature sibling plurals across locales.
@@ -228,15 +241,16 @@ function walkIcu(
         let structuralPath = parentPath;
 
         const otherOption = plural.options.other;
+        const omitOuter = new Set([plural.value]);
         const otherArgs = otherOption
-          ? collectInterpolationArgsDeep(otherOption.value, plural.value)
+          ? collectInterpolationArgsDeep(otherOption.value, omitOuter)
           : [];
         const categoryArgs: Record<string, string[]> = {};
         for (const [optionKey, option] of Object.entries(plural.options)) {
           if (isExactPluralKey(optionKey) || optionKey === "other") continue;
           categoryArgs[optionKey] = collectInterpolationArgsDeep(
             option.value,
-            plural.value,
+            omitOuter,
           );
         }
 
@@ -402,35 +416,41 @@ function isExactPluralPathSegment(segment: string): boolean {
 }
 
 /**
- * Prefix of `frPath` through its first `=N` segment, or `null` if none.
- * Used to decide whether an extra fr nest sits under a fr-only exact branch.
+ * Every prefix of `frPath` that ends at an `=N` segment. An extra fr nest is
+ * allowed when any of these is fr-only (absent from en paths).
  */
-function prefixThroughFirstExact(frPath: string): string | null {
+function exactPrefixes(frPath: string): string[] {
   const segments = frPath.split("/");
   const parts: string[] = [];
+  const prefixes: string[] = [];
   for (const segment of segments) {
     parts.push(segment);
     if (isExactPluralPathSegment(segment)) {
-      return parts.join("/");
+      prefixes.push(parts.join("/"));
     }
   }
-  return null;
+  return prefixes;
+}
+
+function enHasExactPrefix(prefix: string, enPaths: Set<string>): boolean {
+  for (const enPath of enPaths) {
+    if (enPath === prefix || enPath.startsWith(`${prefix}/`)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
- * Extra fr paths are only legitimate under a fr-only `=N` segment: the prefix
- * through the first `=N` must not appear on any en path. Extras under shared
- * `=0` / `other` / `one` / shared selects fail.
+ * Extra fr paths are legitimate when any `=N` prefix in the chain is fr-only
+ * (no en path equal to it or under it). Shared-`=N`-only extras still fail
+ * because every `=N` prefix in their chain is shared. Extras under `other` /
+ * `one` / shared selects (no `=N`) fail.
  */
 function isAllowedExtraFrPath(frPath: string, enPaths: Set<string>): boolean {
-  const prefix = prefixThroughFirstExact(frPath);
-  if (prefix === null) return false;
-  for (const enPath of enPaths) {
-    if (enPath === prefix || enPath.startsWith(`${prefix}/`)) {
-      return false;
-    }
-  }
-  return true;
+  const prefixes = exactPrefixes(frPath);
+  if (prefixes.length === 0) return false;
+  return prefixes.some((prefix) => !enHasExactPrefix(prefix, enPaths));
 }
 
 function pluralSignature(plural: PluralInfo): string {
@@ -511,8 +531,7 @@ function assertExactPluralKeysPreserved(
 /**
  * Each non-`other` category branch's named args must be ⊆ `other`'s in the
  * same locale. Catches typos / unknown args in `one`/`many`; allows singular
- * to omit args that plural keeps. `#` and the plural's own variable are not
- * args.
+ * to omit args that plural keeps. `#` and plural variables are not args.
  */
 function assertCategoryArgsMatchOther(
   label: string,
@@ -526,6 +545,58 @@ function assertCategoryArgsMatchOther(
         unexpected.length,
         0,
         `${label}: plural "${plural.structuralPath}" category "${category}" args ${JSON.stringify(args)} must be ⊆ other ${JSON.stringify(plural.otherArgs)} (unexpected: ${JSON.stringify(unexpected)}; same-locale; # and plural variable omitted)`,
+      );
+    }
+  }
+}
+
+/**
+ * Cross-locale partner to same-locale ⊆: fr must not drop args that en uses in
+ * the same category. fr `one` ⊇ en `one`, fr `other` ⊇ en `other`; fr-only
+ * `many` ⊇ en `other` (many is the large-number other).
+ */
+function assertFrCategoryArgsPreserveEn(
+  label: string,
+  enPlurals: PluralInfo[],
+  frPlurals: PluralInfo[],
+): void {
+  const frByPath = new Map(
+    frPlurals.map((plural) => [plural.structuralPath, plural]),
+  );
+
+  for (const enPlural of enPlurals) {
+    const frPlural = frByPath.get(enPlural.structuralPath);
+    if (!frPlural) continue;
+
+    const path = enPlural.structuralPath;
+
+    const frOther = new Set(frPlural.otherArgs);
+    const missingOther = enPlural.otherArgs.filter((arg) => !frOther.has(arg));
+    assert.equal(
+      missingOther.length,
+      0,
+      `${label}: fr-CA \`other\` drops ${missingOther.map((arg) => `{${arg}}`).join(", ")} that en-CA \`other\` uses (plural "${path}")`,
+    );
+
+    const enOne = enPlural.categoryArgs.one;
+    if (enOne) {
+      const frOne = new Set(frPlural.categoryArgs.one ?? []);
+      const missingOne = enOne.filter((arg) => !frOne.has(arg));
+      assert.equal(
+        missingOne.length,
+        0,
+        `${label}: fr-CA \`one\` drops ${missingOne.map((arg) => `{${arg}}`).join(", ")} that en-CA \`one\` uses (plural "${path}")`,
+      );
+    }
+
+    const frMany = frPlural.categoryArgs.many;
+    if (frMany) {
+      const manySet = new Set(frMany);
+      const missingMany = enPlural.otherArgs.filter((arg) => !manySet.has(arg));
+      assert.equal(
+        missingMany.length,
+        0,
+        `${label}: fr-CA \`many\` drops ${missingMany.map((arg) => `{${arg}}`).join(", ")} that en-CA \`other\` uses (plural "${path}")`,
       );
     }
   }
@@ -553,9 +624,9 @@ function assertIcuParity(
     `${label}: select option keys must match exactly across locales`,
   );
 
-  // One-way: every en path must exist in fr. Extra fr paths are only allowed
-  // when the prefix through their first `=N` is absent from every en path
-  // (that exact branch is fr-only). Extras under shared =N / other / one fail.
+  // One-way: every en path must exist in fr. Extra fr paths are allowed when
+  // any `=N` prefix in the chain is fr-only. Extras under shared-only =N /
+  // other / one fail.
   const enPaths = new Set(enShape.plurals.map(pluralSignature));
   const frPathList = frShape.plurals.map(pluralSignature);
   const frPaths = new Set(frPathList);
@@ -586,6 +657,7 @@ function assertIcuParity(
     ...frShape.plurals,
     ...frShape.coveragePlurals,
   ]);
+  assertFrCategoryArgsPreserveEn(label, enShape.plurals, frShape.plurals);
 }
 
 function loadNamespace(locale: string, namespace: string): Record<string, unknown> {
@@ -693,6 +765,25 @@ describe("ICU plural structural pairing", () => {
     );
   });
 
+  it("allows nested plural {guests} like # under outer one", () => {
+    const en = `{count, plural, one {{guests, plural, one {one guest} other {{guests} guests}}} other {{guests, plural, one {# guest} other {# guests}}}}`;
+    const fr = `{count, plural, one {{guests, plural, one {un invité} many {{guests} invités} other {{guests} invités}}} many {{guests, plural, one {# invité} many {# invités} other {# invités}}} other {{guests, plural, one {# invité} many {# invités} other {# invités}}}}`;
+
+    assert.doesNotThrow(() =>
+      assertIcuParity("fixture", "nestedGuestsAsArgLikePound", en, fr),
+    );
+  });
+
+  it("fails when fr one drops an argument that en one keeps", () => {
+    const en = `{count, plural, one {# site for {name}} other {# sites for {name}}}`;
+    const fr = `{count, plural, one {# site} many {# sites pour {name}} other {# sites pour {name}}}`;
+
+    assert.throws(
+      () => assertIcuParity("fixture", "frOneDropsName", en, fr),
+      /fr-CA `one` drops \{name\} that en-CA `one` uses/,
+    );
+  });
+
   it("fails when fr one introduces an argument other lacks", () => {
     // `{extra}` also appears outside so overall arg sets still match.
     const en = `{count, plural, one {# site for {name}} other {# sites for {name}}} ({extra})`;
@@ -723,6 +814,15 @@ describe("ICU plural structural pairing", () => {
     assert.throws(
       () => assertIcuParity("fixture", "extraUnderSharedExact", en, fr),
       /unexpected extra fr-CA plural path/,
+    );
+  });
+
+  it("allows a fr-only =1 nest under a shared =0", () => {
+    const en = `{count, plural, =0 {{guests, plural, =0 {none} other {# guests}}} one {# site} other {# sites}}`;
+    const fr = `{count, plural, =0 {{guests, plural, =0 {aucun} =1 {{guests, plural, one {pile un} many {x} other {x}}} one {#} many {#} other {# invités}}} one {# site} many {# sites} other {# sites}}`;
+
+    assert.doesNotThrow(() =>
+      assertIcuParity("fixture", "exactOneUnderSharedZero", en, fr),
     );
   });
 
