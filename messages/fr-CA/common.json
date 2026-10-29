@@ -23,24 +23,6 @@
     }
   },
 
-  "AuthPage": {
-    "meta": {
-      "title": "Connexion / Inscription | Campy",
-      "description": "Connectez-vous ou créez un compte Campy pour réserver votre prochain voyage en camping."
-    },
-    "welcome": "Bienvenue sur Campy",
-    "signInTitle": "Connexion",
-    "signUpTitle": "Créer un compte",
-    "subtitle": "Connectez-vous pour gérer vos réservations ou créez un compte",
-    "noAccount": "Pas encore de compte ? Inscrivez-vous",
-    "haveAccount": "Déjà un compte ? Connectez-vous",
-    "signupSuccess": "Compte créé ! Vérifiez votre courriel pour confirmer.",
-    "emailLabel": "Courriel",
-    "emailPlaceholder": "vous@exemple.com",
-    "passwordLabel": "Mot de passe",
-    "passwordPlaceholder": "••••••••"
-  },
-
   "ProfilePage": {
     "meta": {
       "title": "Profil | Campy",
@@ -66,7 +48,7 @@
     "amenityPlaceholder": "ex. Wi-Fi, Animaux acceptés, Feu de camp",
     "categoryName": "Catégorie",
     "categoryPlaceholder": "Choisissez une catégorie",
-    "confirmAmenityDeletion": "Supprimer la commodité '{code}' ? Cette action est irréversible.",
+    "confirmAmenityDeletion": "Supprimer la commodité '{code}'? Cette action est irréversible.",
     "noAmenity": "Aucune commodité",
     "noCategory": "Aucune catégorie"
   },
@@ -79,7 +61,7 @@
     },
     "actions": "Actions",
     "categoryName": "Catégorie",
-    "confirmAmenityCategoryDeletion": "Supprimer la catégorie de commodité '{category}' ? Cette action est irréversible.",
+    "confirmAmenityCategoryDeletion": "Supprimer la catégorie de commodité '{category}'? Cette action est irréversible.",
     "noCategory": "Aucune catégorie",
     "placeholder": "ex. Services, Installations, Activités"
   },
