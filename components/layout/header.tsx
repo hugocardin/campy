@@ -1,6 +1,7 @@
 "use client";
 
 import { signOutAction } from "@/app/actions/auth";
+import { usePathname } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Image from "next/image";
@@ -28,6 +29,7 @@ import ThemeToggle from "../ThemeToggle";
 export default function Header() {
   const tc = useTranslations("common");
   const t_auth = useTranslations("auth");
+  const pathname = usePathname();
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,13 +37,15 @@ export default function Header() {
   const supabase = createClient();
 
   useEffect(() => {
+    // Re-read cookies on route change so server-action sign-in/sign-out
+    // (which set cookies + soft-navigate) refresh Header without a hard reload.
     const fetchUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user);
       setLoading(false);
     };
 
-    fetchUser();
+    void fetchUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_, session) => {
@@ -53,11 +57,15 @@ export default function Header() {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, pathname]);
 
   const handleSignOut = () => {
-    startSignOut(() => {
-      void signOutAction();
+    startSignOut(async () => {
+      // Clear browser client session so Header's onAuthStateChange updates
+      // before the soft navigation from the server action.
+      await supabase.auth.signOut();
+      setUser(null);
+      await signOutAction();
     });
   };
 
