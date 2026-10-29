@@ -23,6 +23,7 @@ import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
 import { useUserRole } from "@/lib/hooks/use-user-role";
 import { routes } from "@/lib/routes";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import LocaleSwitcher from "../LocaleSwitcher";
 import ThemeToggle from "../ThemeToggle";
 
@@ -64,20 +65,37 @@ export default function Header() {
     // without re-subscribing the auth listener or hitting Auth over the network.
     const syncId = ++authSyncId.current;
 
-    void supabase.auth.getSession().then(({ data }) => {
-      applyUser(data.session?.user ?? null, syncId);
-    });
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        applyUser(data.session?.user ?? null, syncId);
+      })
+      .catch(() => {
+        // Storage/cookie parse failures: treat as signed out for this sync.
+        applyUser(null, syncId);
+      });
   }, [supabase, pathname]);
 
   const handleSignOut = () => {
     startSignOut(async () => {
-      // Invalidate any in-flight session sync, then clear client session so
-      // onAuthStateChange / Header update before the soft navigation.
+      // Clear local session first (always succeeds offline); only flip UI after
+      // that, then revoke via the server action. Never show signed-out while a
+      // local session remains.
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) {
+        toast.error(t_auth("errors.unknown_auth_error"));
+        return;
+      }
+
       authSyncId.current += 1;
-      await supabase.auth.signOut();
       setUser(null);
       setLoading(false);
-      await signOutAction();
+
+      try {
+        await signOutAction();
+      } catch {
+        toast.error(t_auth("errors.network_error"));
+      }
     });
   };
 

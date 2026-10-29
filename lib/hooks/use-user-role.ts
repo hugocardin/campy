@@ -6,22 +6,22 @@ import { useEffect, useState } from "react";
 /**
  * Fetch the signed-in user's role. Pass `userId` from Header auth state so the
  * role refetches after soft-nav sign-in/sign-out (Header stays mounted).
+ *
+ * `roleName` is only returned when it was fetched for the current `userId`,
+ * so a direct A→B user switch never paints A's role on B for a frame.
  */
 export function useUserRole(userId: string | null | undefined) {
-  const [roleName, setRoleName] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(Boolean(userId));
+  const [cache, setCache] = useState<{
+    userId: string;
+    roleName: string | null;
+  } | null>(null);
 
   useEffect(() => {
     let ignore = false;
 
     if (!userId) {
-      setRoleName(null);
-      setIsLoading(false);
       return;
     }
-
-    setRoleName(null);
-    setIsLoading(true);
 
     const fetchRole = async () => {
       const supabase = createClient();
@@ -35,13 +35,14 @@ export function useUserRole(userId: string | null | undefined) {
 
       if (error || !profile) {
         console.error("Failed to fetch role:", error);
-        setRoleName(null);
+        setCache({ userId, roleName: null });
       } else {
-        // @ts-expect-error — types are loose because of the join; improve later with generated types
-        setRoleName(profile.role_name.code ?? null);
+        setCache({
+          userId,
+          // @ts-expect-error — types are loose because of the join; improve later with generated types
+          roleName: profile.role_name.code ?? null,
+        });
       }
-
-      setIsLoading(false);
     };
 
     void fetchRole();
@@ -50,6 +51,9 @@ export function useUserRole(userId: string | null | undefined) {
       ignore = true;
     };
   }, [userId]);
+
+  const roleName = cache?.userId === userId ? cache.roleName : null;
+  const isLoading = Boolean(userId) && cache?.userId !== userId;
 
   return { roleName, isLoading };
 }
