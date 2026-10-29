@@ -11,6 +11,7 @@ import {
 import { createTranslator } from "next-intl";
 import {
   getActionErrorId,
+  safeTranslationValues,
   translateErrorCode,
   withErrorReference,
   type ErrorTranslator,
@@ -52,40 +53,95 @@ function collectArgumentNames(
   return into;
 }
 
-describe("translateErrorCode", () => {
-  it("translates known codes and falls back otherwise", () => {
-    const t = mockTranslator({
-      DB_DUPLICATE_VALUE: "This value already exists.",
-      COMMON_MISSING_FIELD: "{field} is required but was not provided.",
+describe("safeTranslationValues", () => {
+  it("allowlists only user-facing field values and drops unexpected keys", () => {
+    assert.deepEqual(
+      safeTranslationValues({
+        field: "code",
+        errorId: "uuid",
+        message: "secret path /tmp/x",
+        email: "user@example.com",
+        hint: "do not show",
+      }),
+      { field: "code" },
+    );
+    assert.deepEqual(safeTranslationValues({ field: "category" }), {
+      field: "category",
     });
+    assert.deepEqual(safeTranslationValues({ field: "id" }), {});
+    assert.deepEqual(
+      safeTranslationValues({ message: "leak", errno: 61 }),
+      {},
+    );
+  });
+});
+
+describe("translateErrorCode", () => {
+  const t = mockTranslator({
+    DB_DUPLICATE_VALUE: "This value already exists.",
+    COMMON_MISSING_FIELD:
+      "A required value was missing. Please check your input and try again.",
+    COMMON_MISSING_NAMED_FIELD: "{field} is required but was not provided.",
+  });
+
+  it("translates known codes and falls back otherwise", () => {
     assert.equal(
       translateErrorCode("DB_DUPLICATE_VALUE", t, "Error"),
       "This value already exists.",
-    );
-    assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", { field: "id" }),
-      "id is required but was not provided.",
     );
     assert.equal(translateErrorCode("DB_UNKNOWN", t, "Error"), "Error");
     assert.equal(translateErrorCode(undefined, t, "Error"), "Error");
   });
 
-  it("falls back when the translator returns a next-intl missing-message key", () => {
-    const t = ((key: string) => `errors.${key}`) as ErrorTranslator;
-    t.has = () => true;
+  it("uses a generic message for internal fields like id", () => {
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error"),
+      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", { field: "id" }),
+      "A required value was missing. Please check your input and try again.",
+    );
+  });
+
+  it("interpolates only allowlisted user-facing field names", () => {
+    assert.equal(
+      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", {
+        field: "code",
+      }),
+      "code is required but was not provided.",
+    );
+  });
+
+  it("does not interpolate unexpected details keys into the message", () => {
+    const message = translateErrorCode("COMMON_MISSING_FIELD", t, "Error", {
+      field: "id",
+      message: "duplicate key value violates unique constraint",
+      email: "admin@example.com",
+      hint: "Check RLS",
+    });
+    assert.equal(
+      message,
+      "A required value was missing. Please check your input and try again.",
+    );
+    assert.equal(message.includes("duplicate key"), false);
+    assert.equal(message.includes("admin@example.com"), false);
+    assert.equal(message.includes("RLS"), false);
+    assert.equal(message.includes("id is required"), false);
+  });
+
+  it("falls back when the translator returns a next-intl missing-message key", () => {
+    const bad = ((key: string) => `errors.${key}`) as ErrorTranslator;
+    bad.has = () => true;
+    assert.equal(
+      translateErrorCode("COMMON_MISSING_FIELD", bad, "Error"),
       "Error",
     );
   });
 
   it("falls back when the translator throws", () => {
-    const t = ((key: string) => {
+    const bad = ((key: string) => {
       throw new Error(`INVALID_MESSAGE: ${key}`);
     }) as ErrorTranslator;
-    t.has = () => true;
+    bad.has = () => true;
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error"),
+      translateErrorCode("COMMON_MISSING_FIELD", bad, "Error"),
       "Error",
     );
   });
@@ -125,11 +181,10 @@ describe("en-CA errors catalogue", () => {
       const argNames = [...collectArgumentNames(elements)];
       const values: Record<string, string> = {};
       for (const name of argNames) {
-        values[name] = name === "field" ? "id" : "sample";
+        values[name] = name === "field" ? "code" : "sample";
       }
 
-      const message =
-        argNames.length > 0 ? t(key, values) : t(key);
+      const message = argNames.length > 0 ? t(key, values) : t(key);
 
       assert.ok(message.length > 0, `${key} produced an empty message`);
       assert.notEqual(

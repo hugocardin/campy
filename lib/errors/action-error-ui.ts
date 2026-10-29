@@ -1,3 +1,5 @@
+import { CommonErrorCode } from "./common";
+
 /** next-intl translator shape we need (`t` + `t.has`). */
 export type ErrorTranslator = {
   (
@@ -7,6 +9,18 @@ export type ErrorTranslator = {
   has: (key: string) => boolean;
 };
 
+/** Only these `details` keys may be interpolated into user-visible ICU messages. */
+const INTERPOLATABLE_DETAIL_KEYS = new Set(["field"]);
+
+/**
+ * `field` values safe to show end users (form fields). Internal names like `id`
+ * are programming errors — omit them and use a generic message instead.
+ */
+const USER_FACING_FIELD_VALUES = new Set(["code", "category"]);
+
+/** Named missing-field message used when `field` is user-facing. */
+export const COMMON_MISSING_NAMED_FIELD = "COMMON_MISSING_NAMED_FIELD";
+
 /** Pull the support correlation id from an ActionResult `details` payload. */
 export function getActionErrorId(
   details?: Record<string, unknown>,
@@ -15,7 +29,10 @@ export function getActionErrorId(
   return typeof id === "string" && id.length > 0 ? id : undefined;
 }
 
-/** String/number details safe to pass as ICU values (skips errorId and objects). */
+/**
+ * Allowlisted ICU values from ActionResult `details`.
+ * Unexpected keys (and internal field names like `id`) are dropped — never forwarded.
+ */
 export function safeTranslationValues(
   details?: Record<string, unknown>,
 ): Record<string, string | number> {
@@ -24,15 +41,15 @@ export function safeTranslationValues(
   }
 
   const values: Record<string, string | number> = {};
-  for (const [key, value] of Object.entries(details)) {
-    if (key === "errorId") {
+  for (const key of INTERPOLATABLE_DETAIL_KEYS) {
+    const value = details[key];
+    if (typeof value !== "string" || value.length === 0) {
       continue;
     }
-    if (typeof value === "string" && value.length > 0) {
-      values[key] = value;
-    } else if (typeof value === "number" && Number.isFinite(value)) {
-      values[key] = value;
+    if (key === "field" && !USER_FACING_FIELD_VALUES.has(value)) {
+      continue;
     }
+    values[key] = value;
   }
   return values;
 }
@@ -60,15 +77,29 @@ export function translateErrorCode(
     return fallback;
   }
 
-  const values = safeTranslationValues(details);
+  let code = errorCode;
+  let values = safeTranslationValues(details);
+
+  // Prefer a named message when we have a user-facing field; otherwise keep the
+  // generic COMMON_MISSING_FIELD (no placeholder) for internal fields like `id`.
+  if (errorCode === CommonErrorCode.COMMON_MISSING_FIELD) {
+    if (
+      typeof values.field === "string" &&
+      tErrors.has(COMMON_MISSING_NAMED_FIELD)
+    ) {
+      code = COMMON_MISSING_NAMED_FIELD;
+    } else {
+      values = {};
+    }
+  }
 
   try {
     const message =
       Object.keys(values).length > 0
-        ? tErrors(errorCode, values)
-        : tErrors(errorCode);
+        ? tErrors(code, values)
+        : tErrors(code);
 
-    if (!message || looksLikeMissingMessage(message, errorCode)) {
+    if (!message || looksLikeMissingMessage(message, code)) {
       return fallback;
     }
 
