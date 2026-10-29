@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -35,63 +35,53 @@ export default function Header() {
   const [loading, setLoading] = useState(true);
   const [isSigningOut, startSignOut] = useTransition();
   const supabase = createClient();
+  // Monotonic id so a late getSession / auth event cannot overwrite a newer one.
+  const authSyncId = useRef(0);
+
+  const applyUser = (next: User | null, syncId: number) => {
+    if (syncId !== authSyncId.current) return;
+    setUser(next);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    let ignore = false;
-
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (ignore) return;
-      setUser(data.user);
-      setLoading(false);
-    };
-
-    void fetchUser();
-
+    // Display-only source of truth: session + auth events (no network getUser).
+    // INITIAL_SESSION fires on subscribe and covers the first paint.
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_, session) => {
-        if (ignore) return;
-        setUser(session?.user ?? null);
-        setLoading(false);
+        applyUser(session?.user ?? null, ++authSyncId.current);
       },
     );
 
     return () => {
-      ignore = true;
+      authSyncId.current += 1;
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
 
   useEffect(() => {
-    // After server-action auth soft-navigates, sync from local session
-    // (cookie read — no network) without re-subscribing the auth listener.
-    let ignore = false;
+    // After server-action auth soft-navigates, sync from local session cookies
+    // without re-subscribing the auth listener or hitting Auth over the network.
+    const syncId = ++authSyncId.current;
 
-    const syncFromSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (ignore) return;
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    };
-
-    void syncFromSession();
-
-    return () => {
-      ignore = true;
-    };
+    void supabase.auth.getSession().then(({ data }) => {
+      applyUser(data.session?.user ?? null, syncId);
+    });
   }, [supabase, pathname]);
 
   const handleSignOut = () => {
     startSignOut(async () => {
-      // Clear browser client session so Header's onAuthStateChange updates
-      // before the soft navigation from the server action.
+      // Invalidate any in-flight session sync, then clear client session so
+      // onAuthStateChange / Header update before the soft navigation.
+      authSyncId.current += 1;
       await supabase.auth.signOut();
       setUser(null);
+      setLoading(false);
       await signOutAction();
     });
   };
 
-  const { roleName, isLoading: roleLoading } = useUserRole();
+  const { roleName, isLoading: roleLoading } = useUserRole(user?.id);
 
   if (loading) {
     return (
