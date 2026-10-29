@@ -1,11 +1,11 @@
 "use client";
 
+import { signOutAction } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -31,8 +31,8 @@ export default function Header() {
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSigningOut, startSignOut] = useTransition();
   const supabase = createClient();
-  const router = useRouter();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -55,10 +55,10 @@ export default function Header() {
     };
   }, [supabase]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push(routes.home());
-    router.refresh();
+  const handleSignOut = () => {
+    startSignOut(() => {
+      void signOutAction();
+    });
   };
 
   const { roleName, isLoading: roleLoading } = useUserRole();
@@ -155,6 +155,7 @@ export default function Header() {
 
                 <DropdownMenuItem
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  disabled={isSigningOut}
                   onClick={handleSignOut}
                 >
                   {t_auth("signOut")}

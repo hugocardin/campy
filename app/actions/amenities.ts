@@ -7,19 +7,24 @@ import {
   resultError,
   resultSuccess,
 } from "@/lib/errors";
+import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
   handleDbSingle,
   handleUnexpectedError,
   mapPostgrestError,
 } from "@/lib/supabase/db-utils";
-import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 
 export interface AmenityCreateInput {
   code: string;
   category_id: number;
+}
+
+function revalidateAmenityConsumers() {
+  // Amenity create/delete changes pickers and views across platform admin.
+  revalidateLocalizedPath(routes.platformAdmin.root(), "layout");
 }
 
 export async function createAmenityAction(
@@ -56,7 +61,7 @@ export async function createAmenityAction(
     );
 
     if (result.success) {
-      revalidateLocalizedPath(routes.platformAdmin.amenities());
+      revalidateAmenityConsumers();
     }
 
     return result;
@@ -99,7 +104,7 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
       });
     }
 
-    revalidateLocalizedPath(routes.platformAdmin.amenities());
+    revalidateAmenityConsumers();
     return resultSuccess();
   } catch (err) {
     return handleUnexpectedError(err);

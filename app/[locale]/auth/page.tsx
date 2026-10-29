@@ -1,7 +1,9 @@
+import { redirect } from "@/i18n/navigation";
 import { routes } from "@/lib/routes";
+import { toSafeInternalHref } from "@/lib/safe-internal-href";
 import { createClient } from "@/lib/supabase/server";
 import { generatePageMetadata } from "@/lib/utils";
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
 import AuthForm from "./AuthForm";
 
 const PAGE_NAMESPACE = "auth.AuthPage" as const;
@@ -14,8 +16,9 @@ export default async function AuthPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const search = await searchParams;
-  const redirectTo =
-    typeof search.redirect === "string" ? search.redirect : routes.profile();
+  const redirectTo = toSafeInternalHref(
+    typeof search.redirect === "string" ? search.redirect : undefined,
+  );
 
   const supabase = await createClient();
   const {
@@ -23,7 +26,8 @@ export default async function AuthPage({
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect(redirectTo);
+    const locale = await getLocale();
+    return redirect({ href: redirectTo, locale });
   }
 
   return <AuthForm redirectTo={redirectTo} />;

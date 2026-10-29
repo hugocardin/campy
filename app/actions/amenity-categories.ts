@@ -7,17 +7,22 @@ import {
   resultSuccess,
 } from "@/lib/errors";
 import { routes } from "@/lib/routes";
+import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import {
   handleDbSingle,
   handleUnexpectedError,
   mapPostgrestError,
 } from "@/lib/supabase/db-utils";
-import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 
 export interface AmenityCategoryCreateInput {
   code: string;
+}
+
+function revalidateAmenityCategoryConsumers() {
+  // Categories label amenities + pickers under platform admin.
+  revalidateLocalizedPath(routes.platformAdmin.root(), "layout");
 }
 
 export async function createAmenityCategoryAction(
@@ -40,7 +45,7 @@ export async function createAmenityCategoryAction(
     );
 
     if (result.success) {
-      revalidateLocalizedPath(routes.platformAdmin.amenityCategory());
+      revalidateAmenityCategoryConsumers();
     }
 
     return result;
@@ -85,7 +90,7 @@ export async function deleteAmenityCategoryAction(
       });
     }
 
-    revalidateLocalizedPath(routes.platformAdmin.amenityCategory());
+    revalidateAmenityCategoryConsumers();
     return resultSuccess();
   } catch (err) {
     return handleUnexpectedError(err);
