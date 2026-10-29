@@ -46,6 +46,8 @@ const FR_CA_PLURAL_CATEGORIES = {
 type LeafMap = Map<string, string>;
 
 type PluralInfo = {
+  /** Structural path (`select:arg:option` / `plural:arg:option` chain + this plural) */
+  structuralPath: string;
   name: string;
   pluralType: NonNullable<Intl.PluralRulesOptions["type"]>;
   /** CLDR categories present (excludes `=N` exact matches) */
@@ -85,11 +87,16 @@ function isExactPluralKey(key: string): boolean {
   return key.startsWith("=");
 }
 
+function joinPath(parentPath: string, segment: string): string {
+  return parentPath ? `${parentPath}/${segment}` : segment;
+}
+
 function walkIcu(
   elements: MessageFormatElement[],
   argumentsOut: Set<string>,
   selectOptionsOut: Set<string>,
   pluralsOut: PluralInfo[],
+  parentPath = "",
 ): void {
   for (const element of elements) {
     switch (element.type) {
@@ -104,28 +111,52 @@ function walkIcu(
         argumentsOut.add(select.value);
         const keys = Object.keys(select.options).sort();
         selectOptionsOut.add(`${select.value}:${keys.join(",")}`);
-        for (const option of Object.values(select.options)) {
-          walkIcu(option.value, argumentsOut, selectOptionsOut, pluralsOut);
+        for (const [optionKey, option] of Object.entries(select.options)) {
+          walkIcu(
+            option.value,
+            argumentsOut,
+            selectOptionsOut,
+            pluralsOut,
+            joinPath(parentPath, `select:${select.value}:${optionKey}`),
+          );
         }
         break;
       }
       case TYPE.plural: {
         const plural = element as PluralElement;
+        const pluralType = plural.pluralType ?? "cardinal";
         argumentsOut.add(plural.value);
         const optionKeys = Object.keys(plural.options);
+        const structuralPath = joinPath(
+          parentPath,
+          `plural:${plural.value}:${pluralType}`,
+        );
         pluralsOut.push({
+          structuralPath,
           name: plural.value,
-          pluralType: plural.pluralType ?? "cardinal",
+          pluralType,
           categories: optionKeys.filter((key) => !isExactPluralKey(key)).sort(),
           exactKeys: optionKeys.filter(isExactPluralKey).sort(),
         });
-        for (const option of Object.values(plural.options)) {
-          walkIcu(option.value, argumentsOut, selectOptionsOut, pluralsOut);
+        for (const [optionKey, option] of Object.entries(plural.options)) {
+          walkIcu(
+            option.value,
+            argumentsOut,
+            selectOptionsOut,
+            pluralsOut,
+            joinPath(structuralPath, `plural:${plural.value}:${optionKey}`),
+          );
         }
         break;
       }
       case TYPE.tag:
-        walkIcu(element.children, argumentsOut, selectOptionsOut, pluralsOut);
+        walkIcu(
+          element.children,
+          argumentsOut,
+          selectOptionsOut,
+          pluralsOut,
+          parentPath,
+        );
         break;
       case TYPE.literal:
       case TYPE.pound:
@@ -154,13 +185,7 @@ function icuShape(message: string, label: string): IcuShape {
 }
 
 function pluralSignature(plural: PluralInfo): string {
-  return `${plural.name}:${plural.pluralType}`;
-}
-
-function sortPlurals(plurals: PluralInfo[]): PluralInfo[] {
-  return [...plurals].sort((a, b) =>
-    pluralSignature(a).localeCompare(pluralSignature(b)),
-  );
+  return plural.structuralPath;
 }
 
 function assertRuntimePluralRulesAgree(): void {
@@ -184,7 +209,7 @@ function assertFrPluralCoverage(label: string, plurals: PluralInfo[]): void {
     for (const category of required) {
       assert.ok(
         plural.categories.includes(category),
-        `${label}: plural "${plural.name}" (${plural.pluralType}) missing required fr-CA category "${category}" (have: ${plural.categories.join(", ") || "(none)"}). Cardinal "many" is required (CLDR 38+) for large round numbers — do not rely on fallback to "other".`,
+        `${label}: plural "${plural.structuralPath}" missing required fr-CA category "${category}" (have: ${plural.categories.join(", ") || "(none)"}). Cardinal "many" is required (CLDR 38+) for large round numbers — do not rely on fallback to "other".`,
       );
     }
   }
@@ -195,18 +220,22 @@ function assertExactPluralKeysPreserved(
   enPlurals: PluralInfo[],
   frPlurals: PluralInfo[],
 ): void {
-  const enSorted = sortPlurals(enPlurals);
-  const frSorted = sortPlurals(frPlurals);
+  const frByPath = new Map(
+    frPlurals.map((plural) => [plural.structuralPath, plural]),
+  );
 
-  for (let index = 0; index < enSorted.length; index++) {
-    const enPlural = enSorted[index]!;
-    const frPlural = frSorted[index]!;
+  for (const enPlural of enPlurals) {
+    const frPlural = frByPath.get(enPlural.structuralPath);
+    assert.ok(
+      frPlural,
+      `${label}: missing fr-CA plural at structural path "${enPlural.structuralPath}"`,
+    );
+
     const frExact = new Set(frPlural.exactKeys);
-
     for (const exactKey of enPlural.exactKeys) {
       assert.ok(
         frExact.has(exactKey),
-        `${label}: plural "${enPlural.name}" (${enPlural.pluralType}) is missing en-CA exact branch "${exactKey}" in fr-CA (fr has: ${frPlural.exactKeys.join(", ") || "(none)"}). French may add extra =N keys, but must not drop English ones.`,
+        `${label}: plural "${enPlural.structuralPath}" is missing en-CA exact branch "${exactKey}" in fr-CA (fr has: ${frPlural.exactKeys.join(", ") || "(none)"}). French may add extra =N keys, but must not drop English ones.`,
       );
     }
   }
@@ -235,9 +264,9 @@ function assertIcuParity(
   );
 
   assert.deepEqual(
-    sortPlurals(frShape.plurals).map(pluralSignature),
-    sortPlurals(enShape.plurals).map(pluralSignature),
-    `${label}: plural/selectordinal argument names and pluralType must match`,
+    frShape.plurals.map(pluralSignature).sort(),
+    enShape.plurals.map(pluralSignature).sort(),
+    `${label}: plural structural paths must match (select/plural option chains + name:pluralType)`,
   );
 
   // Category branches are locale-specific (fr-CA needs `many`); =N from en must remain.
@@ -250,6 +279,28 @@ function loadNamespace(locale: string, namespace: string): Record<string, unknow
     readFileSync(join(messagesRoot, locale, `${namespace}.json`), "utf8"),
   ) as Record<string, unknown>;
 }
+
+describe("ICU plural structural pairing", () => {
+  const enNested = `{role, select, admin {{count, plural, =0 {none} one {# site} other {# sites}}} guest {{count, plural, one {# site} other {# sites}}} other {{count, plural, one {# site} other {# sites}}}}`;
+
+  it("pairs =N keys across reordered select branches", () => {
+    // French lists `other` before `admin` — walk order differs, paths must still match.
+    const frNested = `{role, select, other {{count, plural, one {# site} many {# sites} other {# sites}}} guest {{count, plural, one {# site} many {# sites} other {# sites}}} admin {{count, plural, =0 {aucun} one {# site} many {# sites} other {# sites}}}}`;
+
+    assert.doesNotThrow(() =>
+      assertIcuParity("fixture", "reorderedSelect", enNested, frNested),
+    );
+  });
+
+  it("still detects a dropped =0 when select branches are reordered", () => {
+    const frDropped = `{role, select, other {{count, plural, one {# site} many {# sites} other {# sites}}} guest {{count, plural, =0 {aucun} one {# site} many {# sites} other {# sites}}} admin {{count, plural, one {# site} many {# sites} other {# sites}}}}`;
+
+    assert.throws(
+      () => assertIcuParity("fixture", "droppedExact", enNested, frDropped),
+      /select:role:admin\/plural:count:cardinal[\s\S]*=0/,
+    );
+  });
+});
 
 describe("fr-CA message parity (existing namespaces only)", () => {
   const frFiles = readdirSync(join(messagesRoot, "fr-CA"))
