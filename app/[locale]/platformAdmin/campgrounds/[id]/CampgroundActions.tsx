@@ -9,6 +9,7 @@ import { ManageAmenitiesButton } from "@/components/buttons/ManageAmenitiesButto
 import { ManageSitesButton } from "@/components/buttons/ManageSitesButton";
 import { Button } from "@/components/ui/button";
 import { CampgroundAdmin } from "@/entities/campground-admin";
+import { withErrorReference } from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import { Power, PowerOff } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -20,6 +21,7 @@ type CampgroundActionsProps = {
 };
 
 export function CampgroundActions({ campground }: CampgroundActionsProps) {
+  const tc = useTranslations("common");
   const t_campgrounds = useTranslations("campgrounds");
 
   const router = useRouter();
@@ -45,7 +47,13 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     startTransition(async () => {
       const result = await action(campground.id);
       if (!result.success) {
-        setError(result.errorCode);
+        setError(
+          withErrorReference(
+            result.errorCode ?? tc("error"),
+            result.details,
+            (errorId) => tc("errorReference", { errorId }),
+          ),
+        );
       } else {
         router.refresh();
       }
@@ -87,7 +95,7 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
       </div>
 
       {error && (
-        <div className="text-sm text-destructive text-right md:text-left max-w-75 md:max-w-none">
+        <div className="text-sm text-destructive text-right md:text-left max-w-75 md:max-w-none whitespace-pre-line">
           {error}
         </div>
       )}

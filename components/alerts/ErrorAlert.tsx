@@ -7,9 +7,11 @@ import { useTranslations } from "next-intl";
 type ErrorAlertProps = {
   title?: string;
   errorMsg?: string | null;
+  /** Optional support correlation id (also fine if already appended into errorMsg). */
+  errorId?: string | null;
 };
 
-export function ErrorAlert({ title, errorMsg }: ErrorAlertProps) {
+export function ErrorAlert({ title, errorMsg, errorId }: ErrorAlertProps) {
   const tc = useTranslations("common");
 
   if (!errorMsg) {
@@ -19,11 +21,22 @@ export function ErrorAlert({ title, errorMsg }: ErrorAlertProps) {
     title = tc("error");
   }
 
+  const referenceAlreadyInMsg =
+    !!errorId && errorMsg.includes(errorId);
+
   return (
     <Alert variant="destructive">
       <AlertCircle className="h-4 w-4" />
       <AlertTitle>{title}</AlertTitle>
-      <AlertDescription>{errorMsg}</AlertDescription>
+      <AlertDescription className="whitespace-pre-line">
+        {errorMsg}
+        {errorId && !referenceAlreadyInMsg ? (
+          <>
+            {"\n"}
+            {tc("errorReference", { errorId })}
+          </>
+        ) : null}
+      </AlertDescription>
     </Alert>
   );
 }

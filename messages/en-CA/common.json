@@ -9,6 +9,7 @@
   "details": "Details",
   "edit": "Edit",
   "error": "Error",
+  "errorReference": "Reference: {errorId}",
   "logoAlt": "Campy logo",
   "save": "Save",
   "processing": "Processing...",

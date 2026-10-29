@@ -18,7 +18,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { UserProfileNoRole } from "@/entities/user-profile";
-import { ActionResult } from "@/lib/errors";
+import { ActionResult, withErrorReference } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 
@@ -100,7 +100,13 @@ export default function CampgroundFormClient({
       const result = await onSubmit(payload);
 
       if (!result.success) {
-        setError(result.errorCode);
+        setError(
+          withErrorReference(
+            result.errorCode ?? tc("error"),
+            result.details,
+            (errorId) => tc("errorReference", { errorId }),
+          ),
+        );
       }
     });
   };

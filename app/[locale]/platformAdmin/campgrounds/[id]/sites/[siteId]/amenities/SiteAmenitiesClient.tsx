@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Amenity } from "@/entities/amenity";
+import { withErrorReference } from "@/lib/errors";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
@@ -76,7 +77,13 @@ export default function SiteAmenitiesClient({
       });
 
       if (!result.success) {
-        setError(result.errorCode);
+        setError(
+          withErrorReference(
+            result.errorCode ?? tc("error"),
+            result.details,
+            (errorId) => tc("errorReference", { errorId }),
+          ),
+        );
         return;
       }
     });
@@ -150,7 +157,9 @@ export default function SiteAmenitiesClient({
             </Button>
 
             {error && (
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-line">
+                {error}
+              </p>
             )}
           </div>
         </CardContent>

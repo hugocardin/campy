@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
+import { withErrorReference } from "@/lib/errors";
 import { AUTH_MODES, AuthMode } from "@/lib/types/auth";
 
 type AuthFormProps = {
@@ -45,7 +46,11 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
 
       if (!result.success) {
         console.log("Auth error:", result);
-        setError(t_errors(result.errorCode!));
+        setError(
+          withErrorReference(t_errors(result.errorCode!), result.details, (errorId) =>
+            tc("errorReference", { errorId }),
+          ),
+        );
         return;
       }
 
@@ -134,7 +139,9 @@ export default function AuthForm({ redirectTo }: AuthFormProps) {
               </div>
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <p className="text-sm text-destructive whitespace-pre-line">{error}</p>
+            )}
             {message && (
               <p className="text-sm text-green-600 dark:text-green-400">
                 {message}

@@ -82,6 +82,18 @@ describe("isPostgrestError", () => {
     );
   });
 
+  it("accepts plain PostgREST bodies with null details/hint", () => {
+    assert.equal(
+      isPostgrestError({
+        code: "42501",
+        message: "new row violates row-level security policy",
+        details: null,
+        hint: null,
+      }),
+      true,
+    );
+  });
+
   it("rejects Node-style coded errors that only have code+message", () => {
     assert.equal(
       isPostgrestError({
@@ -123,6 +135,46 @@ describe("handleUnexpectedError", () => {
       hint: "",
     });
     assertSafeFailure(result, DbErrorCode.DB_DUPLICATE_VALUE);
+  });
+
+  it("maps RLS plain JSON with null details/hint to DB_PERMISSION_DENIED", () => {
+    const result = handleUnexpectedError({
+      code: "42501",
+      message: "new row violates row-level security policy for table \"campgrounds\"",
+      details: null,
+      hint: null,
+    });
+    assertSafeFailure(result, DbErrorCode.DB_PERMISSION_DENIED);
+  });
+
+  it("logs an allowlisted cause summary for fetch failures", () => {
+    const logged: unknown[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      logged.push(args);
+    };
+
+    try {
+      const cause = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:54321"), {
+        code: "ECONNREFUSED",
+      });
+      const err = new TypeError("fetch failed", { cause });
+      const result = handleUnexpectedError(err);
+      assertSafeFailure(result, DbErrorCode.DB_UNHANDLED_DATABASE_ERROR);
+
+      assert.ok(logged.length >= 1);
+      const payload = logged[0]![1] as Record<string, unknown>;
+      assert.equal(payload.name, "TypeError");
+      assert.equal(payload.message, "fetch failed");
+      assert.deepEqual(payload.cause, {
+        name: "Error",
+        message: "connect ECONNREFUSED 127.0.0.1:54321",
+        code: "ECONNREFUSED",
+      });
+      assert.equal("headers" in payload, false);
+    } finally {
+      console.error = original;
+    }
   });
 });
 

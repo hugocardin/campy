@@ -20,7 +20,7 @@ import { SiteType } from "@/entities/site-type";
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
-import { ActionResult } from "@/lib/errors";
+import { ActionResult, withErrorReference } from "@/lib/errors";
 
 type SiteFormProps = {
   campgroundId: string;
@@ -100,7 +100,13 @@ export default function SiteFormClient({
       const result = await onSubmit(campgroundId, payload);
 
       if (!result.success) {
-        setError(result.errorCode);
+        setError(
+          withErrorReference(
+            result.errorCode ?? tc("error"),
+            result.details,
+            (errorId) => tc("errorReference", { errorId }),
+          ),
+        );
       }
     });
   };

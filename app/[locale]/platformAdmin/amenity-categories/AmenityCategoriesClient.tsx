@@ -9,6 +9,7 @@ import {
   deleteAmenityCategoryAction,
 } from "@/app/actions/amenity-categories";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
+import { withErrorReference } from "@/lib/errors";
 import { DeleteButtonWithConfirmation } from "@/components/dialogs/DeleteButtonWithConfirmation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +49,11 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     const result = await createAmenityCategoryAction({ code: code.trim() });
 
     if (!result.success) {
-      setError(t_errors(result.errorCode!));
+      setError(
+        withErrorReference(t_errors(result.errorCode!), result.details, (errorId) =>
+          tc("errorReference", { errorId }),
+        ),
+      );
     } else {
       setCode("");
       router.refresh();
@@ -64,7 +69,11 @@ export default function AmenityCategoriesClient({ initialCategories }: Props) {
     const result = await deleteAmenityCategoryAction(categoryId);
 
     if (!result.success) {
-      setError(t_errors(result.errorCode!));
+      setError(
+        withErrorReference(t_errors(result.errorCode!), result.details, (errorId) =>
+          tc("errorReference", { errorId }),
+        ),
+      );
     } else {
       router.refresh();
     }

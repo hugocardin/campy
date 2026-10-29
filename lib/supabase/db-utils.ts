@@ -139,9 +139,15 @@ function safeClientError(
   return resultError(errorCode, details);
 }
 
+function isStringOrNull(value: unknown): value is string | null {
+  return typeof value === "string" || value === null;
+}
+
 /**
- * True for real PostgREST errors (class instance or plain `{ code, message, details, hint }`).
- * Requires `details` + `hint` so Node/undici `{ code, message }` errors are not misrouted.
+ * True for real PostgREST errors (class instance or plain response body).
+ * Requires `details` + `hint` keys (values may be `string | null`) so Node/undici
+ * `{ code, message }` errors are not misrouted. Plain JSON bodies from postgrest-js
+ * (without `throwOnError()`) are not `instanceof PostgrestError`.
  */
 export function isPostgrestError(err: unknown): err is PostgrestError {
   if (typeof err !== "object" || err === null) {
@@ -156,9 +162,56 @@ export function isPostgrestError(err: unknown): err is PostgrestError {
   return (
     typeof e.code === "string" &&
     typeof e.message === "string" &&
-    typeof e.details === "string" &&
-    typeof e.hint === "string"
+    "details" in e &&
+    "hint" in e &&
+    isStringOrNull(e.details) &&
+    isStringOrNull(e.hint)
   );
+}
+
+/** Allowlisted cause snapshot (1–2 levels): name/code/message only — no URLs/headers. */
+function summarizeCause(
+  cause: unknown,
+  depth = 0,
+): Record<string, unknown> | undefined {
+  if (depth > 1 || cause == null) {
+    return undefined;
+  }
+
+  if (cause instanceof Error) {
+    const snap: Record<string, unknown> = {
+      name: cause.name,
+      message: cause.message,
+    };
+    if (typeof (cause as NodeJS.ErrnoException).code === "string") {
+      snap.code = (cause as NodeJS.ErrnoException).code;
+    }
+    const nested = summarizeCause(cause.cause, depth + 1);
+    if (nested) {
+      snap.cause = nested;
+    }
+    return snap;
+  }
+
+  if (typeof cause === "object") {
+    const c = cause as Record<string, unknown>;
+    const snap: Record<string, unknown> = {};
+    if (typeof c.name === "string") snap.name = c.name;
+    if (typeof c.code === "string") snap.code = c.code;
+    if (typeof c.message === "string") snap.message = c.message;
+    if (Object.keys(snap).length === 0) {
+      return undefined;
+    }
+    if ("cause" in c) {
+      const nested = summarizeCause(c.cause, depth + 1);
+      if (nested) {
+        snap.cause = nested;
+      }
+    }
+    return snap;
+  }
+
+  return undefined;
 }
 
 /**
@@ -185,6 +238,7 @@ function logServerError(
   }
 
   if (err instanceof Error) {
+    const cause = summarizeCause(err.cause);
     console.error(prefix, {
       ...extra,
       name: err.name,
@@ -193,6 +247,7 @@ function logServerError(
       ...(typeof (err as NodeJS.ErrnoException).code === "string"
         ? { code: (err as NodeJS.ErrnoException).code }
         : {}),
+      ...(cause ? { cause } : {}),
     });
     return;
   }
@@ -200,11 +255,13 @@ function logServerError(
   // Plain non-PostgREST objects (e.g. { code: 'ECONNREFUSED', message }) — allowlist only.
   if (typeof err === "object" && err !== null) {
     const e = err as Record<string, unknown>;
+    const cause = "cause" in e ? summarizeCause(e.cause) : undefined;
     console.error(prefix, {
       ...extra,
       ...(typeof e.name === "string" ? { name: e.name } : {}),
       ...(typeof e.code === "string" ? { code: e.code } : {}),
       ...(typeof e.message === "string" ? { message: e.message } : {}),
+      ...(cause ? { cause } : {}),
     });
     return;
   }
