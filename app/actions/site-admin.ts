@@ -8,9 +8,9 @@ import {
   handleDbSingle,
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
+import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function updateSiteAction(
@@ -48,8 +48,8 @@ export async function updateSiteAction(
       return result;
     }
 
-    revalidatePath(routes.platformAdmin.campgroundSites(campgroundId));
-    revalidatePath(
+    revalidateLocalizedPath(routes.platformAdmin.campgroundSites(campgroundId));
+    revalidateLocalizedPath(
       routes.platformAdmin.campgroundSiteView(campgroundId, input.id),
     );
   } catch (err) {
@@ -95,7 +95,7 @@ export async function createSiteAction(
 
     newSiteId = result.data.id;
 
-    revalidatePath(routes.platformAdmin.campgroundSites(campgroundId));
+    revalidateLocalizedPath(routes.platformAdmin.campgroundSites(campgroundId));
   } catch (err) {
     return handleUnexpectedError(err);
   }
@@ -145,11 +145,11 @@ export async function updateSiteAmenitiesAction({
       }
     }
 
-    revalidatePath(routes.platformAdmin.campgroundSites(campgroundId));
-    revalidatePath(
+    revalidateLocalizedPath(routes.platformAdmin.campgroundSites(campgroundId));
+    revalidateLocalizedPath(
       routes.platformAdmin.campgroundSiteView(campgroundId, siteId),
     );
-    revalidatePath(
+    revalidateLocalizedPath(
       routes.platformAdmin.campgroundSiteEdit(campgroundId, siteId),
     );
   } catch (err) {

@@ -1,11 +1,11 @@
 "use server";
 
 import { ActionResult, resultSuccess } from "@/lib/errors";
+import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import { handleAuthResponse } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 import { AUTH_MODES, AuthMode } from "@/lib/types/auth";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function authAction(
@@ -37,6 +37,6 @@ export async function authAction(
   }
 
   // For signin → redirect to the initial page
-  revalidatePath("/");
+  revalidateLocalizedPath("/");
   redirect(redirectTo);
 }

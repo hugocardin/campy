@@ -13,9 +13,9 @@ import {
   handleUnexpectedError,
   mapPostgrestError,
 } from "@/lib/supabase/db-utils";
+import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 
 export interface AmenityCreateInput {
   code: string;
@@ -56,7 +56,7 @@ export async function createAmenityAction(
     );
 
     if (result.success) {
-      revalidatePath(routes.platformAdmin.amenities());
+      revalidateLocalizedPath(routes.platformAdmin.amenities());
     }
 
     return result;
@@ -99,7 +99,7 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
       });
     }
 
-    revalidatePath(routes.platformAdmin.amenities());
+    revalidateLocalizedPath(routes.platformAdmin.amenities());
     return resultSuccess();
   } catch (err) {
     return handleUnexpectedError(err);
