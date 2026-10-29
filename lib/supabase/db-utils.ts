@@ -85,15 +85,10 @@ export function handleUnexpectedError(err: unknown): ActionResult<never> {
     return mapPostgrestError(err);
   }
 
-  // Otherwise it's an unexpected JS error (network, createClient failure, etc.)
+  // Log full error (incl. stack) server-side only — never return internals to the client.
   console.error("Unexpected database-related error:", err);
 
-  return resultError(DbErrorCode.DB_UNHANDLED_DATABASE_ERROR, {
-    message: err instanceof Error ? err.message : "Unknown error",
-    ...{
-      stack: err instanceof Error ? err.stack : undefined,
-    },
-  });
+  return resultError(DbErrorCode.DB_UNHANDLED_DATABASE_ERROR);
 }
 
 // ── Returns domain error code + rich details for client ───────────────────────
