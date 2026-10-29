@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
 import { useUserRole } from "@/lib/hooks/use-user-role";
 import { routes } from "@/lib/routes";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import LocaleSwitcher from "../LocaleSwitcher";
@@ -78,23 +79,22 @@ export default function Header() {
 
   const handleSignOut = () => {
     startSignOut(async () => {
-      // Clear local session first (always succeeds offline); only flip UI after
-      // that, then revoke via the server action. Never show signed-out while a
-      // local session remains.
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      if (error) {
-        toast.error(t_auth("errors.unknown_auth_error"));
-        return;
-      }
-
-      authSyncId.current += 1;
-      setUser(null);
-      setLoading(false);
-
+      // Revoke while cookies still exist, then always clear local session.
+      // redirect() from the action throws NEXT_REDIRECT on success — rethrow it
+      // after finally so the router can navigate.
       try {
         await signOutAction();
-      } catch {
-        toast.error(t_auth("errors.network_error"));
+      } catch (error) {
+        if (!isRedirectError(error)) {
+          toast.error(t_auth("errors.network_error"));
+        } else {
+          throw error;
+        }
+      } finally {
+        await supabase.auth.signOut({ scope: "local" });
+        authSyncId.current += 1;
+        setUser(null);
+        setLoading(false);
       }
     });
   };

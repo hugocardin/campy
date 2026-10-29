@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
  *
  * `roleName` is only returned when it was fetched for the current `userId`,
  * so a direct A→B user switch never paints A's role on B for a frame.
+ * Cache is cleared on sign-out so a returning user cannot flash a stale role.
  */
 export function useUserRole(userId: string | null | undefined) {
   const [cache, setCache] = useState<{
@@ -20,6 +21,7 @@ export function useUserRole(userId: string | null | undefined) {
     let ignore = false;
 
     if (!userId) {
+      setCache(null);
       return;
     }
 

@@ -60,7 +60,12 @@ export async function authAction(
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    // Surface to the client so Header can toast instead of assuming revoke worked.
+    throw new Error(error.message);
+  }
 
   revalidateLocalizedPath("/", "layout");
 
