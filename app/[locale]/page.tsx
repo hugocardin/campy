@@ -1,10 +1,12 @@
 import CampgroundCardSkeleton from "@/components/search/CampgroundCardSkeleton";
 import CampgroundList from "@/components/search/CampgroundList";
+import { getActionErrorId, translateErrorCode } from "@/lib/errors";
+import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 import CampgroundListControls from "../../components/search/list/CampgroundListControls";
 import { getCampgrounds } from "../../data/campgrounds/get-campgrounds";
-import { generatePageMetadata } from "@/lib/utils";
 
 const PAGE_NAMESPACE = "search.SearchPage" as const;
 
@@ -14,15 +16,29 @@ export default async function Home() {
   const campgroundsResult = await getCampgrounds();
 
   if (!campgroundsResult.success) {
+    const tc = await getTranslations("common");
+    const tErrors = await getTranslations("errors");
+    const errorId = getActionErrorId(campgroundsResult.details);
+    const message = translateErrorCode(
+      campgroundsResult.errorCode,
+      tErrors,
+      tc("error"),
+      campgroundsResult.details,
+    );
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center">
         <AlertCircle className="h-16 w-16 text-destructive mb-6" />
         <h1 className="text-3xl font-bold tracking-tight mb-4">
-          Something went wrong
+          {tc("somethingWentWrong")}
         </h1>
-        <p className="text-lg text-muted-foreground max-w-md mb-8">
-          {campgroundsResult.errorCode}
-        </p>
+        <p className="text-lg text-muted-foreground max-w-md mb-2">{message}</p>
+        {errorId ? (
+          <p className="text-sm text-muted-foreground max-w-md mb-8">
+            {tc("errorReference", { errorId })}
+          </p>
+        ) : (
+          <div className="mb-8" />
+        )}
       </div>
     );
   }

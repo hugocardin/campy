@@ -20,7 +20,11 @@ import { SiteType } from "@/entities/site-type";
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
-import { ActionResult } from "@/lib/errors";
+import {
+  ActionResult,
+  translateErrorCode,
+  withErrorReference,
+} from "@/lib/errors";
 
 type SiteFormProps = {
   campgroundId: string;
@@ -39,6 +43,7 @@ export default function SiteFormClient({
   onSubmit,
 }: SiteFormProps) {
   const tc = useTranslations("common");
+  const t_errors = useTranslations("errors");
   const t_sites = useTranslations("sites");
 
   const [isPending, startTransition] = useTransition();
@@ -100,7 +105,13 @@ export default function SiteFormClient({
       const result = await onSubmit(campgroundId, payload);
 
       if (!result.success) {
-        setError(result.errorCode);
+        setError(
+          withErrorReference(
+            translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
+            result.details,
+            (errorId) => tc("errorReference", { errorId }),
+          ),
+        );
       }
     });
   };

@@ -8,6 +8,7 @@ import {
   deleteAmenityAction,
 } from "@/app/actions/amenities";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
+import { translateErrorCode, withErrorReference } from "@/lib/errors";
 import { DeleteButtonWithConfirmation } from "@/components/dialogs/DeleteButtonWithConfirmation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,7 +65,13 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     });
 
     if (!result.success) {
-      setError(t_errors(result.errorCode!));
+      setError(
+        withErrorReference(
+          translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
+          result.details,
+          (errorId) => tc("errorReference", { errorId }),
+        ),
+      );
     } else {
       setCode("");
       setCategoryId("");
@@ -81,7 +88,13 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     const result = await deleteAmenityAction(id);
 
     if (!result.success) {
-      setError(t_errors(result.errorCode!));
+      setError(
+        withErrorReference(
+          translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
+          result.details,
+          (errorId) => tc("errorReference", { errorId }),
+        ),
+      );
     } else {
       router.refresh();
     }

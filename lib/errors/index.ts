@@ -2,6 +2,7 @@ import { AuthErrorCodeType } from "./auth";
 import { CommonErrorCodeType } from "./common";
 import { DbErrorCodeType } from "./db";
 
+export * from "./action-error-ui";
 export * from "./auth";
 export * from "./common";
 export * from "./db";
