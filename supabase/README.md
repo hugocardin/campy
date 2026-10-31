@@ -69,8 +69,8 @@ Write policies (and authenticated SELECT admin branches) use `(SELECT public.is_
 
 **Views:**
 
-- `v_campgrounds` — left as definer (`security_invoker = false`); do not flip to invoker without `pg_get_viewdef` + before/after anon probe.
-- `v_campgrounds_admin` — definer; direct `SELECT` revoked from `anon`/`authenticated`; app reads via `get_campgrounds_admin(p_id uuid DEFAULT NULL)` RPC (platform_admin only).
+- `v_campgrounds` — **unchanged** (migration does not `ALTER` it). Snapshot `reloptions` / `pg_get_viewdef` before apply.
+- `v_campgrounds_admin` — direct `SELECT` revoked from `anon`/`authenticated` (no `security_invoker` flip); app reads via `get_campgrounds_admin(p_id uuid DEFAULT NULL)` RPC (`42501` if not platform_admin; `ORDER BY name`).
 
 **owner_id on active parks:** intentionally still readable by anon on the base table (UUID only; not treated as secret). Column revoke deferred unless product says otherwise.
 

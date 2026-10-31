@@ -202,37 +202,25 @@ END $$;
 
 -- ---------------------------------------------------------------------------
 -- Views
--- v_campgrounds: leave definition + invoker settings unchanged (unknown live
---   def; flipping security_invoker can break anon listing). Direct table RLS
---   still blocks inactive parks on /rest/v1/campgrounds.
--- v_campgrounds_admin: keep definer semantics (owner email joins must keep
---   working for admins). Revoke direct table SELECT; gate via RPC below.
+-- v_campgrounds: truly unchanged (no ALTER). Snapshot reloptions pre-apply.
+--   Direct table RLS still blocks inactive parks on /rest/v1/campgrounds.
+-- v_campgrounds_admin: revoke direct SELECT only — do not flip security_invoker
+--   without a live reloptions check. Gate reads via RPC below (SECURITY DEFINER
+--   so owner-email joins keep working regardless of view invoker setting).
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
-  -- Undo any earlier draft that set security_invoker on the public listing view.
-  IF EXISTS (
-    SELECT 1 FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relname = 'v_campgrounds' AND c.relkind = 'v'
-  ) THEN
-    EXECUTE 'ALTER VIEW public.v_campgrounds SET (security_invoker = false)';
-  END IF;
-
   IF EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relname = 'v_campgrounds_admin' AND c.relkind = 'v'
   ) THEN
-    -- Definer semantics so owner email joins keep working for the RPC below.
-    EXECUTE 'ALTER VIEW public.v_campgrounds_admin SET (security_invoker = false)';
     EXECUTE 'REVOKE ALL ON TABLE public.v_campgrounds_admin FROM anon';
     EXECUTE 'REVOKE ALL ON TABLE public.v_campgrounds_admin FROM authenticated';
   END IF;
 END $$;
 
--- Platform-admin-only read of the existing admin view (definer bypasses
--- profiles/auth.users grants that would break under security_invoker).
+-- Platform-admin-only read of the existing admin view.
 CREATE OR REPLACE FUNCTION public.get_campgrounds_admin(p_id uuid DEFAULT NULL)
 RETURNS SETOF public.v_campgrounds_admin
 LANGUAGE plpgsql
@@ -242,13 +230,15 @@ SET search_path = ''
 AS $$
 BEGIN
   IF NOT public.is_platform_admin() THEN
-    RETURN;
+    RAISE EXCEPTION 'platform_admin required'
+      USING ERRCODE = '42501';
   END IF;
 
   RETURN QUERY
   SELECT v.*
   FROM public.v_campgrounds_admin AS v
-  WHERE p_id IS NULL OR v.id = p_id;
+  WHERE p_id IS NULL OR v.id = p_id
+  ORDER BY v.name;
 END;
 $$;
 

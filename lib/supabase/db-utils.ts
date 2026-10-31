@@ -122,9 +122,11 @@ function postgrestErrorCode(error: PostgrestError): DbErrorCodeType {
     case "42501": // insufficient_privilege
       return DbErrorCode.DB_PERMISSION_DENIED;
 
-    // .single() on 0 rows (RLS filter or missing id) — not an unexpected failure.
+    // .single(): 0 rows → not found; multiple rows → integrity / unexpected.
     case "PGRST116":
-      return DbErrorCode.DB_NOT_FOUND;
+      return isPostgrestZeroRowDetails(error.details)
+        ? DbErrorCode.DB_NOT_FOUND
+        : DbErrorCode.DB_UNHANDLED_DATABASE_ERROR;
 
     case "PGRST301": // JWT expired / invalid (PostgREST specific)
     case "PGRST302": // other JWT issues
@@ -133,6 +135,15 @@ function postgrestErrorCode(error: PostgrestError): DbErrorCodeType {
     default:
       return DbErrorCode.DB_UNHANDLED_DATABASE_ERROR;
   }
+}
+
+/** PostgREST PGRST116 details for zero-row `.single()` / `.maybeSingle()` misses. */
+function isPostgrestZeroRowDetails(details: string | null | undefined): boolean {
+  if (typeof details !== "string") {
+    return false;
+  }
+  // e.g. "The result contains 0 rows" (0-row case only — not "2 rows").
+  return /\b0 rows\b/i.test(details);
 }
 
 function safeClientError(

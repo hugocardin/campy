@@ -19,6 +19,10 @@ ORDER BY tablename, policyname;
 -- Please paste into the PR if reviewing view changes:
 SELECT pg_get_viewdef('public.v_campgrounds'::regclass, true);
 SELECT pg_get_viewdef('public.v_campgrounds_admin'::regclass, true);
+
+SELECT relname, reloptions
+FROM pg_class
+WHERE relname IN ('v_campgrounds', 'v_campgrounds_admin');
 ```
 
 Save the result; the migration `RAISE NOTICE`s each dropped name during apply.
@@ -84,8 +88,8 @@ ROLLBACK;
 | Anon `GET /rest/v1/sites` for inactive park | **0 rows** |
 | Anon `GET /rest/v1/v_campgrounds` | Same active count/sample as **before** apply (public listing unbroken) |
 | Anon / non-admin `GET /rest/v1/v_campgrounds_admin` | Denied / empty |
-| Non-admin `rpc/get_campgrounds_admin` | **0 rows** |
-| Platform admin `rpc/get_campgrounds_admin` | Rows **with** `owner_email` / `owner_full_name` |
+| Non-admin `rpc/get_campgrounds_admin` | **`42501`** (permission denied), not empty list |
+| Platform admin `rpc/get_campgrounds_admin` | Rows **with** `owner_email` / `owner_full_name`, ordered by `name` |
 | Anon/auth catalog writes | `42501` or 0 rows mutated |
 | Non-admin `UPDATE` own `profiles.role_id` | Fail — **parked** until profiles/user_roles migrations + live dump |
 | App RLS-blocked `.single()` update | `DB_NOT_FOUND` (PGRST116 mapped), not unhandled |
