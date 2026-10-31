@@ -28,9 +28,10 @@
 --
 -- Apply as one script in the SQL Editor (or `supabase db push` after link).
 -- Wrapped in a transaction. Idempotent: safe to re-run.
--- Pre-apply: non-INSERT auth.users triggers are kept (live on_auth_user_updated
--- → public.sync_email_on_update). Other AFTER INSERT competitors or a
--- differently wired on_auth_user_created → RAISE; review/remove those first.
+-- Pre-apply / re-apply: only exact companion on_auth_user_updated →
+-- public.sync_email_on_update (NOT fires_insert) is kept; any other
+-- non-internal auth.users trigger besides handle_new_user → RAISE.
+-- Idempotent: safe after a prior apply of this migration.
 
 BEGIN;
 
@@ -60,7 +61,47 @@ REVOKE ALL ON FUNCTION public._campy_is_trusted_profile_writer() FROM anon;
 REVOKE ALL ON FUNCTION public._campy_is_trusted_profile_writer() FROM authenticated;
 
 COMMENT ON FUNCTION public._campy_is_trusted_profile_writer() IS
-  'True for service_role JWT (auth.role() / jwt.claims jsonb / legacy claim GUC) or session_user postgres/supabase_admin. Used by profile role/email lock.';
+  'True for service_role JWT (auth.role() / jwt.claims jsonb / legacy claim GUC) or session_user postgres/supabase_admin. Used by profile role/email lock. Does NOT include supabase_auth_admin (email sync uses a narrow check).';
+
+-- Shared signup/sync email rule: real email, else NULL if nullable, else placeholder.
+CREATE OR REPLACE FUNCTION public._campy_normalize_profile_email(
+  p_user_id uuid,
+  p_auth_email text
+)
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  email_nullable boolean;
+BEGIN
+  IF p_auth_email IS NOT NULL THEN
+    RETURN p_auth_email;
+  END IF;
+
+  SELECT (c.is_nullable = 'YES')
+  INTO email_nullable
+  FROM information_schema.columns AS c
+  WHERE c.table_schema = 'public'
+    AND c.table_name = 'profiles'
+    AND c.column_name = 'email';
+
+  IF coalesce(email_nullable, true) THEN
+    RETURN NULL;
+  END IF;
+
+  RETURN p_user_id::text || '@no-email.invalid';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public._campy_normalize_profile_email(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._campy_normalize_profile_email(uuid, text) FROM anon;
+REVOKE ALL ON FUNCTION public._campy_normalize_profile_email(uuid, text) FROM authenticated;
+
+COMMENT ON FUNCTION public._campy_normalize_profile_email(uuid, text) IS
+  'Map auth.users.email into profiles.email: keep value, or NULL if column nullable, else id||@no-email.invalid. Used by handle_new_user and sync_email_on_update.';
 
 -- ---------------------------------------------------------------------------
 -- Role-change + server-owned column lock (defense in depth with column grants)
@@ -74,15 +115,34 @@ AS $$
 DECLARE
   platform_admin_role_id integer;
   other_admins integer;
+  auth_email text;
 BEGIN
   IF NEW.id IS DISTINCT FROM OLD.id THEN
     RAISE EXCEPTION 'profiles.id is immutable'
       USING ERRCODE = '42501';
   END IF;
 
-  -- email is server-owned (Auth / trusted writers). Column grants also omit it.
+  -- email is server-owned (Auth sync / trusted writers). Column grants omit it.
+  -- supabase_auth_admin is NOT a general trusted writer (must not open role_id).
   IF NEW.email IS DISTINCT FROM OLD.email THEN
-    IF NOT public._campy_is_trusted_profile_writer() THEN
+    IF public._campy_is_trusted_profile_writer() THEN
+      NULL;
+    ELSIF session_user = 'supabase_auth_admin' THEN
+      SELECT u.email
+      INTO auth_email
+      FROM auth.users AS u
+      WHERE u.id = NEW.id;
+
+      -- Allow only when the new profiles.email matches Auth (normalized the same
+      -- way as signup/sync). Equivalent to matching auth.users.email when that
+      -- value is non-null; covers NULL/placeholder when email-less.
+      IF NEW.email IS NOT DISTINCT FROM public._campy_normalize_profile_email(NEW.id, auth_email) THEN
+        NULL;
+      ELSE
+        RAISE EXCEPTION 'Only a trusted server path can change profiles.email'
+          USING ERRCODE = '42501';
+      END IF;
+    ELSE
       RAISE EXCEPTION 'Only a trusted server path can change profiles.email'
         USING ERRCODE = '42501';
     END IF;
@@ -139,7 +199,7 @@ REVOKE ALL ON FUNCTION public.restrict_profile_role_id_change() FROM anon;
 REVOKE ALL ON FUNCTION public.restrict_profile_role_id_change() FROM authenticated;
 
 COMMENT ON FUNCTION public.restrict_profile_role_id_change() IS
-  'BEFORE UPDATE on profiles: lock id/email/role_id. role_id changes require platform_admin or trusted writer; blocks demoting the last platform_admin (advisory xact lock then COUNT; postgres/supabase_admin exempt). Replaces live WITH CHECK policy "Restrict role changes to platform_admin".';
+  'BEFORE UPDATE on profiles: lock id/email/role_id. Email: trusted writer OR supabase_auth_admin writing normalized auth.users.email (sync path only — not general trust). role_id: platform_admin or trusted writer; last-admin advisory xact lock then COUNT. Replaces live WITH CHECK policy "Restrict role changes to platform_admin".';
 
 DROP TRIGGER IF EXISTS trg_restrict_profile_role_id_change ON public.profiles;
 CREATE TRIGGER trg_restrict_profile_role_id_change
@@ -220,8 +280,6 @@ SET search_path = ''
 AS $$
 DECLARE
   default_role_id integer;
-  email_nullable boolean;
-  profile_email text;
 BEGIN
   SELECT r.id
   INTO default_role_id
@@ -234,28 +292,12 @@ BEGIN
       USING ERRCODE = 'P0001';
   END IF;
 
-  -- Phone / OAuth-without-email: NEW.email is NULL.
-  -- Prefer real NULL when the column allows it (avoids '' UNIQUE collisions and
-  -- blank owner-picker rows). If NOT NULL, use a non-colliding placeholder.
-  IF NEW.email IS NOT NULL THEN
-    profile_email := NEW.email;
-  ELSE
-    SELECT (c.is_nullable = 'YES')
-    INTO email_nullable
-    FROM information_schema.columns AS c
-    WHERE c.table_schema = 'public'
-      AND c.table_name = 'profiles'
-      AND c.column_name = 'email';
-
-    IF coalesce(email_nullable, true) THEN
-      profile_email := NULL;
-    ELSE
-      profile_email := NEW.id::text || '@no-email.invalid';
-    END IF;
-  END IF;
-
   INSERT INTO public.profiles (id, email, role_id)
-  VALUES (NEW.id, profile_email, default_role_id)
+  VALUES (
+    NEW.id,
+    public._campy_normalize_profile_email(NEW.id, NEW.email),
+    default_role_id
+  )
   ON CONFLICT (id) DO NOTHING;
 
   RETURN NEW;
@@ -267,16 +309,50 @@ REVOKE ALL ON FUNCTION public.handle_new_user() FROM anon;
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM authenticated;
 
 COMMENT ON FUNCTION public.handle_new_user() IS
-  'AFTER INSERT on auth.users: insert profiles row with role_id for user_roles.code = user. Does not read role from raw_user_meta_data. Email: keep NULL when nullable; else id||@no-email.invalid (never ''''). Later Auth email changes are synced by live on_auth_user_updated → public.sync_email_on_update (preserved by this migration; not redefined here).';
+  'AFTER INSERT on auth.users: insert profiles row with role_id for user_roles.code = user. Does not read role from raw_user_meta_data. Email via _campy_normalize_profile_email.';
+
+-- ---------------------------------------------------------------------------
+-- Auth email → profiles.email sync (versioned; replaces live unversioned body)
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.sync_email_on_update()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.email IS NOT DISTINCT FROM OLD.email THEN
+    RETURN NEW;
+  END IF;
+
+  UPDATE public.profiles AS p
+  SET email = public._campy_normalize_profile_email(NEW.id, NEW.email)
+  WHERE p.id = NEW.id;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.sync_email_on_update() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.sync_email_on_update() FROM anon;
+REVOKE ALL ON FUNCTION public.sync_email_on_update() FROM authenticated;
+
+COMMENT ON FUNCTION public.sync_email_on_update() IS
+  'AFTER UPDATE OF email ON auth.users: sync profiles.email with _campy_normalize_profile_email. SECURITY DEFINER, search_path empty. Does not read raw_user_meta_data.';
+
+DROP TRIGGER IF EXISTS on_auth_user_updated ON auth.users;
+CREATE TRIGGER on_auth_user_updated
+  AFTER UPDATE OF email ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_email_on_update();
 
 -- Install signup trigger: replace only handle_new_user callers.
--- Keep non-INSERT companions (e.g. on_auth_user_updated → sync_email_on_update).
--- RAISE only for other AFTER INSERT (or INSERT-bit) competitors / a differently
--- wired on_auth_user_created — do not drop legitimate UPDATE email sync.
+-- Keep ONLY exact companion on_auth_user_updated → sync_email_on_update with
+-- NOT fires_insert. RAISE for any other non-internal auth.users trigger.
 DO $$
 DECLARE
   r record;
-  competitors text[] := ARRAY[]::text[];
+  leftover text[] := ARRAY[]::text[];
   fires_insert boolean;
 BEGIN
   FOR r IN
@@ -301,34 +377,26 @@ BEGIN
         'auth.users trigger on_auth_user_created points at %.% — review/remove before apply (refusing silent replace)',
         r.nspname, r.proname
         USING ERRCODE = 'P0001';
-    ELSIF (
-        r.tgname = 'on_auth_user_updated'
-        AND r.nspname = 'public'
-        AND r.proname = 'sync_email_on_update'
-      )
-      OR NOT fires_insert
+    ELSIF r.tgname = 'on_auth_user_updated'
+      AND r.nspname = 'public'
+      AND r.proname = 'sync_email_on_update'
+      AND NOT fires_insert
     THEN
-      -- Allowlisted email sync and any non-INSERT trigger (not a signup competitor).
       RAISE NOTICE
-        'Keeping auth.users trigger % → %.% (not an AFTER INSERT signup competitor)',
+        'Keeping allowlisted auth.users companion % → %.%',
         r.tgname, r.nspname, r.proname;
-    ELSIF fires_insert THEN
-      competitors := array_append(
-        competitors,
-        format('%s → %I.%I', r.tgname, r.nspname, r.proname)
-      );
     ELSE
-      competitors := array_append(
-        competitors,
-        format('%s → %I.%I (unknown)', r.tgname, r.nspname, r.proname)
+      leftover := array_append(
+        leftover,
+        format('%s → %I.%I', r.tgname, r.nspname, r.proname)
       );
     END IF;
   END LOOP;
 
-  IF coalesce(array_length(competitors, 1), 0) > 0 THEN
+  IF coalesce(array_length(leftover, 1), 0) > 0 THEN
     RAISE EXCEPTION
-      'Refusing to install on_auth_user_created: other AFTER INSERT (signup-competitor) triggers on auth.users must be reviewed/removed first: %',
-      array_to_string(competitors, ', ')
+      'Refusing to install on_auth_user_created: unexpected non-internal triggers on auth.users must be reviewed/removed first: %',
+      array_to_string(leftover, ', ')
       USING ERRCODE = 'P0001';
   END IF;
 END $$;

@@ -170,6 +170,7 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 | 2b | Non-admin `PATCH` own `{email: "spoof@example.com"}` | **Fail** (`42501`); email unchanged (service_role re-SELECT) |
 | 2c | **service_role** `PATCH` throwaway profile `{email: "trusted-sync@example.com"}` | **200**; service_role re-SELECT shows new email (trusted writer / `auth.role()` path) |
 | 2d | Non-admin `PATCH` own on **any non-allow-listed column that exists live** (pick from §1 catalog where `in_allow_list = false`, e.g. `email` / `role_id` / `created_at` if present — do not assume a name) | **Fail** `42501` (no column UPDATE grant) |
+| 2e | Change throwaway user email via **Auth API** (`updateUser` / Admin update email — not SQL Editor) | Auth update **succeeds** (no 500 from profile lock); service_role `GET profiles.email` **matches** new Auth email |
 | 3 | Non-admin `DELETE` own profile | **0 rows** / denied; profile still present |
 | 4 | Non-admin `POST` profile with `role_id = platform_admin` | **42501** RLS |
 | 5 | Non-admin / anon `PATCH`/`POST`/`DELETE` on `user_roles` | Writes fail or **0 rows**; codes unchanged |
@@ -180,7 +181,7 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 | 9 | Platform_admin `rpc/set_user_role` on another user → then **service_role** `GET /profiles?id=eq.<target>&select=role_id` | RPC **200**; service_role SELECT shows **new** `role_id` (do not trust RPC/PATCH 2xx alone) |
 | 9b | Platform_admin raw `PATCH` other user's `role_id` | Should **not** change the row (no column privilege / own-only UPDATE); service_role SELECT confirms unchanged — use RPC instead |
 | 10 | Public `signUp` with `user_metadata` roles (`role` / `role_id` / `app_role` = platform_admin) | New `profiles.role_id` = **1 (`user`)** |
-| 10b | SQL inventory: non-internal triggers on `auth.users` | **Exactly one AFTER INSERT signup**: `on_auth_user_created` → `handle_new_user`. `on_auth_user_updated` → `sync_email_on_update` may also be present (kept) |
+| 10b | SQL inventory: non-internal triggers on `auth.users` | **Exactly two**: `on_auth_user_created` → `handle_new_user` (AFTER INSERT); `on_auth_user_updated` → `sync_email_on_update` (AFTER UPDATE OF email only). No other non-internal triggers |
 | 10c | Email-less signup (Auth Admin create user with **no email** / phone-only if available, or insert path that yields `NEW.email` NULL) × **two** users | Both succeed; `profiles.email` is **NULL** (if nullable) or `<uuid>@no-email.invalid` (if NOT NULL) — **never** `''`; no UNIQUE collision on second signup |
 | 11 | `rpc/current_user_role_code` as signed-in user | `"user"` / `"platform_admin"` matching profile (live helper; not redefined here) |
 | 12 | Anon `GET /rest/v1/v_campgrounds` after apply | Same active count/sample as **before** apply (profiles `REVOKE ALL` from anon must not break public listing) |
@@ -192,7 +193,7 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 
 - Admin role changes go through **`set_user_role`**, not PostgREST `PATCH` (own-only SELECT would make cross-user PATCH match 0 rows).
 - Column UPDATE is granted only on `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (where present live); any unclassified live column aborts the migration.
-- Trusted writer bypass uses **`auth.role()`** / `request.jwt.claims` jsonb / legacy claim GUC, or **`session_user` in (`postgres`,`supabase_admin`)** — not `auth.uid() IS NULL`.
-- `handle_new_user` must not read role from `raw_user_meta_data`. Email-less signups use NULL or `@no-email.invalid` (never `''`). Later Auth email changes are synced by live `on_auth_user_updated` → `public.sync_email_on_update` (migration keeps it; not redefined here).
+- Trusted writer bypass uses **`auth.role()`** / `request.jwt.claims` jsonb / legacy claim GUC, or **`session_user` in (`postgres`,`supabase_admin`)** — not `auth.uid() IS NULL`, and **not** general `supabase_auth_admin` (email sync uses a narrow Auth-email match).
+- `handle_new_user` / `sync_email_on_update` share `_campy_normalize_profile_email` (NULL or `@no-email.invalid`; never `''`). Neither reads `raw_user_meta_data`.
 - If `user_roles.code = 'user'` is missing, every signup fails closed (`P0001`) — intentional; keep that seed row.
 - Owner picker (`get-owners.ts`) uses **service_role** (bypasses RLS).

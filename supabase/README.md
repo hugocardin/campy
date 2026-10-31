@@ -90,18 +90,18 @@ After applying, walk through `probes/admin-catalog-rls.md`.
 | `profiles` | own row (`authenticated`) | `GRANT UPDATE` = **allow-list ∩ live** (`full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds`); unexpected live cols → **RAISE** | **`set_user_role(user_id, role_code)`** RPC (`SECURITY DEFINER`, `platform_admin` only). Own-only SELECT would make cross-user `PATCH` match 0 rows. |
 | `user_roles` | `authenticated` only (not `anon`) | none — `REVOKE ALL` then no write grants | n/a |
 
-**Defense in depth:** `BEFORE UPDATE` trigger `trg_restrict_profile_role_id_change` locks `id` / `email` / `role_id`, allows trusted writers (`auth.role()` / jwt claims = `service_role`, or `session_user` ∈ (`postgres`,`supabase_admin`)) or `is_platform_admin()`, and refuses demoting the **last** `platform_admin` (advisory xact lock then `COUNT`; no `FOR UPDATE` — avoids `40P01` deadlocks; concurrent races expect one `P0001`. DB owners can still recover in SQL Editor).
+**Defense in depth:** `BEFORE UPDATE` trigger `trg_restrict_profile_role_id_change` locks `id` / `email` / `role_id`. Trusted writers (`auth.role()` / jwt claims = `service_role`, or `session_user` ∈ (`postgres`,`supabase_admin`)) — **not** `supabase_auth_admin` generally. Email sync from GoTrue is allowed only when `session_user = supabase_auth_admin` and `profiles.email` matches normalized `auth.users.email`. Role changes: `is_platform_admin()` or trusted writer; last-admin via advisory xact lock then `COUNT` (no `FOR UPDATE`).
 
 **Grants:** `REVOKE ALL` on both tables from `anon`/`authenticated`, then minimal grants (clears default `TRUNCATE` / `REFERENCES` / `TRIGGER` too). Column UPDATE = allow-list ∩ live `information_schema` columns; unexpected live cols abort apply.
 
-**Signup:** `handle_new_user` on `auth.users` AFTER INSERT → `profiles` with `user_roles.code = 'user'`. Email-less: keep `NULL` if `profiles.email` is nullable; otherwise `id::text || '@no-email.invalid'` (never `''`). Ignores `raw_user_meta_data` role keys.
+**Signup / email sync:** `handle_new_user` (AFTER INSERT) and versioned `sync_email_on_update` (AFTER UPDATE OF email) share `_campy_normalize_profile_email` (NULL if nullable, else `id@no-email.invalid`; never `''`). Ignores `raw_user_meta_data`.
 
-Migration drops triggers that call `public.handle_new_user`. It **keeps** non-INSERT companions — notably live `on_auth_user_updated` → `public.sync_email_on_update` (Auth email → `profiles.email`). It does **not** silently replace a differently wired `on_auth_user_created` — that case **RAISE**s. Same for other **AFTER INSERT** signup competitors. Review/remove only those, then re-apply.
+Migration drops `handle_new_user` callers; recreates `on_auth_user_updated` → `sync_email_on_update`. Trigger inventory **keeps only** that exact companion (`name` + `fn` + `NOT fires_insert`); any other non-internal `auth.users` trigger → **RAISE**. Idempotent for re-apply after a prior run.
 
 **Notes / failure modes:**
 
-- `profiles.email` is set at signup; later Auth email changes are synced by live `on_auth_user_updated` / `sync_email_on_update` (preserved; not redefined in this migration).
 - Snapshot `information_schema.columns` / `pg_indexes` for `profiles.email` before apply (nullability + unique).
+- After apply: probe Auth API email change (not SQL Editor) and confirm `profiles.email` matches.
 - If `user_roles` has no `code = 'user'` row, **every signup fails closed** (`P0001`) — keep that seed row.
 - After `REVOKE ALL … FROM anon` on `profiles`, confirm anon `GET /v_campgrounds` still works (view may join profiles as invoker).
 
