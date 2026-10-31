@@ -128,25 +128,30 @@ SELECT
   has_table_privilege('authenticated', 'public.user_roles', 'references') AS auth_refs_roles,-- false
   has_table_privilege('authenticated', 'public.user_roles', 'trigger') AS auth_trig_roles;   -- false
 
--- Column UPDATE: full_name yes; email / role_id no
-SELECT
-  has_column_privilege('authenticated', 'public.profiles', 'full_name', 'update') AS auth_upd_full_name, -- true
-  has_column_privilege('authenticated', 'public.profiles', 'email', 'update') AS auth_upd_email,         -- false
-  has_column_privilege('authenticated', 'public.profiles', 'role_id', 'update') AS auth_upd_role_id;     -- false
-
 SELECT has_function_privilege('anon', 'public.set_user_role(uuid, text)', 'execute') AS anon_exec_set_role;           -- false
 SELECT has_function_privilege('authenticated', 'public.set_user_role(uuid, text)', 'execute') AS auth_exec_set_role; -- true
 
--- Final grant set (should match allow-list ∩ live; paste into PR with §0 snapshot)
+-- Final grant set from live catalog (safe if an allow-list col is missing).
+-- Expect can_update = true ONLY for allow-list ∩ live:
+--   full_name, default_rig_length, preferred_site_type_id,
+--   notification_preferences, bookmarked_campgrounds
+-- Expect false for every other live column (id, role_id, email, timestamps, …).
+-- Paste into PR with §0 snapshot.
 SELECT
-  has_column_privilege('authenticated', 'public.profiles', 'full_name', 'update') AS upd_full_name,
-  has_column_privilege('authenticated', 'public.profiles', 'default_rig_length', 'update') AS upd_rig,
-  has_column_privilege('authenticated', 'public.profiles', 'preferred_site_type_id', 'update') AS upd_site_type,
-  has_column_privilege('authenticated', 'public.profiles', 'notification_preferences', 'update') AS upd_notif,
-  has_column_privilege('authenticated', 'public.profiles', 'bookmarked_campgrounds', 'update') AS upd_bookmarks,
-  has_column_privilege('authenticated', 'public.profiles', 'email', 'update') AS upd_email,       -- false
-  has_column_privilege('authenticated', 'public.profiles', 'role_id', 'update') AS upd_role_id,   -- false
-  has_column_privilege('authenticated', 'public.profiles', 'updated_at', 'update') AS upd_updated_at; -- false
+  c.column_name,
+  has_column_privilege('authenticated', 'public.profiles', c.column_name, 'update') AS can_update,
+  c.column_name IN (
+    'full_name',
+    'default_rig_length',
+    'preferred_site_type_id',
+    'notification_preferences',
+    'bookmarked_campgrounds'
+  ) AS in_allow_list
+FROM information_schema.columns AS c
+WHERE c.table_schema = 'public'
+  AND c.table_name = 'profiles'
+ORDER BY c.ordinal_position;
+-- Expect: can_update = in_allow_list for every row (both true or both false).
 ```
 
 ## 2. Behavioral checks (PostgREST / Auth)
@@ -159,7 +164,7 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 | 2 | Non-admin `PATCH` own `{full_name: "..."}` | **200**; `role_id` unchanged |
 | 2b | Non-admin `PATCH` own `{email: "spoof@example.com"}` | **Fail** (`42501`); email unchanged (service_role re-SELECT) |
 | 2c | **service_role** `PATCH` throwaway profile `{email: "trusted-sync@example.com"}` | **200**; service_role re-SELECT shows new email (trusted writer / `auth.role()` path) |
-| 2d | Non-admin `PATCH` own non-allow-listed col e.g. `{created_at: "..."}` | **Fail** `42501` (no column UPDATE grant) |
+| 2d | Non-admin `PATCH` own on **any non-allow-listed column that exists live** (pick from §1 catalog where `in_allow_list = false`, e.g. `email` / `role_id` / `created_at` if present — do not assume a name) | **Fail** `42501` (no column UPDATE grant) |
 | 3 | Non-admin `DELETE` own profile | **0 rows** / denied; profile still present |
 | 4 | Non-admin `POST` profile with `role_id = platform_admin` | **42501** RLS |
 | 5 | Non-admin / anon `PATCH`/`POST`/`DELETE` on `user_roles` | Writes fail or **0 rows**; codes unchanged |
