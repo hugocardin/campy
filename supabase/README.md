@@ -96,11 +96,11 @@ After applying, walk through `probes/admin-catalog-rls.md`.
 
 **Signup:** `handle_new_user` on `auth.users` AFTER INSERT → `profiles` with `user_roles.code = 'user'`. Email-less: keep `NULL` if `profiles.email` is nullable; otherwise `id::text || '@no-email.invalid'` (never `''`). Ignores `raw_user_meta_data` role keys.
 
-Migration drops triggers that call `public.handle_new_user`. It does **not** silently `DROP TRIGGER on_auth_user_created` when that name points at a different function — it **RAISE**s instead. Same for any other leftover non-internal `auth.users` trigger. Review and remove conflicting triggers, then re-apply.
+Migration drops triggers that call `public.handle_new_user`. It **keeps** non-INSERT companions — notably live `on_auth_user_updated` → `public.sync_email_on_update` (Auth email → `profiles.email`). It does **not** silently replace a differently wired `on_auth_user_created` — that case **RAISE**s. Same for other **AFTER INSERT** signup competitors. Review/remove only those, then re-apply.
 
 **Notes / failure modes:**
 
-- `profiles.email` is copied **once** at signup — later Auth email changes are **not** synced (owner picker / admin listing can drift until a sync path exists).
+- `profiles.email` is set at signup; later Auth email changes are synced by live `on_auth_user_updated` / `sync_email_on_update` (preserved; not redefined in this migration).
 - Snapshot `information_schema.columns` / `pg_indexes` for `profiles.email` before apply (nullability + unique).
 - If `user_roles` has no `code = 'user'` row, **every signup fails closed** (`P0001`) — keep that seed row.
 - After `REVOKE ALL … FROM anon` on `profiles`, confirm anon `GET /v_campgrounds` still works (view may join profiles as invoker).

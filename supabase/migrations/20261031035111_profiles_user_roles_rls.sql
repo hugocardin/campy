@@ -28,8 +28,9 @@
 --
 -- Apply as one script in the SQL Editor (or `supabase db push` after link).
 -- Wrapped in a transaction. Idempotent: safe to re-run.
--- Pre-apply: if auth.users has a non-handle_new_user trigger (including
--- on_auth_user_created → other fn), migration RAISE — review/remove it first.
+-- Pre-apply: non-INSERT auth.users triggers are kept (live on_auth_user_updated
+-- → public.sync_email_on_update). Other AFTER INSERT competitors or a
+-- differently wired on_auth_user_created → RAISE; review/remove those first.
 
 BEGIN;
 
@@ -266,25 +267,32 @@ REVOKE ALL ON FUNCTION public.handle_new_user() FROM anon;
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM authenticated;
 
 COMMENT ON FUNCTION public.handle_new_user() IS
-  'AFTER INSERT on auth.users: insert profiles row with role_id for user_roles.code = user. Does not read role from raw_user_meta_data. Email: keep NULL when nullable; else id||@no-email.invalid (never ''''). Copied once — not synced with later Auth email changes.';
+  'AFTER INSERT on auth.users: insert profiles row with role_id for user_roles.code = user. Does not read role from raw_user_meta_data. Email: keep NULL when nullable; else id||@no-email.invalid (never ''''). Later Auth email changes are synced by live on_auth_user_updated → public.sync_email_on_update (preserved by this migration; not redefined here).';
 
--- Install signup trigger: replace only handle_new_user callers; refuse other
--- auth.users triggers (including a differently wired on_auth_user_created).
--- Does NOT silently DROP TRIGGER on_auth_user_created when it points elsewhere —
--- that case RAISE; review/remove the conflicting trigger, then re-apply.
+-- Install signup trigger: replace only handle_new_user callers.
+-- Keep non-INSERT companions (e.g. on_auth_user_updated → sync_email_on_update).
+-- RAISE only for other AFTER INSERT (or INSERT-bit) competitors / a differently
+-- wired on_auth_user_created — do not drop legitimate UPDATE email sync.
 DO $$
 DECLARE
   r record;
-  leftover text[] := ARRAY[]::text[];
+  competitors text[] := ARRAY[]::text[];
+  fires_insert boolean;
 BEGIN
   FOR r IN
-    SELECT t.tgname, n.nspname, p.proname
+    SELECT
+      t.tgname,
+      n.nspname,
+      p.proname,
+      t.tgtype
     FROM pg_trigger AS t
     JOIN pg_proc AS p ON p.oid = t.tgfoid
     JOIN pg_namespace AS n ON n.oid = p.pronamespace
     WHERE t.tgrelid = 'auth.users'::regclass
       AND NOT t.tgisinternal
   LOOP
+    fires_insert := (r.tgtype & (1 << 2)) <> 0; -- TRIGGER_TYPE_INSERT
+
     IF r.nspname = 'public' AND r.proname = 'handle_new_user' THEN
       RAISE NOTICE 'Dropping auth.users trigger % (public.handle_new_user)', r.tgname;
       EXECUTE format('DROP TRIGGER IF EXISTS %I ON auth.users', r.tgname);
@@ -293,18 +301,34 @@ BEGIN
         'auth.users trigger on_auth_user_created points at %.% — review/remove before apply (refusing silent replace)',
         r.nspname, r.proname
         USING ERRCODE = 'P0001';
-    ELSE
-      leftover := array_append(
-        leftover,
+    ELSIF (
+        r.tgname = 'on_auth_user_updated'
+        AND r.nspname = 'public'
+        AND r.proname = 'sync_email_on_update'
+      )
+      OR NOT fires_insert
+    THEN
+      -- Allowlisted email sync and any non-INSERT trigger (not a signup competitor).
+      RAISE NOTICE
+        'Keeping auth.users trigger % → %.% (not an AFTER INSERT signup competitor)',
+        r.tgname, r.nspname, r.proname;
+    ELSIF fires_insert THEN
+      competitors := array_append(
+        competitors,
         format('%s → %I.%I', r.tgname, r.nspname, r.proname)
+      );
+    ELSE
+      competitors := array_append(
+        competitors,
+        format('%s → %I.%I (unknown)', r.tgname, r.nspname, r.proname)
       );
     END IF;
   END LOOP;
 
-  IF coalesce(array_length(leftover, 1), 0) > 0 THEN
+  IF coalesce(array_length(competitors, 1), 0) > 0 THEN
     RAISE EXCEPTION
-      'Refusing to install on_auth_user_created: other non-internal triggers on auth.users must be reviewed/removed first: %',
-      array_to_string(leftover, ', ')
+      'Refusing to install on_auth_user_created: other AFTER INSERT (signup-competitor) triggers on auth.users must be reviewed/removed first: %',
+      array_to_string(competitors, ', ')
       USING ERRCODE = 'P0001';
   END IF;
 END $$;
