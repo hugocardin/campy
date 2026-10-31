@@ -2,12 +2,13 @@
 
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { redirect } from "@/i18n/navigation";
-import { ActionResult, resultError } from "@/lib/errors";
+import { ActionResult, DbErrorCode, resultError } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
   handleDbNoData,
+  handleDbResponse,
   handleDbSingle,
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
@@ -84,7 +85,9 @@ export async function updateCampgroundAction(
     // SRID 4326 = WGS 84 (standard for GPS coordinates)
     const locationWKT = `POINT(${input.location.lng} ${input.location.lat})`;
 
-    const result = await handleDbNoData(
+    // .select().single() so RLS-filtered 0-row updates surface as errors
+    // instead of handleDbNoData fake-success + redirect.
+    const result = await handleDbSingle(
       supabase
         .from("campgrounds")
         .update({
@@ -102,12 +105,16 @@ export async function updateCampgroundAction(
           // This is the important part: convert to geography type
           location: `SRID=4326;${locationWKT}`,
         })
-        .eq("id", input.id),
+        .eq("id", input.id)
+        .select("id")
+        .single(),
     );
 
-    if (result.success) {
-      revalidateCampgroundPublicAndAdmin(input.id);
+    if (!result.success) {
+      return result;
     }
+
+    revalidateCampgroundPublicAndAdmin(input.id);
   } catch (err) {
     return handleUnexpectedError(err);
   }
@@ -190,7 +197,8 @@ export async function updateCampgroundAmenitiesAction({
   try {
     const supabase = await createClient();
 
-    // 1. Delete all existing links for this campground
+    // 1. Delete existing links. 0 rows is OK (empty → empty, or first assign).
+    //    A hard RLS/error still fails via handleDbNoData.
     const resultDelete = await handleDbNoData(
       supabase
         .from("campground_amenities")
@@ -202,19 +210,26 @@ export async function updateCampgroundAmenitiesAction({
       return resultDelete;
     }
 
-    // 2. If there are new amenities to add → insert them
+    // 2. Insert new links with .select() so an RLS-blocked insert cannot
+    //    report success after a quiet delete (empty amenity lists are valid).
     if (amenityIds.length > 0) {
       const inserts = amenityIds.map((amenity_id) => ({
         campground_id: campgroundId,
         amenity_id,
       }));
 
-      const resultInsert = await handleDbNoData(
-        supabase.from("campground_amenities").insert(inserts),
+      const resultInsert = await handleDbResponse(
+        supabase.from("campground_amenities").insert(inserts).select("amenity_id"),
       );
 
       if (!resultInsert.success) {
         return resultInsert;
+      }
+
+      if (resultInsert.data.length !== amenityIds.length) {
+        return resultError(DbErrorCode.DB_PERMISSION_DENIED, {
+          reason: "amenity_insert_incomplete",
+        });
       }
     }
 
