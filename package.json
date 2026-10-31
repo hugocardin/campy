@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/revalidate-localized-path.test.ts lib/safe-internal-href.test.ts lib/message-locale-parity.test.ts lib/supabase/db-utils.test.ts lib/errors/action-error-ui.test.ts"
+    "test": "tsx --test lib/revalidate-localized-path.test.ts lib/safe-internal-href.test.ts lib/message-locale-parity.test.ts lib/supabase/db-utils.test.ts lib/errors/action-error-ui.test.ts app/actions/amenities.test.ts"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.2.7",

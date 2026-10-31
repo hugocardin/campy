@@ -35,6 +35,11 @@ export type TranslateErrorOptions = {
    * Only keys present here get a named message; unlabeled fields stay generic.
    */
   fieldMessages?: Readonly<Record<string, string>>;
+  /**
+   * Entity-namespaced field → fully translated too-long message
+   * (e.g. `amenities.errors.codeTooLong`).
+   */
+  fieldTooLongMessages?: Readonly<Record<string, string>>;
 };
 
 /** Pull the support correlation id from an ActionResult `details` payload. */
@@ -117,9 +122,9 @@ function containsUnsubstitutedPlaceholder(message: string): boolean {
  * (e.g. malformed catalogue entry → next-intl returns `errors.CODE`, or a
  * leftover `{arg}` placeholder when details are not interpolated).
  *
- * For `COMMON_MISSING_FIELD`, prefers a caller-supplied per-field message
- * (form-local, entity-namespaced) when present; otherwise the generic catalogue
- * entry. Details are never interpolated into ICU.
+ * For `COMMON_MISSING_FIELD` / `COMMON_FIELD_TOO_LONG`, prefers a caller-supplied
+ * per-field message (form-local, entity-namespaced) when present; otherwise the
+ * generic catalogue entry. Details are never interpolated into ICU.
  */
 export function translateErrorCode(
   errorCode: string | undefined,
@@ -137,6 +142,19 @@ export function translateErrorCode(
       const rawField = details?.field;
       if (typeof rawField === "string" && rawField.length > 0) {
         const named = resolveFieldMessage(rawField, options?.fieldMessages);
+        if (named) {
+          return named;
+        }
+      }
+    }
+
+    if (errorCode === CommonErrorCode.COMMON_FIELD_TOO_LONG) {
+      const rawField = details?.field;
+      if (typeof rawField === "string" && rawField.length > 0) {
+        const named = resolveFieldMessage(
+          rawField,
+          options?.fieldTooLongMessages,
+        );
         if (named) {
           return named;
         }

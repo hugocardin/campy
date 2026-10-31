@@ -24,10 +24,33 @@ export interface AmenityCreateInput {
 }
 
 /**
- * App-level cap for amenity `code`. DB column limit is not in-repo (no
- * migrations); keep this conservative so multi-MB payloads never hit insert.
+ * App-level cap for amenity `code` (UTF-16 length after trim + uppercase).
+ * DB column limit is not in-repo (no migrations); keep this conservative so
+ * multi-MB payloads never hit insert.
  */
 export const AMENITY_CODE_MAX_LENGTH = 64;
+
+export type NormalizeAmenityCodeResult =
+  | { ok: true; code: string }
+  | { ok: false; reason: "missing" | "too_long" };
+
+/**
+ * Trim, uppercase, then enforce length on the normalized value so characters
+ * that expand when uppercased (`ß` → `SS`) cannot bypass the cap.
+ */
+export function normalizeAmenityCode(
+  input: unknown,
+): NormalizeAmenityCodeResult {
+  const trimmed = typeof input === "string" ? input.trim() : "";
+  if (!trimmed) {
+    return { ok: false, reason: "missing" };
+  }
+  const code = trimmed.toUpperCase();
+  if (code.length > AMENITY_CODE_MAX_LENGTH) {
+    return { ok: false, reason: "too_long" };
+  }
+  return { ok: true, code };
+}
 
 function revalidateAmenityConsumers() {
   // Amenity create/delete changes pickers and views across platform admin.
@@ -43,18 +66,20 @@ export async function createAmenityAction(
   }
 
   try {
-    // Normalize before the missing-field check so whitespace-only / non-string
+    // Normalize before missing/too-long checks so whitespace-only / non-string
     // payloads cannot bypass the server guard (client trim is not enough).
     // DB CHECK (length(trim(code)) > 0) still tracked as a follow-up — no
     // in-repo migrations yet.
-    const code = typeof input.code === "string" ? input.code.trim() : "";
-    if (!code) {
+    const normalized = normalizeAmenityCode(input.code);
+    if (!normalized.ok) {
+      if (normalized.reason === "too_long") {
+        return resultError(CommonErrorCode.COMMON_FIELD_TOO_LONG, {
+          field: AmenityMissingField.code,
+        });
+      }
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
         field: AmenityMissingField.code,
       });
-    }
-    if (code.length > AMENITY_CODE_MAX_LENGTH) {
-      return resultError(DbErrorCode.DB_CHECK_VIOLATION);
     }
     if (
       !Number.isSafeInteger(input.category_id) ||
@@ -71,7 +96,7 @@ export async function createAmenityAction(
       supabase
         .from("amenities")
         .insert({
-          code: code.toUpperCase(),
+          code: normalized.code,
           category_id: input.category_id,
         })
         .select()

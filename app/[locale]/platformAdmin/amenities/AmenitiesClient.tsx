@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
+  AMENITY_CODE_MAX_LENGTH,
   createAmenityAction,
   deleteAmenityAction,
 } from "@/app/actions/amenities";
@@ -54,11 +55,14 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
 
   const router = useRouter();
 
-  // Form-local required copy (entity-namespaced). Reuses the same wording as the
+  // Form-local field copy (entity-namespaced). Reuses the same wording as the
   // visible labels so en-CA stays in sync; fr-CA can rewrite each string later.
   const amenityFieldMessages = {
     [AmenityMissingField.code]: t_amenities("errors.codeRequired"),
     [AmenityMissingField.category]: t_amenities("errors.categoryRequired"),
+  };
+  const amenityFieldTooLongMessages = {
+    [AmenityMissingField.code]: t_amenities("errors.codeTooLong"),
   };
 
   const showActionError = (
@@ -69,6 +73,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
       withErrorReference(
         translateErrorCode(errorCode, t_errors, tc("error"), details, {
           fieldMessages: amenityFieldMessages,
+          fieldTooLongMessages: amenityFieldTooLongMessages,
         }),
         details,
         (errorId) => tc("errorReference", { errorId }),
@@ -130,6 +135,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder={t_amenities("form.amenityPlaceholder")}
+              maxLength={AMENITY_CODE_MAX_LENGTH}
               disabled={submitting}
               required
             />

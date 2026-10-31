@@ -222,6 +222,34 @@ describe("translateErrorCode", () => {
     );
   });
 
+  it("uses caller-supplied too-long messages for namespaced fields", () => {
+    const tTooLong = mockTranslator({
+      COMMON_FIELD_TOO_LONG:
+        "A value is too long. Please shorten it and try again.",
+    });
+    assert.equal(
+      translateErrorCode(
+        "COMMON_FIELD_TOO_LONG",
+        tTooLong,
+        "Error",
+        { field: AmenityMissingField.code },
+        {
+          fieldTooLongMessages: {
+            [AmenityMissingField.code]:
+              "Amenity Name must be 64 characters or fewer.",
+          },
+        },
+      ),
+      "Amenity Name must be 64 characters or fewer.",
+    );
+    assert.equal(
+      translateErrorCode("COMMON_FIELD_TOO_LONG", tTooLong, "Error", {
+        field: AmenityMissingField.code,
+      }),
+      "A value is too long. Please shorten it and try again.",
+    );
+  });
+
   it("falls back to generic when the mapped message is empty", () => {
     assert.equal(
       translateErrorCode(
@@ -346,12 +374,16 @@ describe("withErrorReference", () => {
 });
 
 describe("amenity form label reuse", () => {
-  it("required messages equal visible form labels + fixed en-CA suffix", () => {
+  it("required/too-long messages equal visible form labels + fixed en-CA wording", () => {
     const amenities = JSON.parse(
       readFileSync(join(messagesRoot, "en-CA/amenities.json"), "utf8"),
     ) as {
       form: { amenityLabel: string };
-      errors: { codeRequired: string; categoryRequired: string };
+      errors: {
+        codeRequired: string;
+        categoryRequired: string;
+        codeTooLong: string;
+      };
     };
     const amenityCategories = JSON.parse(
       readFileSync(join(messagesRoot, "en-CA/amenityCategories.json"), "utf8"),
@@ -364,6 +396,10 @@ describe("amenity form label reuse", () => {
     assert.equal(
       amenities.errors.categoryRequired,
       `${amenityCategories.form.categoryLabel} is required but was not provided.`,
+    );
+    assert.equal(
+      amenities.errors.codeTooLong,
+      `${amenities.form.amenityLabel} must be 64 characters or fewer.`,
     );
   });
 });
