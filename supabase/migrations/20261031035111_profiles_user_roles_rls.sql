@@ -312,7 +312,84 @@ COMMENT ON FUNCTION public.handle_new_user() IS
   'AFTER INSERT on auth.users: insert profiles row with role_id for user_roles.code = user. Does not read role from raw_user_meta_data. Email via _campy_normalize_profile_email.';
 
 -- ---------------------------------------------------------------------------
--- Auth email → profiles.email sync (versioned; replaces live unversioned body)
+-- Inventory LIVE auth.users triggers BEFORE recreating sync (refuse silent replace)
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  r record;
+  leftover text[] := ARRAY[]::text[];
+  fires_insert boolean;
+  live_fn_def text;
+BEGIN
+  -- Snapshot live sync body for apply logs (§0 also saves this for review).
+  IF to_regproc('public.sync_email_on_update') IS NOT NULL THEN
+    live_fn_def := pg_get_functiondef('public.sync_email_on_update'::regproc);
+    RAISE NOTICE
+      'Live public.sync_email_on_update (will be CREATE OR REPLACE with email-only body): %',
+      left(live_fn_def, 1500);
+  END IF;
+
+  FOR r IN
+    SELECT
+      t.oid AS tgoid,
+      t.tgname,
+      n.nspname,
+      p.proname,
+      t.tgtype
+    FROM pg_trigger AS t
+    JOIN pg_proc AS p ON p.oid = t.tgfoid
+    JOIN pg_namespace AS n ON n.oid = p.pronamespace
+    WHERE t.tgrelid = 'auth.users'::regclass
+      AND NOT t.tgisinternal
+  LOOP
+    fires_insert := (r.tgtype & (1 << 2)) <> 0; -- TRIGGER_TYPE_INSERT
+
+    IF r.nspname = 'public' AND r.proname = 'handle_new_user' THEN
+      RAISE NOTICE 'Dropping auth.users trigger % (public.handle_new_user)', r.tgname;
+      EXECUTE format('DROP TRIGGER IF EXISTS %I ON auth.users', r.tgname);
+    ELSIF r.tgname = 'on_auth_user_created' THEN
+      RAISE EXCEPTION
+        'auth.users trigger on_auth_user_created points at %.% — review/remove before apply (refusing silent replace)',
+        r.nspname, r.proname
+        USING ERRCODE = 'P0001';
+    ELSIF r.tgname = 'on_auth_user_updated' THEN
+      -- Must already be the email-sync companion; refuse foreign targets before DROP.
+      IF r.nspname IS DISTINCT FROM 'public'
+         OR r.proname IS DISTINCT FROM 'sync_email_on_update'
+         OR fires_insert
+      THEN
+        RAISE EXCEPTION
+          'auth.users trigger on_auth_user_updated points at %.% (fires_insert=%) — review/remove before apply (refusing silent replace of foreign companion). Live triggerdef: %',
+          r.nspname,
+          r.proname,
+          fires_insert,
+          pg_get_triggerdef(r.tgoid)
+          USING ERRCODE = 'P0001';
+      END IF;
+
+      RAISE NOTICE
+        'Allowlisted live companion on_auth_user_updated → public.sync_email_on_update will be recreated (UPDATE OF email only). Live triggerdef: %',
+        pg_get_triggerdef(r.tgoid);
+    ELSE
+      leftover := array_append(
+        leftover,
+        format('%s → %I.%I', r.tgname, r.nspname, r.proname)
+      );
+    END IF;
+  END LOOP;
+
+  IF coalesce(array_length(leftover, 1), 0) > 0 THEN
+    RAISE EXCEPTION
+      'Refusing to install auth.users triggers: unexpected non-internal triggers must be reviewed/removed first: %',
+      array_to_string(leftover, ', ')
+      USING ERRCODE = 'P0001';
+  END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- Auth email → profiles.email sync (versioned; intentional email-only replace)
+-- Live body was snapshotted above. This REPLACE is deliberate: email only via
+-- _campy_normalize_profile_email; AFTER UPDATE OF email (not all columns).
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.sync_email_on_update()
 RETURNS trigger
@@ -338,68 +415,13 @@ REVOKE ALL ON FUNCTION public.sync_email_on_update() FROM anon;
 REVOKE ALL ON FUNCTION public.sync_email_on_update() FROM authenticated;
 
 COMMENT ON FUNCTION public.sync_email_on_update() IS
-  'AFTER UPDATE OF email ON auth.users: sync profiles.email with _campy_normalize_profile_email. SECURITY DEFINER, search_path empty. Does not read raw_user_meta_data.';
+  'AFTER UPDATE OF email ON auth.users: sync profiles.email with _campy_normalize_profile_email. SECURITY DEFINER, search_path empty. Does not read raw_user_meta_data. Intentional email-only replace of any prior live body.';
 
 DROP TRIGGER IF EXISTS on_auth_user_updated ON auth.users;
 CREATE TRIGGER on_auth_user_updated
   AFTER UPDATE OF email ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_email_on_update();
-
--- Install signup trigger: replace only handle_new_user callers.
--- Keep ONLY exact companion on_auth_user_updated → sync_email_on_update with
--- NOT fires_insert. RAISE for any other non-internal auth.users trigger.
-DO $$
-DECLARE
-  r record;
-  leftover text[] := ARRAY[]::text[];
-  fires_insert boolean;
-BEGIN
-  FOR r IN
-    SELECT
-      t.tgname,
-      n.nspname,
-      p.proname,
-      t.tgtype
-    FROM pg_trigger AS t
-    JOIN pg_proc AS p ON p.oid = t.tgfoid
-    JOIN pg_namespace AS n ON n.oid = p.pronamespace
-    WHERE t.tgrelid = 'auth.users'::regclass
-      AND NOT t.tgisinternal
-  LOOP
-    fires_insert := (r.tgtype & (1 << 2)) <> 0; -- TRIGGER_TYPE_INSERT
-
-    IF r.nspname = 'public' AND r.proname = 'handle_new_user' THEN
-      RAISE NOTICE 'Dropping auth.users trigger % (public.handle_new_user)', r.tgname;
-      EXECUTE format('DROP TRIGGER IF EXISTS %I ON auth.users', r.tgname);
-    ELSIF r.tgname = 'on_auth_user_created' THEN
-      RAISE EXCEPTION
-        'auth.users trigger on_auth_user_created points at %.% — review/remove before apply (refusing silent replace)',
-        r.nspname, r.proname
-        USING ERRCODE = 'P0001';
-    ELSIF r.tgname = 'on_auth_user_updated'
-      AND r.nspname = 'public'
-      AND r.proname = 'sync_email_on_update'
-      AND NOT fires_insert
-    THEN
-      RAISE NOTICE
-        'Keeping allowlisted auth.users companion % → %.%',
-        r.tgname, r.nspname, r.proname;
-    ELSE
-      leftover := array_append(
-        leftover,
-        format('%s → %I.%I', r.tgname, r.nspname, r.proname)
-      );
-    END IF;
-  END LOOP;
-
-  IF coalesce(array_length(leftover, 1), 0) > 0 THEN
-    RAISE EXCEPTION
-      'Refusing to install on_auth_user_created: unexpected non-internal triggers on auth.users must be reviewed/removed first: %',
-      array_to_string(leftover, ', ')
-      USING ERRCODE = 'P0001';
-  END IF;
-END $$;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users

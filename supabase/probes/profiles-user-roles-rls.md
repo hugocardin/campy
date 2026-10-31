@@ -42,22 +42,26 @@ FROM pg_trigger
 WHERE tgrelid = 'auth.users'::regclass
   AND NOT tgisinternal;
 
--- Expect live companion: on_auth_user_updated → public.sync_email_on_update
--- (AFTER UPDATE email sync). Migration KEEPS non-INSERT triggers.
--- RAISE only for other AFTER INSERT signup competitors / differently wired
--- on_auth_user_created.
+-- Live auth.users companions (save output in PR before apply).
+-- Migration inventories these BEFORE recreating sync; RAISE if
+-- on_auth_user_updated points at anything other than public.sync_email_on_update.
 SELECT
   t.tgname,
   n.nspname AS fn_schema,
   p.proname AS fn_name,
   (t.tgtype & (1 << 2)) <> 0 AS fires_insert,
-  (t.tgtype & (1 << 4)) <> 0 AS fires_update
+  (t.tgtype & (1 << 4)) <> 0 AS fires_update,
+  pg_get_triggerdef(t.oid) AS triggerdef
 FROM pg_trigger AS t
 JOIN pg_proc AS p ON p.oid = t.tgfoid
 JOIN pg_namespace AS n ON n.oid = p.pronamespace
 WHERE t.tgrelid = 'auth.users'::regclass
   AND NOT t.tgisinternal
 ORDER BY t.tgname;
+
+-- Save live sync body (migration intentionally REPLACE with email-only).
+-- Confirm prior body only touched profiles.email (or accept intentional replace).
+SELECT pg_get_functiondef('public.sync_email_on_update'::regproc);
 
 SELECT
   has_table_privilege('anon', 'public.profiles', 'select') AS anon_sel_profiles,

@@ -96,7 +96,7 @@ After applying, walk through `probes/admin-catalog-rls.md`.
 
 **Signup / email sync:** `handle_new_user` (AFTER INSERT) and versioned `sync_email_on_update` (AFTER UPDATE OF email) share `_campy_normalize_profile_email` (NULL if nullable, else `id@no-email.invalid`; never `''`). Ignores `raw_user_meta_data`.
 
-Migration drops `handle_new_user` callers; recreates `on_auth_user_updated` → `sync_email_on_update`. Trigger inventory **keeps only** that exact companion (`name` + `fn` + `NOT fires_insert`); any other non-internal `auth.users` trigger → **RAISE**. Idempotent for re-apply after a prior run.
+Migration inventories **live** `auth.users` triggers **before** recreating sync: RAISE if `on_auth_user_updated` points elsewhere; drop `handle_new_user` callers; then `CREATE OR REPLACE sync_email_on_update` (intentional email-only) + recreate companion + signup trigger. Idempotent for re-apply.
 
 **Notes / failure modes:**
 
