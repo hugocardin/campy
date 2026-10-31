@@ -1,8 +1,7 @@
 import { CampgroundAdmin } from "@/entities/campground-admin";
-import { ActionResult, resultSuccess } from "@/lib/errors";
+import { ActionResult, DbErrorCode, resultError, resultSuccess } from "@/lib/errors";
 import {
   handleDbResponse,
-  handleDbSingle,
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
@@ -48,20 +47,24 @@ function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
   };
 }
 
+/**
+ * Platform-admin catalog via SECURITY DEFINER RPC (direct SELECT on
+ * v_campgrounds_admin is revoked from anon/authenticated).
+ */
 export const getCampgroundsAdmin = cache(
   async (): Promise<ActionResult<CampgroundAdmin[]>> => {
     try {
       const supabase = await createClient();
 
       const result = await handleDbResponse(
-        supabase.from("v_campgrounds_admin").select("*").order("name"),
+        supabase.rpc("get_campgrounds_admin"),
       );
 
       if (!result.success) {
         return result;
       }
 
-      const campgrounds = result.data.map(toDomain);
+      const campgrounds = (result.data as CampgroundAdminRow[]).map(toDomain);
 
       return resultSuccess(campgrounds);
     } catch (err) {
@@ -75,16 +78,20 @@ export const getCampgroundAdminById = cache(
     try {
       const supabase = await createClient();
 
-      const result = await handleDbSingle(
-        supabase.from("v_campgrounds_admin").select("*").eq("id", id).single(),
+      const result = await handleDbResponse(
+        supabase.rpc("get_campgrounds_admin", { p_id: id }),
       );
 
       if (!result.success) {
         return result;
       }
-      const campground = toDomain(result.data);
 
-      return resultSuccess(campground);
+      const rows = result.data as CampgroundAdminRow[];
+      if (!rows.length) {
+        return resultError(DbErrorCode.DB_NOT_FOUND);
+      }
+
+      return resultSuccess(toDomain(rows[0]!));
     } catch (err) {
       return handleUnexpectedError(err);
     }

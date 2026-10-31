@@ -2,11 +2,17 @@
 
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { redirect } from "@/i18n/navigation";
-import { ActionResult, CommonErrorCode, resultError } from "@/lib/errors";
+import {
+  ActionResult,
+  CommonErrorCode,
+  DbErrorCode,
+  resultError,
+} from "@/lib/errors";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
   handleDbNoData,
+  handleDbResponse,
   handleDbSingle,
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
@@ -43,7 +49,9 @@ export async function updateSiteAction(
   try {
     const supabase = await createClient();
 
-    const result = await handleDbNoData(
+    // .select().single() so RLS-filtered 0-row updates surface as errors
+    // instead of handleDbNoData fake-success + redirect.
+    const result = await handleDbSingle(
       supabase
         .from("sites")
         .update({
@@ -55,7 +63,9 @@ export async function updateSiteAction(
           description: input.description,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", input.id),
+        .eq("id", input.id)
+        .select("id")
+        .single(),
     );
 
     if (!result.success) {
@@ -141,7 +151,7 @@ export async function updateSiteAmenitiesAction({
   try {
     const supabase = await createClient();
 
-    // 1. Delete all existing links for this campground
+    // 1. Delete existing links. 0 rows is OK (empty list is valid).
     const resultDelete = await handleDbNoData(
       supabase.from("site_amenities").delete().eq("site_id", siteId),
     );
@@ -150,19 +160,25 @@ export async function updateSiteAmenitiesAction({
       return resultDelete;
     }
 
-    // 2. If there are new amenities to add → insert them
+    // 2. Insert with .select() so RLS cannot silently accept a partial write.
     if (amenityIds.length > 0) {
       const inserts = amenityIds.map((amenity_id) => ({
         site_id: siteId,
         amenity_id,
       }));
 
-      const resultInsert = await handleDbNoData(
-        supabase.from("site_amenities").insert(inserts),
+      const resultInsert = await handleDbResponse(
+        supabase.from("site_amenities").insert(inserts).select("amenity_id"),
       );
 
       if (!resultInsert.success) {
         return resultInsert;
+      }
+
+      if (resultInsert.data.length !== amenityIds.length) {
+        return resultError(DbErrorCode.DB_PERMISSION_DENIED, {
+          reason: "amenity_insert_incomplete",
+        });
       }
     }
 

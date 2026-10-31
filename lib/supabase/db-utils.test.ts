@@ -147,6 +147,36 @@ describe("handleUnexpectedError", () => {
     assertSafeFailure(result, DbErrorCode.DB_PERMISSION_DENIED);
   });
 
+  it("maps PGRST116 with 0-row details to DB_NOT_FOUND", () => {
+    const result = mapPostgrestError({
+      code: "PGRST116",
+      message: "JSON object requested, multiple (or no) rows returned",
+      details: "The result contains 0 rows",
+      hint: null,
+    } as PostgrestError);
+    assertSafeFailure(result, DbErrorCode.DB_NOT_FOUND);
+  });
+
+  it("maps PGRST116 with multiple-row details to DB_UNHANDLED_DATABASE_ERROR", () => {
+    const result = mapPostgrestError({
+      code: "PGRST116",
+      message: "JSON object requested, multiple (or no) rows returned",
+      details: "The result contains 2 rows",
+      hint: null,
+    } as PostgrestError);
+    assertSafeFailure(result, DbErrorCode.DB_UNHANDLED_DATABASE_ERROR);
+  });
+
+  it("maps PGRST116 with missing details to DB_UNHANDLED_DATABASE_ERROR", () => {
+    const result = mapPostgrestError({
+      code: "PGRST116",
+      message: "JSON object requested, multiple (or no) rows returned",
+      details: null,
+      hint: null,
+    } as PostgrestError);
+    assertSafeFailure(result, DbErrorCode.DB_UNHANDLED_DATABASE_ERROR);
+  });
+
   it("logs an allowlisted cause summary for fetch failures", () => {
     const logged: unknown[] = [];
     const original = console.error;
