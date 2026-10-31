@@ -96,49 +96,23 @@ const amenityFieldMessages = {
 };
 
 describe("safeTranslationValues", () => {
-  it("allowlists field only when a caller fieldMessages entry exists", () => {
+  it("forwards no details keys (including namespaced field ids)", () => {
     assert.deepEqual(
-      safeTranslationValues(
-        {
-          field: AmenityMissingField.code,
-          errorId: "uuid",
-          message: "secret path /tmp/x",
-          email: "user@example.com",
-          hint: "do not show",
-        },
-        amenityFieldMessages,
-      ),
-      { field: AmenityMissingField.code },
-    );
-    assert.deepEqual(
-      safeTranslationValues(
-        { field: AmenityMissingField.category },
-        amenityFieldMessages,
-      ),
-      { field: AmenityMissingField.category },
-    );
-    assert.deepEqual(
-      safeTranslationValues({ field: "id" }, amenityFieldMessages),
+      safeTranslationValues({
+        field: AmenityMissingField.code,
+        errorId: "uuid",
+        message: "secret path /tmp/x",
+        email: "user@example.com",
+        hint: "do not show",
+      }),
       {},
     );
     assert.deepEqual(
-      safeTranslationValues({ field: AmenityMissingField.code }),
+      safeTranslationValues({ field: AmenityMissingField.category }),
       {},
     );
-    assert.deepEqual(
-      safeTranslationValues({ message: "leak", errno: 61 }, amenityFieldMessages),
-      {},
-    );
-  });
-
-  it("drops empty-string fieldMessages entries", () => {
-    assert.deepEqual(
-      safeTranslationValues(
-        { field: AmenityMissingField.code },
-        { [AmenityMissingField.code]: "   " },
-      ),
-      {},
-    );
+    assert.deepEqual(safeTranslationValues({ field: "id" }), {});
+    assert.deepEqual(safeTranslationValues({ message: "leak", errno: 61 }), {});
   });
 });
 
@@ -339,6 +313,25 @@ describe("translateErrorCode", () => {
       "Error",
     );
   });
+
+  it("never renders raw amenity.code even when a catalogue entry has {field}", () => {
+    const withFieldPlaceholder = mockTranslator({
+      DB_DUPLICATE_VALUE: "{field} already exists.",
+      COMMON_MISSING_FIELD:
+        "A required value was missing. Please check your input and try again.",
+    });
+    const message = translateErrorCode(
+      "DB_DUPLICATE_VALUE",
+      withFieldPlaceholder,
+      "Error",
+      { field: AmenityMissingField.code },
+      { fieldMessages: amenityFieldMessages },
+    );
+    assert.equal(message.includes("amenity.code"), false);
+    assert.equal(message.includes(AmenityMissingField.code), false);
+    // No ICU values are passed, so the placeholder is left unsubstituted.
+    assert.equal(message, "{field} already exists.");
+  });
 });
 
 describe("withErrorReference", () => {
@@ -354,7 +347,7 @@ describe("withErrorReference", () => {
 });
 
 describe("amenity form label reuse", () => {
-  it("required messages include the visible form labels", () => {
+  it("required messages equal visible form labels + fixed en-CA suffix", () => {
     const amenities = JSON.parse(
       readFileSync(join(messagesRoot, "en-CA/amenities.json"), "utf8"),
     ) as {
@@ -363,17 +356,15 @@ describe("amenity form label reuse", () => {
     };
     const amenityCategories = JSON.parse(
       readFileSync(join(messagesRoot, "en-CA/amenityCategories.json"), "utf8"),
-    ) as { singular: string };
+    ) as { form: { categoryLabel: string } };
 
     assert.equal(
-      amenities.errors.codeRequired.startsWith(amenities.form.amenityLabel),
-      true,
-      "codeRequired must reuse amenities.form.amenityLabel",
+      amenities.errors.codeRequired,
+      `${amenities.form.amenityLabel} is required but was not provided.`,
     );
     assert.equal(
-      amenities.errors.categoryRequired.startsWith(amenityCategories.singular),
-      true,
-      "categoryRequired must reuse amenityCategories.singular (form Label)",
+      amenities.errors.categoryRequired,
+      `${amenityCategories.form.categoryLabel} is required but was not provided.`,
     );
   });
 });
@@ -445,7 +436,7 @@ describe("en-CA errors catalogue", () => {
     };
     const amenityCategories = JSON.parse(
       readFileSync(join(messagesRoot, "en-CA/amenityCategories.json"), "utf8"),
-    ) as { singular: string };
+    ) as { form: { categoryLabel: string } };
 
     const t = createTranslator({
       locale: "en-CA",
@@ -479,12 +470,12 @@ describe("en-CA errors catalogue", () => {
       amenities.errors.categoryRequired,
     );
     assert.equal(
-      amenities.errors.codeRequired.includes(amenities.form.amenityLabel),
-      true,
+      amenities.errors.codeRequired,
+      `${amenities.form.amenityLabel} is required but was not provided.`,
     );
     assert.equal(
-      amenities.errors.categoryRequired.includes(amenityCategories.singular),
-      true,
+      amenities.errors.categoryRequired,
+      `${amenityCategories.form.categoryLabel} is required but was not provided.`,
     );
     assert.equal(
       translateErrorCode("COMMON_MISSING_FIELD", t, "Error", { field: "id" }, {
@@ -492,5 +483,28 @@ describe("en-CA errors catalogue", () => {
       }),
       "A required value was missing. Please check your input and try again.",
     );
+  });
+
+  it("createTranslator {field} catalogue never renders amenity.code from details", () => {
+    const t = createTranslator({
+      locale: "en-CA",
+      messages: {
+        errors: {
+          DB_DUPLICATE_VALUE: "{field} already exists.",
+        },
+      },
+      namespace: "errors",
+    }) as ErrorTranslator;
+
+    const message = translateErrorCode(
+      "DB_DUPLICATE_VALUE",
+      t,
+      "Error",
+      { field: AmenityMissingField.code },
+      { fieldMessages: amenityFieldMessages },
+    );
+    assert.equal(message.includes("amenity.code"), false);
+    // next-intl leaves the placeholder unsubstituted when no values are passed.
+    assert.equal(message, "{field} already exists.");
   });
 });

@@ -136,7 +136,9 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">{t_amenityCategories("singular")}</Label>
+            <Label htmlFor="category">
+              {t_amenityCategories("form.categoryLabel")}
+            </Label>
             <Select
               value={categoryId}
               onValueChange={setCategoryId}

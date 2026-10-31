@@ -9,8 +9,13 @@ export type ErrorTranslator = {
   has: (key: string) => boolean;
 };
 
-/** Only these `details` keys may ever be considered for user-visible messaging. */
-const INTERPOLATABLE_DETAIL_KEYS = new Set(["field"]);
+/**
+ * Detail keys that may be interpolated into user-visible ICU messages.
+ * Empty on purpose: flat error codes do not interpolate `details`. Named
+ * missing-field copy comes from caller-supplied `fieldMessages`, never from
+ * forwarding raw namespaced ids like `amenity.code` into `{field}`.
+ */
+const INTERPOLATABLE_DETAIL_KEYS = new Set<string>();
 
 /**
  * Entity-namespaced `field` values emitted by amenity actions.
@@ -48,14 +53,12 @@ function hasOwnKey(
 }
 
 /**
- * Allowlisted values from ActionResult `details` that may be considered for ICU.
- * Unexpected keys are dropped — never forwarded. `field` is only forwarded when
- * a caller-supplied `fieldMessages` entry exists for that namespaced value
- * (so raw/`id`/prototype keys never become message material by themselves).
+ * Allowlisted ICU values from ActionResult `details`.
+ * Currently forwards nothing — unexpected keys (and raw `field` ids) are
+ * dropped so they can never reach a `{field}` catalogue placeholder.
  */
 export function safeTranslationValues(
   details?: Record<string, unknown>,
-  fieldMessages?: Readonly<Record<string, string>>,
 ): Record<string, string | number> {
   if (!details) {
     return {};
@@ -66,15 +69,6 @@ export function safeTranslationValues(
     const value = details[key];
     if (typeof value !== "string" || value.length === 0) {
       continue;
-    }
-    if (key === "field") {
-      if (!fieldMessages || !hasOwnKey(fieldMessages, value)) {
-        continue;
-      }
-      const message = fieldMessages[value as string];
-      if (typeof message !== "string" || message.trim().length === 0) {
-        continue;
-      }
     }
     values[key] = value;
   }
@@ -115,7 +109,7 @@ function looksLikeMissingMessage(message: string, errorCode: string): boolean {
  *
  * For `COMMON_MISSING_FIELD`, prefers a caller-supplied per-field message
  * (form-local, entity-namespaced) when present; otherwise the generic catalogue
- * entry. Details are never interpolated into that path.
+ * entry. Details are never interpolated into ICU.
  */
 export function translateErrorCode(
   errorCode: string | undefined,
@@ -139,9 +133,9 @@ export function translateErrorCode(
       }
     }
 
-    // Keep allowlist behavior for any future ICU args; today no flat error
-    // codes interpolate details. Unexpected keys never reach tErrors.
-    const values = safeTranslationValues(details, options?.fieldMessages);
+    // Never pass details into ICU — safeTranslationValues is always empty today
+    // and exists to keep the allowlist explicit for future keys.
+    const values = safeTranslationValues(details);
     const message =
       Object.keys(values).length > 0
         ? tErrors(errorCode, values)

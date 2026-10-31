@@ -37,12 +37,17 @@ export async function createAmenityAction(
   }
 
   try {
-    if (!input.code) {
+    // Normalize before the missing-field check so whitespace-only / non-string
+    // payloads cannot bypass the server guard (client trim is not enough).
+    // DB CHECK (length(trim(code)) > 0) still tracked as a follow-up — no
+    // in-repo migrations yet.
+    const code = typeof input.code === "string" ? input.code.trim() : "";
+    if (!code) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
         field: AmenityMissingField.code,
       });
     }
-    if (!input.category_id) {
+    if (typeof input.category_id !== "number" || !input.category_id) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
         field: AmenityMissingField.category,
       });
@@ -54,7 +59,7 @@ export async function createAmenityAction(
       supabase
         .from("amenities")
         .insert({
-          code: input.code.toUpperCase().trim(),
+          code: code.toUpperCase(),
           category_id: input.category_id,
         })
         .select()

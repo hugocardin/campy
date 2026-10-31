@@ -4,6 +4,7 @@
   "noResult": "No category",
 
   "form": {
+    "categoryLabel": "Category",
     "selectAmenityCategoryPlaceholder": "Select category",
     "createCategoryPlaceholder": "e.g. Services, Facilities, Activities"
   },
