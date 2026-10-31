@@ -82,8 +82,10 @@ WHERE n.nspname = 'public'
 
 Expect the live policy **“Restrict role changes to platform_admin”** in the pre-apply snapshot; the migration drops it (trigger + `set_user_role` replace that lock).
 
-Expected profiles columns (document; live may differ — migration GRANTs dynamically):
+Expected profiles columns (document; live may differ):
 `id`, `role_id`, `full_name`, `email`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds`, `created_at`, `updated_at`.
+
+Column UPDATE is granted only on `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (where present live). Any unclassified live column aborts the migration.
 
 ## 1. Policy / trigger / grant inventory (after apply)
 
@@ -134,6 +136,17 @@ SELECT
 
 SELECT has_function_privilege('anon', 'public.set_user_role(uuid, text)', 'execute') AS anon_exec_set_role;           -- false
 SELECT has_function_privilege('authenticated', 'public.set_user_role(uuid, text)', 'execute') AS auth_exec_set_role; -- true
+
+-- Final grant set (should match allow-list ∩ live; paste into PR with §0 snapshot)
+SELECT
+  has_column_privilege('authenticated', 'public.profiles', 'full_name', 'update') AS upd_full_name,
+  has_column_privilege('authenticated', 'public.profiles', 'default_rig_length', 'update') AS upd_rig,
+  has_column_privilege('authenticated', 'public.profiles', 'preferred_site_type_id', 'update') AS upd_site_type,
+  has_column_privilege('authenticated', 'public.profiles', 'notification_preferences', 'update') AS upd_notif,
+  has_column_privilege('authenticated', 'public.profiles', 'bookmarked_campgrounds', 'update') AS upd_bookmarks,
+  has_column_privilege('authenticated', 'public.profiles', 'email', 'update') AS upd_email,       -- false
+  has_column_privilege('authenticated', 'public.profiles', 'role_id', 'update') AS upd_role_id,   -- false
+  has_column_privilege('authenticated', 'public.profiles', 'updated_at', 'update') AS upd_updated_at; -- false
 ```
 
 ## 2. Behavioral checks (PostgREST / Auth)
@@ -146,6 +159,7 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 | 2 | Non-admin `PATCH` own `{full_name: "..."}` | **200**; `role_id` unchanged |
 | 2b | Non-admin `PATCH` own `{email: "spoof@example.com"}` | **Fail** (`42501`); email unchanged (service_role re-SELECT) |
 | 2c | **service_role** `PATCH` throwaway profile `{email: "trusted-sync@example.com"}` | **200**; service_role re-SELECT shows new email (trusted writer / `auth.role()` path) |
+| 2d | Non-admin `PATCH` own non-allow-listed col e.g. `{created_at: "..."}` | **Fail** `42501` (no column UPDATE grant) |
 | 3 | Non-admin `DELETE` own profile | **0 rows** / denied; profile still present |
 | 4 | Non-admin `POST` profile with `role_id = platform_admin` | **42501** RLS |
 | 5 | Non-admin / anon `PATCH`/`POST`/`DELETE` on `user_roles` | Writes fail or **0 rows**; codes unchanged |
@@ -161,12 +175,13 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 | 11 | `rpc/current_user_role_code` as signed-in user | `"user"` / `"platform_admin"` matching profile (live helper; not redefined here) |
 | 12 | Anon `GET /rest/v1/v_campgrounds` after apply | Same active count/sample as **before** apply (profiles `REVOKE ALL` from anon must not break public listing) |
 | 13 | Platform_admin `set_user_role` demoting the **last** remaining platform_admin | **Fail** `P0001` / error; role unchanged |
+| 13b | Optional: two concurrent demotions of each other (two SQL sessions) | One success + one **`P0001`** (not **`40P01`** deadlock) |
 | 14 | Optional: remove `user` row from `user_roles` in a rolled-back transaction and attempt signup | Signup fails closed (`P0001`); restore role row |
 
 ## 3. Notes
 
 - Admin role changes go through **`set_user_role`**, not PostgREST `PATCH` (own-only SELECT would make cross-user PATCH match 0 rows).
-- Column grants omit server-owned cols (`role_id`, `email`, `id`, timestamps); other live cols granted dynamically from `information_schema`.
+- Column UPDATE is granted only on `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (where present live); any unclassified live column aborts the migration.
 - Trusted writer bypass uses **`auth.role()`** / `request.jwt.claims` jsonb / legacy claim GUC, or **`session_user` in (`postgres`,`supabase_admin`)** — not `auth.uid() IS NULL`.
 - `handle_new_user` must not read role from `raw_user_meta_data`. Email-less signups use NULL or `@no-email.invalid` (never `''`). Auth email changes are **not** synced later.
 - If `user_roles.code = 'user'` is missing, every signup fails closed (`P0001`) — intentional; keep that seed row.
