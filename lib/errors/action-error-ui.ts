@@ -13,12 +13,16 @@ export type ErrorTranslator = {
 const INTERPOLATABLE_DETAIL_KEYS = new Set(["field"]);
 
 /**
- * `field` values safe to show end users (form fields). Internal names like `id`
- * are programming errors — omit them and use a generic message instead.
+ * Allowlisted `field` values → errors-namespace label keys (`fields.*`).
+ * Only values with a translated label may appear in COMMON_MISSING_NAMED_FIELD.
+ * Internal/unlabeled names like `id` stay on the generic COMMON_MISSING_FIELD.
  */
-const USER_FACING_FIELD_VALUES = new Set(["code", "category"]);
+export const FIELD_LABEL_KEYS: Readonly<Record<string, string>> = {
+  code: "fields.code",
+  category: "fields.category",
+};
 
-/** Named missing-field message used when `field` is user-facing. */
+/** Named missing-field message used when `field` has a translated label. */
 export const COMMON_MISSING_NAMED_FIELD = "COMMON_MISSING_NAMED_FIELD";
 
 /** Pull the support correlation id from an ActionResult `details` payload. */
@@ -31,7 +35,9 @@ export function getActionErrorId(
 
 /**
  * Allowlisted ICU values from ActionResult `details`.
- * Unexpected keys (and internal field names like `id`) are dropped — never forwarded.
+ * Unexpected keys (and unlabeled field names like `id`) are dropped — never forwarded.
+ * Returned `field` values are still raw allowlisted keys; `translateErrorCode`
+ * maps them through translated form labels before interpolation.
  */
 export function safeTranslationValues(
   details?: Record<string, unknown>,
@@ -46,12 +52,31 @@ export function safeTranslationValues(
     if (typeof value !== "string" || value.length === 0) {
       continue;
     }
-    if (key === "field" && !USER_FACING_FIELD_VALUES.has(value)) {
+    if (key === "field" && !Object.hasOwn(FIELD_LABEL_KEYS, value)) {
       continue;
     }
     values[key] = value;
   }
   return values;
+}
+
+/**
+ * Resolve an allowlisted field key to its translated form label.
+ * Returns undefined when unlabeled/internal or the catalogue key is missing.
+ */
+export function resolveFieldLabel(
+  field: string,
+  tErrors: ErrorTranslator,
+): string | undefined {
+  const labelKey = FIELD_LABEL_KEYS[field];
+  if (!labelKey || !tErrors.has(labelKey)) {
+    return undefined;
+  }
+  const label = tErrors(labelKey);
+  if (!label || looksLikeMissingMessage(label, labelKey)) {
+    return undefined;
+  }
+  return label;
 }
 
 function looksLikeMissingMessage(message: string, errorCode: string): boolean {
@@ -80,14 +105,18 @@ export function translateErrorCode(
   let code = errorCode;
   let values = safeTranslationValues(details);
 
-  // Prefer a named message when we have a user-facing field; otherwise keep the
-  // generic COMMON_MISSING_FIELD (no placeholder) for internal fields like `id`.
+  // Prefer a named message with a translated form label; otherwise keep the
+  // generic COMMON_MISSING_FIELD (no placeholder) for unlabeled/internal fields.
   if (errorCode === CommonErrorCode.COMMON_MISSING_FIELD) {
-    if (
-      typeof values.field === "string" &&
-      tErrors.has(COMMON_MISSING_NAMED_FIELD)
-    ) {
-      code = COMMON_MISSING_NAMED_FIELD;
+    const rawField = values.field;
+    if (typeof rawField === "string") {
+      const label = resolveFieldLabel(rawField, tErrors);
+      if (label && tErrors.has(COMMON_MISSING_NAMED_FIELD)) {
+        code = COMMON_MISSING_NAMED_FIELD;
+        values = { field: label };
+      } else {
+        values = {};
+      }
     } else {
       values = {};
     }

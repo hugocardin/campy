@@ -4,6 +4,11 @@
   "COMMON_MISSING_FIELD": "A required value was missing. Please check your input and try again.",
   "COMMON_MISSING_NAMED_FIELD": "{field} is required but was not provided.",
 
+  "fields": {
+    "code": "Amenity Name",
+    "category": "Category"
+  },
+
   "DB_DUPLICATE_VALUE": "This value already exists. Please choose a different one.",
   "DB_INVALID_REFERENCE": "The referenced record does not exist.",
   "DB_NOT_NULL_VIOLATION": "This field is required and cannot be empty.",
