@@ -18,9 +18,11 @@
 -- Expected profiles columns (Campy live / OpenAPI; §0 snapshot confirms):
 --   id, role_id, full_name, email, default_rig_length, preferred_site_type_id,
 --   notification_preferences, bookmarked_campgrounds, created_at, updated_at
--- Server-owned (no authenticated UPDATE grant): id, role_id, email, created_at,
---   updated_at. All other live columns get UPDATE (dynamic GRANT from
---   information_schema so missing/extra cols don't abort or silently lock out).
+-- Authenticated UPDATE allow-list (intersection with live cols only):
+--   full_name, default_rig_length, preferred_site_type_id,
+--   notification_preferences, bookmarked_campgrounds
+-- Unexpected live columns (not in allow-list and not known server-owned) → RAISE
+-- so the applier must classify them (fail closed; not a deny-list grant).
 --
 -- Depends on public.is_platform_admin() from 20261031030842_admin_catalog_rls.sql.
 --
@@ -97,7 +99,11 @@ BEGIN
 
     -- Refuse leaving zero platform_admin profiles (except postgres/supabase_admin recovery).
     IF session_user NOT IN ('postgres', 'supabase_admin') THEN
-      -- Serialize concurrent demotions (A demotes B while B demotes A).
+      -- Serialize concurrent demotions. Advisory xact lock alone (no FOR UPDATE):
+      -- the row being updated is already locked by the outer UPDATE; FOR UPDATE on
+      -- other admin rows can deadlock (40P01). Under READ COMMITTED each statement
+      -- gets a fresh snapshot, so COUNT after the lock sees committed demotions.
+      -- Concurrent last-admin races should yield one success + one P0001 (not 40P01).
       PERFORM pg_advisory_xact_lock(hashtext('campy_platform_admin_roles'));
 
       SELECT r.id
@@ -109,12 +115,6 @@ BEGIN
       IF platform_admin_role_id IS NOT NULL
          AND OLD.role_id = platform_admin_role_id
          AND NEW.role_id IS DISTINCT FROM platform_admin_role_id THEN
-        -- Lock admin rows, then count others still holding the role.
-        PERFORM 1
-        FROM public.profiles AS p
-        WHERE p.role_id = platform_admin_role_id
-        FOR UPDATE;
-
         SELECT COUNT(*)::integer
         INTO other_admins
         FROM public.profiles AS p
@@ -138,7 +138,7 @@ REVOKE ALL ON FUNCTION public.restrict_profile_role_id_change() FROM anon;
 REVOKE ALL ON FUNCTION public.restrict_profile_role_id_change() FROM authenticated;
 
 COMMENT ON FUNCTION public.restrict_profile_role_id_change() IS
-  'BEFORE UPDATE on profiles: lock id/email/role_id. role_id changes require platform_admin or trusted writer; blocks demoting the last platform_admin (advisory xact lock + FOR UPDATE; postgres/supabase_admin exempt). Replaces live WITH CHECK policy "Restrict role changes to platform_admin".';
+  'BEFORE UPDATE on profiles: lock id/email/role_id. role_id changes require platform_admin or trusted writer; blocks demoting the last platform_admin (advisory xact lock then COUNT; postgres/supabase_admin exempt). Replaces live WITH CHECK policy "Restrict role changes to platform_admin".';
 
 DROP TRIGGER IF EXISTS trg_restrict_profile_role_id_change ON public.profiles;
 CREATE TRIGGER trg_restrict_profile_role_id_change
@@ -386,11 +386,11 @@ REVOKE ALL ON TABLE public.user_roles FROM anon, authenticated;
 
 GRANT SELECT ON TABLE public.profiles TO authenticated;
 
--- Dynamic column UPDATE grants from live information_schema (avoids aborting on
--- missing cols; includes unexpected user-editable live cols).
+-- Allow-list ∩ live columns only (fail closed on unexpected live cols).
 DO $$
 DECLARE
-  deny_cols text[] := ARRAY[
+  -- Known server-owned / non-client cols (not granted; not "unexpected").
+  known_server_cols text[] := ARRAY[
     'id',
     'role_id',
     'email',
@@ -416,17 +416,13 @@ BEGIN
   WHERE c.table_schema = 'public'
     AND c.table_name = 'profiles';
 
+  RAISE NOTICE 'profiles live columns: %', array_to_string(live_cols, ', ');
+
+  -- Intersection: expected_editable ∩ live
   SELECT coalesce(array_agg(c ORDER BY c), ARRAY[]::text[])
   INTO grant_cols
-  FROM unnest(live_cols) AS c
-  WHERE NOT (c = ANY (deny_cols));
-
-  IF coalesce(array_length(grant_cols, 1), 0) = 0 THEN
-    RAISE EXCEPTION
-      'No profiles columns left to GRANT UPDATE after deny-list; live cols were: %',
-      array_to_string(live_cols, ', ')
-      USING ERRCODE = 'P0001';
-  END IF;
+  FROM unnest(expected_editable) AS c
+  WHERE c = ANY (live_cols);
 
   SELECT coalesce(array_agg(c ORDER BY c), ARRAY[]::text[])
   INTO missing_expected
@@ -439,22 +435,31 @@ BEGIN
       array_to_string(missing_expected, ', ');
   END IF;
 
+  -- Live cols that are neither allow-listed nor known server-owned → classify.
   SELECT coalesce(array_agg(c ORDER BY c), ARRAY[]::text[])
   INTO unexpected_live
   FROM unnest(live_cols) AS c
-  WHERE NOT (c = ANY (deny_cols) OR c = ANY (expected_editable));
+  WHERE NOT (c = ANY (known_server_cols) OR c = ANY (expected_editable));
 
   IF coalesce(array_length(unexpected_live, 1), 0) > 0 THEN
-    RAISE NOTICE
-      'Live profiles columns outside expected editable set (still granted UPDATE): %',
-      array_to_string(unexpected_live, ', ');
+    RAISE EXCEPTION
+      'Unexpected profiles columns (add to expected_editable allow-list or known_server_cols before GRANT): %',
+      array_to_string(unexpected_live, ', ')
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF coalesce(array_length(grant_cols, 1), 0) = 0 THEN
+    RAISE EXCEPTION
+      'No profiles columns in expected_editable ∩ live; live cols were: %',
+      array_to_string(live_cols, ', ')
+      USING ERRCODE = 'P0001';
   END IF;
 
   SELECT string_agg(format('%I', c), ', ' ORDER BY c)
   INTO grant_list
   FROM unnest(grant_cols) AS c;
 
-  RAISE NOTICE 'GRANT UPDATE (%) ON public.profiles TO authenticated', grant_list;
+  RAISE NOTICE 'Final GRANT UPDATE (%) ON public.profiles TO authenticated', grant_list;
   EXECUTE format(
     'GRANT UPDATE (%s) ON TABLE public.profiles TO authenticated',
     grant_list

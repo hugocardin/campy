@@ -13,11 +13,18 @@ WHERE schemaname = 'public'
   AND tablename IN ('profiles', 'user_roles')
 ORDER BY tablename, policyname;
 
--- Live profiles columns (grants / updated_at / email nullability depend on this)
+-- Live profiles columns (grants / updated_at / email nullability depend on this).
+-- Paste this output into the PR (or apply NOTICE lines) so the final grant set
+-- can be confirmed: allow-list ∩ live only; unexpected cols abort apply.
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name = 'profiles'
 ORDER BY ordinal_position;
+
+-- Expected authenticated UPDATE allow-list (migration intersects with live):
+--   full_name, default_rig_length, preferred_site_type_id,
+--   notification_preferences, bookmarked_campgrounds
+-- Known server-owned (never granted): id, role_id, email, created_at, updated_at
 
 -- email uniqueness ('' placeholder would collide if unique + NOT NULL)
 SELECT indexname, indexdef

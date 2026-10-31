@@ -87,7 +87,7 @@ After applying, walk through `probes/admin-catalog-rls.md`.
 
 | Relation | SELECT | Client writes | Role assignment |
 | --- | --- | --- | --- |
-| `profiles` | own row (`authenticated`) | dynamic `GRANT UPDATE` on live cols except server-owned (`id`, `role_id`, `email`, `created_at`, `updated_at`); expected editable: `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` | **`set_user_role(user_id, role_code)`** RPC (`SECURITY DEFINER`, `platform_admin` only). Own-only SELECT would make cross-user `PATCH` match 0 rows. |
+| `profiles` | own row (`authenticated`) | `GRANT UPDATE` = **allow-list ∩ live** (`full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds`); unexpected live cols → **RAISE** | **`set_user_role(user_id, role_code)`** RPC (`SECURITY DEFINER`, `platform_admin` only). Own-only SELECT would make cross-user `PATCH` match 0 rows. |
 | `user_roles` | `authenticated` only (not `anon`) | none — `REVOKE ALL` then no write grants | n/a |
 
 **Defense in depth:** `BEFORE UPDATE` trigger `trg_restrict_profile_role_id_change` locks `id` / `email` / `role_id`, allows trusted writers (`auth.role()` / jwt claims = `service_role`, or `session_user` ∈ (`postgres`,`supabase_admin`)) or `is_platform_admin()`, and refuses demoting the **last** `platform_admin` (advisory xact lock + `FOR UPDATE`; DB owners can still recover in SQL Editor).
