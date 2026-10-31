@@ -61,7 +61,11 @@ ORDER BY t.tgname;
 
 -- Save live sync body (migration intentionally REPLACE with email-only).
 -- Confirm prior body only touched profiles.email (or accept intentional replace).
-SELECT pg_get_functiondef('public.sync_email_on_update'::regproc);
+-- '(not present)' is OK on a fresh project (use to_regproc — bare ::regproc errors).
+SELECT CASE
+  WHEN to_regproc('public.sync_email_on_update') IS NULL THEN '(not present)'
+  ELSE pg_get_functiondef(to_regproc('public.sync_email_on_update'))
+END AS sync_email_on_update_def;
 
 SELECT
   has_table_privilege('anon', 'public.profiles', 'select') AS anon_sel_profiles,
