@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
-  AMENITY_CODE_MAX_LENGTH,
   createAmenityAction,
   deleteAmenityAction,
 } from "@/app/actions/amenities";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
+import { AMENITY_CODE_MAX_LENGTH } from "@/lib/amenities/code";
 import {
   AmenityMissingField,
   translateErrorCode,
@@ -62,7 +62,9 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     [AmenityMissingField.category]: t_amenities("errors.categoryRequired"),
   };
   const amenityFieldTooLongMessages = {
-    [AmenityMissingField.code]: t_amenities("errors.codeTooLong"),
+    [AmenityMissingField.code]: t_amenities("errors.codeTooLong", {
+      max: AMENITY_CODE_MAX_LENGTH,
+    }),
   };
 
   const showActionError = (

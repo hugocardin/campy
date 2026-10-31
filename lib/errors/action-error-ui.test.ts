@@ -9,6 +9,7 @@ import {
   type MessageFormatElement,
 } from "@formatjs/icu-messageformat-parser";
 import { createTranslator } from "next-intl";
+import { AMENITY_CODE_MAX_LENGTH } from "@/lib/amenities/code";
 import {
   AmenityMissingField,
   getActionErrorId,
@@ -227,6 +228,7 @@ describe("translateErrorCode", () => {
       COMMON_FIELD_TOO_LONG:
         "A value is too long. Please shorten it and try again.",
     });
+    const tooLongMessage = `Amenity Name must be ${AMENITY_CODE_MAX_LENGTH} characters or fewer.`;
     assert.equal(
       translateErrorCode(
         "COMMON_FIELD_TOO_LONG",
@@ -235,12 +237,11 @@ describe("translateErrorCode", () => {
         { field: AmenityMissingField.code },
         {
           fieldTooLongMessages: {
-            [AmenityMissingField.code]:
-              "Amenity Name must be 64 characters or fewer.",
+            [AmenityMissingField.code]: tooLongMessage,
           },
         },
       ),
-      "Amenity Name must be 64 characters or fewer.",
+      tooLongMessage,
     );
     assert.equal(
       translateErrorCode("COMMON_FIELD_TOO_LONG", tTooLong, "Error", {
@@ -399,7 +400,7 @@ describe("amenity form label reuse", () => {
     );
     assert.equal(
       amenities.errors.codeTooLong,
-      `${amenities.form.amenityLabel} must be 64 characters or fewer.`,
+      `${amenities.form.amenityLabel} must be {max} characters or fewer.`,
     );
   });
 });

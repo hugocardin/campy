@@ -11,7 +11,7 @@
   "errors": {
     "codeRequired": "Amenity Name is required but was not provided.",
     "categoryRequired": "Category is required but was not provided.",
-    "codeTooLong": "Amenity Name must be 64 characters or fewer."
+    "codeTooLong": "Amenity Name must be {max} characters or fewer."
   },
 
   "actions": {
