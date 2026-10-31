@@ -77,7 +77,7 @@ Write policies (and authenticated SELECT admin branches) use `(SELECT public.is_
 
 **owner_id on active parks:** intentionally still readable by anon on the base table (UUID only; not treated as secret). Column revoke deferred unless product says otherwise.
 
-**Dependency:** admin catalog RLS trusts `profiles.role_id` / `user_roles` protection from `20261031035111_profiles_user_roles_rls.sql` (trigger + grants).
+**Dependency:** admin catalog RLS trusts `profiles.role_id` / `user_roles` protection from `20261031035111_profiles_user_roles_rls.sql` (column grants + `set_user_role` + trigger).
 
 After applying, walk through `probes/admin-catalog-rls.md`.
 
@@ -85,13 +85,23 @@ After applying, walk through `probes/admin-catalog-rls.md`.
 
 **Apply after** `20261031030842` (`is_platform_admin()`).
 
-| Relation | SELECT | Writes | Role lock |
+| Relation | SELECT | Client writes | Role assignment |
 | --- | --- | --- | --- |
-| `profiles` | own row (`authenticated`) | UPDATE own **or** `is_platform_admin()`; no auth INSERT/DELETE | **BEFORE UPDATE trigger** `trg_restrict_profile_role_id_change` — non-admins cannot change `role_id`; platform_admin can (PostgREST). Not column `REVOKE` (would block admin). |
-| `user_roles` | open (`anon`/`authenticated`) | no policies; `INSERT`/`UPDATE`/`DELETE` revoked for `anon`/`authenticated` | n/a |
+| `profiles` | own row (`authenticated`) | column `GRANT UPDATE` only: `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (not `role_id` / `email` / `id`) | **`set_user_role(user_id, role_code)`** RPC (`SECURITY DEFINER`, `platform_admin` only). Own-only SELECT would make cross-user `PATCH` match 0 rows. |
+| `user_roles` | `authenticated` only (not `anon`) | none — `REVOKE ALL` then no write grants | n/a |
 
-**Signup:** `handle_new_user` on `auth.users` AFTER INSERT → `profiles` with `user_roles.code = 'user'`. Ignores `raw_user_meta_data` role keys.
+**Defense in depth:** `BEFORE UPDATE` trigger `trg_restrict_profile_role_id_change` locks `id` / `email` / `role_id`, allows trusted writers (`service_role` JWT or `session_user` ∈ (`postgres`,`supabase_admin`)) or `is_platform_admin()`, and refuses demoting the **last** `platform_admin` (DB owners can still recover in SQL Editor).
 
-**Replaces** live WITH CHECK-only policy `"Restrict role changes to platform_admin"` (Hugo: RLS cannot see `OLD`; trigger is the reviewable lock).
+**Grants:** `REVOKE ALL` on both tables from `anon`/`authenticated`, then minimal grants above (clears default `TRUNCATE` / `REFERENCES` / `TRIGGER` too).
+
+**Signup:** `handle_new_user` on `auth.users` AFTER INSERT → `profiles` with `user_roles.code = 'user'` (`COALESCE` email to `''`). Ignores `raw_user_meta_data` role keys. Migration **`DROP TRIGGER IF EXISTS on_auth_user_created`**, drops other `handle_new_user` callers, then **RAISE** if any other non-internal `auth.users` trigger remains (avoids dual-trigger / metadata role races with `ON CONFLICT DO NOTHING`).
+
+**Notes / failure modes:**
+
+- `profiles.email` is copied **once** at signup — later Auth email changes are **not** synced (owner picker / admin listing can drift until a sync path exists).
+- If `user_roles` has no `code = 'user'` row, **every signup fails closed** (`P0001`) — keep that seed row.
+- After `REVOKE ALL … FROM anon` on `profiles`, confirm anon `GET /v_campgrounds` still works (view may join profiles as invoker).
+
+**Replaces** live WITH CHECK-only policy `"Restrict role changes to platform_admin"`.
 
 After applying, walk through `probes/profiles-user-roles-rls.md`.
