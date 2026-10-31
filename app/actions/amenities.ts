@@ -23,6 +23,12 @@ export interface AmenityCreateInput {
   category_id: number;
 }
 
+/**
+ * App-level cap for amenity `code`. DB column limit is not in-repo (no
+ * migrations); keep this conservative so multi-MB payloads never hit insert.
+ */
+export const AMENITY_CODE_MAX_LENGTH = 64;
+
 function revalidateAmenityConsumers() {
   // Amenity create/delete changes pickers and views across platform admin.
   revalidateLocalizedPath(routes.platformAdmin.root(), "layout");
@@ -47,7 +53,13 @@ export async function createAmenityAction(
         field: AmenityMissingField.code,
       });
     }
-    if (typeof input.category_id !== "number" || !input.category_id) {
+    if (code.length > AMENITY_CODE_MAX_LENGTH) {
+      return resultError(DbErrorCode.DB_CHECK_VIOLATION);
+    }
+    if (
+      !Number.isSafeInteger(input.category_id) ||
+      input.category_id <= 0
+    ) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
         field: AmenityMissingField.category,
       });

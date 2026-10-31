@@ -314,7 +314,7 @@ describe("translateErrorCode", () => {
     );
   });
 
-  it("never renders raw amenity.code even when a catalogue entry has {field}", () => {
+  it("falls back when a catalogue entry leaves an unsubstituted {placeholder}", () => {
     const withFieldPlaceholder = mockTranslator({
       DB_DUPLICATE_VALUE: "{field} already exists.",
       COMMON_MISSING_FIELD:
@@ -327,10 +327,9 @@ describe("translateErrorCode", () => {
       { field: AmenityMissingField.code },
       { fieldMessages: amenityFieldMessages },
     );
+    assert.equal(message, "Error");
+    assert.equal(message.includes("{"), false);
     assert.equal(message.includes("amenity.code"), false);
-    assert.equal(message.includes(AmenityMissingField.code), false);
-    // No ICU values are passed, so the placeholder is left unsubstituted.
-    assert.equal(message, "{field} already exists.");
   });
 });
 
@@ -396,14 +395,18 @@ describe("en-CA errors catalogue", () => {
     for (const [key, pattern] of Object.entries(leaves)) {
       const elements = parse(pattern);
       const argNames = [...collectArgumentNames(elements)];
-      const values: Record<string, string> = {};
-      for (const name of argNames) {
-        values[name] = "sample";
-      }
+      // Flat errors.* must stay argument-free: INTERPOLATABLE_DETAIL_KEYS is
+      // empty, so nothing could ever fill an ICU placeholder.
+      assert.deepEqual(
+        argNames,
+        [],
+        `errors.${key} must not contain ICU arguments (have: ${argNames.join(", ")})`,
+      );
 
-      const message = argNames.length > 0 ? t(key, values) : t(key);
+      const message = t(key);
 
       assert.ok(message.length > 0, `${key} produced an empty message`);
+      assert.equal(message.includes("{"), false, `${key} left a '{' in output`);
       assert.notEqual(
         message,
         `errors.${key}`,
@@ -485,7 +488,7 @@ describe("en-CA errors catalogue", () => {
     );
   });
 
-  it("createTranslator {field} catalogue never renders amenity.code from details", () => {
+  it("createTranslator unsubstituted {field} falls back (never shows amenity.code)", () => {
     const t = createTranslator({
       locale: "en-CA",
       messages: {
@@ -503,8 +506,8 @@ describe("en-CA errors catalogue", () => {
       { field: AmenityMissingField.code },
       { fieldMessages: amenityFieldMessages },
     );
+    assert.equal(message, "Error");
+    assert.equal(message.includes("{"), false);
     assert.equal(message.includes("amenity.code"), false);
-    // next-intl leaves the placeholder unsubstituted when no values are passed.
-    assert.equal(message, "{field} already exists.");
   });
 });

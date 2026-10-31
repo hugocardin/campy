@@ -103,9 +103,19 @@ function looksLikeMissingMessage(message: string, errorCode: string): boolean {
 }
 
 /**
+ * next-intl leaves unsubstituted ICU args as literal `{name}` when no values
+ * are passed. With an empty interpolatable-details allowlist that must never
+ * reach users — treat any leftover `{` as a formatting failure.
+ */
+function containsUnsubstitutedPlaceholder(message: string): boolean {
+  return message.includes("{");
+}
+
+/**
  * Translate an ActionResult `errorCode` via the errors namespace.
  * Falls back when the code is missing, untranslated, or ICU formatting fails
- * (e.g. malformed catalogue entry → next-intl returns `errors.CODE`).
+ * (e.g. malformed catalogue entry → next-intl returns `errors.CODE`, or a
+ * leftover `{arg}` placeholder when details are not interpolated).
  *
  * For `COMMON_MISSING_FIELD`, prefers a caller-supplied per-field message
  * (form-local, entity-namespaced) when present; otherwise the generic catalogue
@@ -141,7 +151,11 @@ export function translateErrorCode(
         ? tErrors(errorCode, values)
         : tErrors(errorCode);
 
-    if (!message || looksLikeMissingMessage(message, errorCode)) {
+    if (
+      !message ||
+      looksLikeMissingMessage(message, errorCode) ||
+      containsUnsubstitutedPlaceholder(message)
+    ) {
       return fallback;
     }
 
