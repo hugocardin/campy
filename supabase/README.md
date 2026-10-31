@@ -16,7 +16,7 @@ There is no full CLI project yet (`config.toml` optional). Prefer **one** apply 
 ### A. Supabase Dashboard SQL Editor (current default)
 
 1. Open Campy in [Supabase Dashboard](https://supabase.com/dashboard) → **SQL** → New query.
-2. **Before apply:** snapshot existing policies (paste into PR / notes):
+2. **Before apply:** snapshot existing policies (paste into PR / notes). Example for catalog RLS:
 
    ```sql
    SELECT tablename, policyname, cmd, roles, qual, with_check
@@ -29,14 +29,17 @@ There is no full CLI project yet (`config.toml` optional). Prefer **one** apply 
    ORDER BY tablename, policyname;
    ```
 
-3. Paste the full contents of the next unapplied file under `migrations/` (e.g. `20261031030842_admin_catalog_rls.sql`).
+   For profiles / user_roles, see the snapshot queries in `probes/profiles-user-roles-rls.md`.
+
+3. Paste the full contents of the next unapplied file under `migrations/` (apply in filename order).
 4. Run it. The script is one `BEGIN`…`COMMIT` transaction (partial apply rolls back). Watch `NOTICE` lines for every dropped policy name.
-5. If you later adopt the Supabase CLI, mark this version applied so `db push` does not re-run it:
+5. If you later adopt the Supabase CLI, mark each SQL-Editor-applied version so `db push` does not re-run it:
 
    ```bash
    npx supabase init   # once, if you want config.toml + CLI workflow
    npx supabase link --project-ref <project-ref>
    npx supabase migration repair --status applied 20261031030842
+   npx supabase migration repair --status applied 20261031035111
    ```
 
    Without `repair`, a later `db push` would re-execute the file (idempotent today, but it re-drops/recreates policies and would wipe hand-edits made since).
@@ -74,6 +77,21 @@ Write policies (and authenticated SELECT admin branches) use `(SELECT public.is_
 
 **owner_id on active parks:** intentionally still readable by anon on the base table (UUID only; not treated as secret). Column revoke deferred unless product says otherwise.
 
-**Dependency (parked):** this second gate is only as strong as live `profiles.role_id` / `user_roles` protection — tracked as the profiles/user_roles migrations follow-up. Live probe needs Cloud Agent secrets.
+**Dependency:** admin catalog RLS trusts `profiles.role_id` / `user_roles` protection from `20261031035111_profiles_user_roles_rls.sql` (trigger + grants).
 
 After applying, walk through `probes/admin-catalog-rls.md`.
+
+## Profiles / user_roles (`20261031035111_profiles_user_roles_rls.sql`)
+
+**Apply after** `20261031030842` (`is_platform_admin()`).
+
+| Relation | SELECT | Writes | Role lock |
+| --- | --- | --- | --- |
+| `profiles` | own row (`authenticated`) | UPDATE own **or** `is_platform_admin()`; no auth INSERT/DELETE | **BEFORE UPDATE trigger** `trg_restrict_profile_role_id_change` — non-admins cannot change `role_id`; platform_admin can (PostgREST). Not column `REVOKE` (would block admin). |
+| `user_roles` | open (`anon`/`authenticated`) | no policies; `INSERT`/`UPDATE`/`DELETE` revoked for `anon`/`authenticated` | n/a |
+
+**Signup:** `handle_new_user` on `auth.users` AFTER INSERT → `profiles` with `user_roles.code = 'user'`. Ignores `raw_user_meta_data` role keys.
+
+**Replaces** live WITH CHECK-only policy `"Restrict role changes to platform_admin"` (Hugo: RLS cannot see `OLD`; trigger is the reviewable lock).
+
+After applying, walk through `probes/profiles-user-roles-rls.md`.
