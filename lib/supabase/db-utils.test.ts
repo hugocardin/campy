@@ -147,6 +147,16 @@ describe("handleUnexpectedError", () => {
     assertSafeFailure(result, DbErrorCode.DB_PERMISSION_DENIED);
   });
 
+  it("maps PGRST116 (.single() on 0 rows / RLS filter) to DB_NOT_FOUND", () => {
+    const result = mapPostgrestError({
+      code: "PGRST116",
+      message: "JSON object requested, multiple (or no) rows returned",
+      details: "The result contains 0 rows",
+      hint: null,
+    } as PostgrestError);
+    assertSafeFailure(result, DbErrorCode.DB_NOT_FOUND);
+  });
+
   it("logs an allowlisted cause summary for fetch failures", () => {
     const logged: unknown[] = [];
     const original = console.error;

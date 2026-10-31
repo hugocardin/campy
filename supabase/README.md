@@ -60,15 +60,20 @@ Do **not** mix “SQL Editor apply” and “`db push`” for the same version u
 | Relation | SELECT | Writes |
 | --- | --- | --- |
 | Lookups + junctions | open (`anon`/`authenticated`) | `is_platform_admin()` |
-| `campgrounds` | `active OR is_platform_admin()` | `is_platform_admin()` |
-| `sites` | parent park `active` OR `is_platform_admin()` | `is_platform_admin()` |
+| `campgrounds` | **split:** anon `active`; authenticated `active OR is_platform_admin()` | `is_platform_admin()` |
+| `sites` | **split:** anon parent-active; authenticated parent-active OR admin | `is_platform_admin()` |
 
-Write policies use `(SELECT public.is_platform_admin())` (initPlan once per statement).
+Write policies (and authenticated SELECT admin branches) use `(SELECT public.is_platform_admin())` (initPlan once per statement). Anon SELECT policies never call the function.
 
-**Helper:** `public.is_platform_admin()` — `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` granted to `authenticated` only.
+**Helper:** `public.is_platform_admin()` — `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` for `authenticated` only (`REVOKE` from `PUBLIC` and `anon`).
 
-**Views:** `v_campgrounds` / `v_campgrounds_admin` set `security_invoker = true`; `REVOKE ALL … FROM anon` on `v_campgrounds_admin`.
+**Views:**
 
-**Dependency:** this second gate is only as strong as live `profiles.role_id` / `user_roles` protection (verify with the probe; full policy commit is a later follow-up).
+- `v_campgrounds` — left as definer (`security_invoker = false`); do not flip to invoker without `pg_get_viewdef` + before/after anon probe.
+- `v_campgrounds_admin` — definer; direct `SELECT` revoked from `anon`/`authenticated`; app reads via `get_campgrounds_admin(p_id uuid DEFAULT NULL)` RPC (platform_admin only).
+
+**owner_id on active parks:** intentionally still readable by anon on the base table (UUID only; not treated as secret). Column revoke deferred unless product says otherwise.
+
+**Dependency (parked):** this second gate is only as strong as live `profiles.role_id` / `user_roles` protection — tracked as the profiles/user_roles migrations follow-up. Live probe needs Cloud Agent secrets.
 
 After applying, walk through `probes/admin-catalog-rls.md`.

@@ -15,11 +15,15 @@ WHERE schemaname = 'public'
     'campground_amenities', 'site_amenities', 'site_types'
   )
 ORDER BY tablename, policyname;
+
+-- Please paste into the PR if reviewing view changes:
+SELECT pg_get_viewdef('public.v_campgrounds'::regclass, true);
+SELECT pg_get_viewdef('public.v_campgrounds_admin'::regclass, true);
 ```
 
 Save the result; the migration `RAISE NOTICE`s each dropped name during apply.
 
-## 1. Policy inventory
+## 1. Policy / grant inventory
 
 ```sql
 SELECT tablename, policyname, cmd, roles, qual, with_check
@@ -30,33 +34,27 @@ WHERE schemaname = 'public'
     'campground_amenities', 'site_amenities', 'site_types'
   )
 ORDER BY tablename, cmd, policyname;
-```
 
-Expect platform_admin write policies on all seven; campgrounds/sites SELECT policies named `*_select_active_*`, not `*_select_all`.
-
-```sql
-SELECT relname, reloptions
-FROM pg_class
-WHERE relname IN ('v_campgrounds', 'v_campgrounds_admin');
--- expect security_invoker=true
-
-SELECT has_table_privilege('anon', 'public.v_campgrounds_admin', 'select') AS anon_can_select_admin_view;
+SELECT has_function_privilege('anon', 'public.is_platform_admin()', 'execute') AS anon_exec_is_platform_admin;
 -- expect false
-```
 
-Confirm the temporary drop helper is gone:
-
-```sql
-SELECT to_regprocedure('public._campy_drop_all_policies(text,text)') IS NULL AS drop_helper_gone;
+SELECT has_function_privilege('authenticated', 'public.is_platform_admin()', 'execute') AS auth_exec_is_platform_admin;
 -- expect true
+
+SELECT has_table_privilege('anon', 'public.v_campgrounds_admin', 'select') AS anon_sel_admin_view;
+SELECT has_table_privilege('authenticated', 'public.v_campgrounds_admin', 'select') AS auth_sel_admin_view;
+-- expect false, false
+
+SELECT has_function_privilege('anon', 'public.get_campgrounds_admin(uuid)', 'execute') AS anon_exec_admin_rpc;
+SELECT has_function_privilege('authenticated', 'public.get_campgrounds_admin(uuid)', 'execute') AS auth_exec_admin_rpc;
+-- expect false, true
 ```
 
 ## 2. `is_platform_admin()` with simulated JWT (SQL Editor)
 
-The SQL Editor runs as `postgres` with no JWT — a bare `SELECT public.is_platform_admin()` is always **false**, not a useful test. Use:
+Bare `SELECT public.is_platform_admin()` in the SQL Editor is always **false** (no JWT). Use:
 
 ```sql
--- Replace UUIDs with real profiles.id values from your project.
 BEGIN;
 SET LOCAL ROLE authenticated;
 SELECT set_config(
@@ -78,21 +76,18 @@ SELECT public.is_platform_admin(); -- expect false
 ROLLBACK;
 ```
 
-## 3. Behavioral checks (PostgREST / app client)
+## 3. Behavioral checks (PostgREST / app)
 
 | Attempt | Expected |
 | --- | --- |
-| Anon `SELECT` amenities / categories / site_types / junctions | Rows returned |
-| Anon `SELECT` `campgrounds` where `active = false` | **0 rows** (not exposed) |
-| Anon `SELECT` `sites` for an inactive park | **0 rows** |
-| Anon `SELECT` `v_campgrounds` | Active parks only |
-| Anon `SELECT` `v_campgrounds_admin` | Denied / empty (no anon grant) |
-| Auth (non-admin) `INSERT`/`UPDATE`/`DELETE` catalog tables | `42501` or **0 rows** mutated |
-| Auth (non-admin) `UPDATE` own `profiles.role_id` → platform_admin | **Fail** (policy / grant) — dependency for this whole gate |
-| Auth (non-admin) `UPDATE`/`DELETE` `user_roles` | **0 rows** / denied |
-| Platform admin session catalog writes | Succeed |
-| App: non-admin (or RLS-blocked) `updateCampgroundAction` / `updateSiteAction` | Surfaces error (**not** fake success redirect) — actions now `.select().single()` |
-| Amenity junction replace: RLS-blocked insert | Error after delete; empty amenity list remains valid product-wise |
-| `POST /rest/v1/rpc/_campy_drop_all_policies` | **404** / not in schema |
+| Anon `GET /rest/v1/campgrounds?select=*` | **Active only** (inactive 0); `owner_id` UUID may appear — accepted for now |
+| Anon `GET /rest/v1/sites` for inactive park | **0 rows** |
+| Anon `GET /rest/v1/v_campgrounds` | Same active count/sample as **before** apply (public listing unbroken) |
+| Anon / non-admin `GET /rest/v1/v_campgrounds_admin` | Denied / empty |
+| Non-admin `rpc/get_campgrounds_admin` | **0 rows** |
+| Platform admin `rpc/get_campgrounds_admin` | Rows **with** `owner_email` / `owner_full_name` |
+| Anon/auth catalog writes | `42501` or 0 rows mutated |
+| Non-admin `UPDATE` own `profiles.role_id` | Fail — **parked** until profiles/user_roles migrations + live dump |
+| App RLS-blocked `.single()` update | `DB_NOT_FOUND` (PGRST116 mapped), not unhandled |
 
 Throwaway rows only: create via **service role**, attempt mutate as normal user, clean up with service role.

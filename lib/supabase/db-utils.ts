@@ -122,6 +122,10 @@ function postgrestErrorCode(error: PostgrestError): DbErrorCodeType {
     case "42501": // insufficient_privilege
       return DbErrorCode.DB_PERMISSION_DENIED;
 
+    // .single() on 0 rows (RLS filter or missing id) — not an unexpected failure.
+    case "PGRST116":
+      return DbErrorCode.DB_NOT_FOUND;
+
     case "PGRST301": // JWT expired / invalid (PostgREST specific)
     case "PGRST302": // other JWT issues
       return DbErrorCode.DB_SESSION_EXPIRED;
