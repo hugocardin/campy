@@ -8,7 +8,12 @@ import {
   deleteAmenityAction,
 } from "@/app/actions/amenities";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
-import { translateErrorCode, withErrorReference } from "@/lib/errors";
+import { AMENITY_CODE_MAX_LENGTH } from "@/lib/amenities/code";
+import {
+  AmenityMissingField,
+  translateErrorCode,
+  withErrorReference,
+} from "@/lib/errors";
 import { DeleteButtonWithConfirmation } from "@/components/dialogs/DeleteButtonWithConfirmation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +55,34 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
 
   const router = useRouter();
 
+  // Form-local field copy (entity-namespaced). Reuses the same wording as the
+  // visible labels so en-CA stays in sync; fr-CA can rewrite each string later.
+  const amenityFieldMessages = {
+    [AmenityMissingField.code]: t_amenities("errors.codeRequired"),
+    [AmenityMissingField.category]: t_amenities("errors.categoryRequired"),
+  };
+  const amenityFieldTooLongMessages = {
+    [AmenityMissingField.code]: t_amenities("errors.codeTooLong", {
+      max: AMENITY_CODE_MAX_LENGTH,
+    }),
+  };
+
+  const showActionError = (
+    errorCode: string | undefined,
+    details: Record<string, unknown> | undefined,
+  ) => {
+    setError(
+      withErrorReference(
+        translateErrorCode(errorCode, t_errors, tc("error"), details, {
+          fieldMessages: amenityFieldMessages,
+          fieldTooLongMessages: amenityFieldTooLongMessages,
+        }),
+        details,
+        (errorId) => tc("errorReference", { errorId }),
+      ),
+    );
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim() || !categoryId) {
@@ -65,13 +98,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     });
 
     if (!result.success) {
-      setError(
-        withErrorReference(
-          translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
-          result.details,
-          (errorId) => tc("errorReference", { errorId }),
-        ),
-      );
+      showActionError(result.errorCode, result.details);
     } else {
       setCode("");
       setCategoryId("");
@@ -88,13 +115,7 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     const result = await deleteAmenityAction(id);
 
     if (!result.success) {
-      setError(
-        withErrorReference(
-          translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
-          result.details,
-          (errorId) => tc("errorReference", { errorId }),
-        ),
-      );
+      showActionError(result.errorCode, result.details);
     } else {
       router.refresh();
     }
@@ -116,13 +137,16 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder={t_amenities("form.amenityPlaceholder")}
+              maxLength={AMENITY_CODE_MAX_LENGTH}
               disabled={submitting}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">{t_amenityCategories("singular")}</Label>
+            <Label htmlFor="category">
+              {t_amenityCategories("form.categoryLabel")}
+            </Label>
             <Select
               value={categoryId}
               onValueChange={setCategoryId}

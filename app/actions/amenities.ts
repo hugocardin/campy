@@ -2,11 +2,13 @@
 
 import {
   ActionResult,
+  AmenityMissingField,
   CommonErrorCode,
   DbErrorCode,
   resultError,
   resultSuccess,
 } from "@/lib/errors";
+import { normalizeAmenityCode } from "@/lib/amenities/code";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
@@ -36,14 +38,27 @@ export async function createAmenityAction(
   }
 
   try {
-    if (!input.code) {
+    // Normalize before missing/too-long checks so whitespace-only / non-string
+    // payloads cannot bypass the server guard (client trim is not enough).
+    // DB CHECK (length(trim(code)) > 0) still tracked as a follow-up — no
+    // in-repo migrations yet.
+    const normalized = normalizeAmenityCode(input.code);
+    if (!normalized.ok) {
+      if (normalized.reason === "too_long") {
+        return resultError(CommonErrorCode.COMMON_FIELD_TOO_LONG, {
+          field: AmenityMissingField.code,
+        });
+      }
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
-        field: "code",
+        field: AmenityMissingField.code,
       });
     }
-    if (!input.category_id) {
+    if (
+      !Number.isSafeInteger(input.category_id) ||
+      input.category_id <= 0
+    ) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
-        field: "category",
+        field: AmenityMissingField.category,
       });
     }
 
@@ -53,7 +68,7 @@ export async function createAmenityAction(
       supabase
         .from("amenities")
         .insert({
-          code: input.code.toUpperCase().trim(),
+          code: normalized.code,
           category_id: input.category_id,
         })
         .select()

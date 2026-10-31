@@ -2,7 +2,7 @@
   "GENERIC_SERVER_ERROR": "Something went wrong. Please try again later.",
 
   "COMMON_MISSING_FIELD": "A required value was missing. Please check your input and try again.",
-  "COMMON_MISSING_NAMED_FIELD": "{field} is required but was not provided.",
+  "COMMON_FIELD_TOO_LONG": "A value is too long. Please shorten it and try again.",
 
   "DB_DUPLICATE_VALUE": "This value already exists. Please choose a different one.",
   "DB_INVALID_REFERENCE": "The referenced record does not exist.",

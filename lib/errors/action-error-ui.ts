@@ -9,17 +9,38 @@ export type ErrorTranslator = {
   has: (key: string) => boolean;
 };
 
-/** Only these `details` keys may be interpolated into user-visible ICU messages. */
-const INTERPOLATABLE_DETAIL_KEYS = new Set(["field"]);
+/**
+ * Detail keys that may be interpolated into user-visible ICU messages.
+ * Empty on purpose: flat error codes do not interpolate `details`. Named
+ * missing-field copy comes from caller-supplied `fieldMessages`, never from
+ * forwarding raw namespaced ids like `amenity.code` into `{field}`.
+ */
+const INTERPOLATABLE_DETAIL_KEYS = new Set<string>();
 
 /**
- * `field` values safe to show end users (form fields). Internal names like `id`
- * are programming errors — omit them and use a generic message instead.
+ * Entity-namespaced `field` values emitted by amenity actions.
+ * Callers map these to form-local required messages (not raw column names).
  */
-const USER_FACING_FIELD_VALUES = new Set(["code", "category"]);
+export const AmenityMissingField = {
+  code: "amenity.code",
+  category: "amenity.category",
+} as const;
 
-/** Named missing-field message used when `field` is user-facing. */
-export const COMMON_MISSING_NAMED_FIELD = "COMMON_MISSING_NAMED_FIELD";
+/** Optional per-call hooks for translating ActionResult errors. */
+export type TranslateErrorOptions = {
+  /**
+   * Entity-namespaced field → fully translated missing-field message.
+   * Prefer form-local copy (e.g. `amenities.errors.codeRequired`) so fr-CA can
+   * use correct agreement without interpolating a free-form noun into a sentence.
+   * Only keys present here get a named message; unlabeled fields stay generic.
+   */
+  fieldMessages?: Readonly<Record<string, string>>;
+  /**
+   * Entity-namespaced field → fully translated too-long message
+   * (e.g. `amenities.errors.codeTooLong`).
+   */
+  fieldTooLongMessages?: Readonly<Record<string, string>>;
+};
 
 /** Pull the support correlation id from an ActionResult `details` payload. */
 export function getActionErrorId(
@@ -29,9 +50,17 @@ export function getActionErrorId(
   return typeof id === "string" && id.length > 0 ? id : undefined;
 }
 
+function hasOwnKey(
+  object: object,
+  key: PropertyKey,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
 /**
  * Allowlisted ICU values from ActionResult `details`.
- * Unexpected keys (and internal field names like `id`) are dropped — never forwarded.
+ * Currently forwards nothing — unexpected keys (and raw `field` ids) are
+ * dropped so they can never reach a `{field}` catalogue placeholder.
  */
 export function safeTranslationValues(
   details?: Record<string, unknown>,
@@ -46,12 +75,28 @@ export function safeTranslationValues(
     if (typeof value !== "string" || value.length === 0) {
       continue;
     }
-    if (key === "field" && !USER_FACING_FIELD_VALUES.has(value)) {
-      continue;
-    }
     values[key] = value;
   }
   return values;
+}
+
+/**
+ * Resolve an entity-namespaced field to a caller-supplied missing-field message.
+ * Guards prototype keys (`constructor`, `__proto__`, …) via hasOwnProperty.
+ * Returns undefined when unlabeled/internal or the mapped message is empty.
+ */
+export function resolveFieldMessage(
+  field: string,
+  fieldMessages?: Readonly<Record<string, string>>,
+): string | undefined {
+  if (!fieldMessages || !hasOwnKey(fieldMessages, field)) {
+    return undefined;
+  }
+  const message = fieldMessages[field];
+  if (typeof message !== "string" || message.trim().length === 0) {
+    return undefined;
+  }
+  return message;
 }
 
 function looksLikeMissingMessage(message: string, errorCode: string): boolean {
@@ -63,43 +108,72 @@ function looksLikeMissingMessage(message: string, errorCode: string): boolean {
 }
 
 /**
+ * next-intl leaves unsubstituted ICU args as literal `{name}` when no values
+ * are passed. With an empty interpolatable-details allowlist that must never
+ * reach users — treat any leftover `{` as a formatting failure.
+ */
+function containsUnsubstitutedPlaceholder(message: string): boolean {
+  return message.includes("{");
+}
+
+/**
  * Translate an ActionResult `errorCode` via the errors namespace.
  * Falls back when the code is missing, untranslated, or ICU formatting fails
- * (e.g. malformed catalogue entry → next-intl returns `errors.CODE`).
+ * (e.g. malformed catalogue entry → next-intl returns `errors.CODE`, or a
+ * leftover `{arg}` placeholder when details are not interpolated).
+ *
+ * For `COMMON_MISSING_FIELD` / `COMMON_FIELD_TOO_LONG`, prefers a caller-supplied
+ * per-field message (form-local, entity-namespaced) when present; otherwise the
+ * generic catalogue entry. Details are never interpolated into ICU.
  */
 export function translateErrorCode(
   errorCode: string | undefined,
   tErrors: ErrorTranslator,
   fallback: string,
   details?: Record<string, unknown>,
+  options?: TranslateErrorOptions,
 ): string {
   if (!errorCode || !tErrors.has(errorCode)) {
     return fallback;
   }
 
-  let code = errorCode;
-  let values = safeTranslationValues(details);
-
-  // Prefer a named message when we have a user-facing field; otherwise keep the
-  // generic COMMON_MISSING_FIELD (no placeholder) for internal fields like `id`.
-  if (errorCode === CommonErrorCode.COMMON_MISSING_FIELD) {
-    if (
-      typeof values.field === "string" &&
-      tErrors.has(COMMON_MISSING_NAMED_FIELD)
-    ) {
-      code = COMMON_MISSING_NAMED_FIELD;
-    } else {
-      values = {};
-    }
-  }
-
   try {
+    if (errorCode === CommonErrorCode.COMMON_MISSING_FIELD) {
+      const rawField = details?.field;
+      if (typeof rawField === "string" && rawField.length > 0) {
+        const named = resolveFieldMessage(rawField, options?.fieldMessages);
+        if (named) {
+          return named;
+        }
+      }
+    }
+
+    if (errorCode === CommonErrorCode.COMMON_FIELD_TOO_LONG) {
+      const rawField = details?.field;
+      if (typeof rawField === "string" && rawField.length > 0) {
+        const named = resolveFieldMessage(
+          rawField,
+          options?.fieldTooLongMessages,
+        );
+        if (named) {
+          return named;
+        }
+      }
+    }
+
+    // Never pass details into ICU — safeTranslationValues is always empty today
+    // and exists to keep the allowlist explicit for future keys.
+    const values = safeTranslationValues(details);
     const message =
       Object.keys(values).length > 0
-        ? tErrors(code, values)
-        : tErrors(code);
+        ? tErrors(errorCode, values)
+        : tErrors(errorCode);
 
-    if (!message || looksLikeMissingMessage(message, code)) {
+    if (
+      !message ||
+      looksLikeMissingMessage(message, errorCode) ||
+      containsUnsubstitutedPlaceholder(message)
+    ) {
       return fallback;
     }
 
