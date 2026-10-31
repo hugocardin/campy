@@ -13,6 +13,18 @@ WHERE schemaname = 'public'
   AND tablename IN ('profiles', 'user_roles')
 ORDER BY tablename, policyname;
 
+-- Live profiles columns (grants / updated_at / email nullability depend on this)
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'profiles'
+ORDER BY ordinal_position;
+
+-- email uniqueness ('' placeholder would collide if unique + NOT NULL)
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public' AND tablename = 'profiles'
+  AND indexdef ILIKE '%email%';
+
 SELECT tgname, pg_get_triggerdef(oid)
 FROM pg_trigger
 WHERE tgrelid = 'public.profiles'::regclass
@@ -23,8 +35,9 @@ FROM pg_trigger
 WHERE tgrelid = 'auth.users'::regclass
   AND NOT tgisinternal;
 
--- If this lists triggers other than the signup one you expect, the migration
--- will RAISE until they are reviewed/removed (dual-trigger role race).
+-- If this lists triggers other than public.handle_new_user callers, the
+-- migration will RAISE until they are reviewed/removed (dual-trigger role race).
+-- A differently wired on_auth_user_created also RAISE (not silent DROP).
 SELECT
   t.tgname,
   n.nspname AS fn_schema,
@@ -61,6 +74,9 @@ WHERE n.nspname = 'public'
 ```
 
 Expect the live policy **“Restrict role changes to platform_admin”** in the pre-apply snapshot; the migration drops it (trigger + `set_user_role` replace that lock).
+
+Expected profiles columns (document; live may differ — migration GRANTs dynamically):
+`id`, `role_id`, `full_name`, `email`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds`, `created_at`, `updated_at`.
 
 ## 1. Policy / trigger / grant inventory (after apply)
 
@@ -122,6 +138,7 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 | 1 | Non-admin `PATCH /profiles?id=eq.<me>` `{role_id: <platform_admin id>}` | **Fail** (`42501` column privilege and/or trigger); role stays `user`. Confirm with **service_role** `SELECT role_id` |
 | 2 | Non-admin `PATCH` own `{full_name: "..."}` | **200**; `role_id` unchanged |
 | 2b | Non-admin `PATCH` own `{email: "spoof@example.com"}` | **Fail** (`42501`); email unchanged (service_role re-SELECT) |
+| 2c | **service_role** `PATCH` throwaway profile `{email: "trusted-sync@example.com"}` | **200**; service_role re-SELECT shows new email (trusted writer / `auth.role()` path) |
 | 3 | Non-admin `DELETE` own profile | **0 rows** / denied; profile still present |
 | 4 | Non-admin `POST` profile with `role_id = platform_admin` | **42501** RLS |
 | 5 | Non-admin / anon `PATCH`/`POST`/`DELETE` on `user_roles` | Writes fail or **0 rows**; codes unchanged |
@@ -133,6 +150,7 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 | 9b | Platform_admin raw `PATCH` other user's `role_id` | Should **not** change the row (no column privilege / own-only UPDATE); service_role SELECT confirms unchanged — use RPC instead |
 | 10 | Public `signUp` with `user_metadata` roles (`role` / `role_id` / `app_role` = platform_admin) | New `profiles.role_id` = **1 (`user`)** |
 | 10b | SQL inventory: non-internal triggers on `auth.users` | **Exactly one**: `on_auth_user_created` |
+| 10c | Email-less signup (Auth Admin create user with **no email** / phone-only if available, or insert path that yields `NEW.email` NULL) × **two** users | Both succeed; `profiles.email` is **NULL** (if nullable) or `<uuid>@no-email.invalid` (if NOT NULL) — **never** `''`; no UNIQUE collision on second signup |
 | 11 | `rpc/current_user_role_code` as signed-in user | `"user"` / `"platform_admin"` matching profile (live helper; not redefined here) |
 | 12 | Anon `GET /rest/v1/v_campgrounds` after apply | Same active count/sample as **before** apply (profiles `REVOKE ALL` from anon must not break public listing) |
 | 13 | Platform_admin `set_user_role` demoting the **last** remaining platform_admin | **Fail** `P0001` / error; role unchanged |
@@ -141,8 +159,8 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 ## 3. Notes
 
 - Admin role changes go through **`set_user_role`**, not PostgREST `PATCH` (own-only SELECT would make cross-user PATCH match 0 rows).
-- Column grants omit `role_id` and `email`; trigger backs that up and enforces last-admin.
-- Trusted writer bypass is **`service_role` JWT** or **`session_user` in (`postgres`,`supabase_admin`)** — not `auth.uid() IS NULL`.
-- `handle_new_user` must not read role from `raw_user_meta_data`. Email is copied once at signup (Auth email changes are **not** synced — owner picker can drift until a sync trigger/RPC exists).
+- Column grants omit server-owned cols (`role_id`, `email`, `id`, timestamps); other live cols granted dynamically from `information_schema`.
+- Trusted writer bypass uses **`auth.role()`** / `request.jwt.claims` jsonb / legacy claim GUC, or **`session_user` in (`postgres`,`supabase_admin`)** — not `auth.uid() IS NULL`.
+- `handle_new_user` must not read role from `raw_user_meta_data`. Email-less signups use NULL or `@no-email.invalid` (never `''`). Auth email changes are **not** synced later.
 - If `user_roles.code = 'user'` is missing, every signup fails closed (`P0001`) — intentional; keep that seed row.
 - Owner picker (`get-owners.ts`) uses **service_role** (bypasses RLS).

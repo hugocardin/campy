@@ -5,21 +5,29 @@
 --   * Policy name "Restrict role changes to platform_admin" rejected non-admin
 --     role_id updates with 42501; platform_admin could still change role_id.
 --   * Own-row SELECT; no auth INSERT/DELETE on profiles.
---   * user_roles SELECT open to clients that need the lookup; writes denied.
+--   * user_roles SELECT for clients that need the lookup; writes denied.
 --   * Signup always assigns user_roles.code = 'user' (ignores user_metadata).
 --
 -- Hugo (PR #6 / #7): locking role_id must use column-level REVOKE / grants OR a
 -- BEFORE UPDATE trigger — NOT only a row-level WITH CHECK. PR #7: own-only
--- SELECT + admin UPDATE branch silently no-ops PostgREST PATCH on other rows
--- (SELECT policies apply to UPDATE/RETURNING). Fix: column grants for
--- user-editable fields + SECURITY DEFINER set_user_role() for admin role
--- assignment; SELECT/UPDATE stay own-row only. Trigger remains as defense
--- in depth (role_id / email / id + last-admin guard).
+-- SELECT + admin UPDATE branch silently no-ops PostgREST PATCH on other rows.
+-- Fix: column grants for user-editable fields + SECURITY DEFINER set_user_role()
+-- for admin role assignment; SELECT/UPDATE stay own-row only. Trigger remains
+-- as defense in depth (role_id / email / id + last-admin guard).
+--
+-- Expected profiles columns (Campy live / OpenAPI; §0 snapshot confirms):
+--   id, role_id, full_name, email, default_rig_length, preferred_site_type_id,
+--   notification_preferences, bookmarked_campgrounds, created_at, updated_at
+-- Server-owned (no authenticated UPDATE grant): id, role_id, email, created_at,
+--   updated_at. All other live columns get UPDATE (dynamic GRANT from
+--   information_schema so missing/extra cols don't abort or silently lock out).
 --
 -- Depends on public.is_platform_admin() from 20261031030842_admin_catalog_rls.sql.
 --
 -- Apply as one script in the SQL Editor (or `supabase db push` after link).
 -- Wrapped in a transaction. Idempotent: safe to re-run.
+-- Pre-apply: if auth.users has a non-handle_new_user trigger (including
+-- on_auth_user_created → other fn), migration RAISE — review/remove it first.
 
 BEGIN;
 
@@ -35,7 +43,12 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT
-    COALESCE(current_setting('request.jwt.claim.role', true), '') = 'service_role'
+    COALESCE(
+      auth.role(),
+      NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
+      current_setting('request.jwt.claim.role', true),
+      ''
+    ) = 'service_role'
     OR session_user IN ('postgres', 'supabase_admin');
 $$;
 
@@ -44,7 +57,7 @@ REVOKE ALL ON FUNCTION public._campy_is_trusted_profile_writer() FROM anon;
 REVOKE ALL ON FUNCTION public._campy_is_trusted_profile_writer() FROM authenticated;
 
 COMMENT ON FUNCTION public._campy_is_trusted_profile_writer() IS
-  'True for service_role JWT or session_user postgres/supabase_admin. Used by profile role/email lock — not a missing-sub bypass.';
+  'True for service_role JWT (auth.role() / jwt.claims jsonb / legacy claim GUC) or session_user postgres/supabase_admin. Used by profile role/email lock.';
 
 -- ---------------------------------------------------------------------------
 -- Role-change + server-owned column lock (defense in depth with column grants)
@@ -84,6 +97,9 @@ BEGIN
 
     -- Refuse leaving zero platform_admin profiles (except postgres/supabase_admin recovery).
     IF session_user NOT IN ('postgres', 'supabase_admin') THEN
+      -- Serialize concurrent demotions (A demotes B while B demotes A).
+      PERFORM pg_advisory_xact_lock(hashtext('campy_platform_admin_roles'));
+
       SELECT r.id
       INTO platform_admin_role_id
       FROM public.user_roles AS r
@@ -93,6 +109,12 @@ BEGIN
       IF platform_admin_role_id IS NOT NULL
          AND OLD.role_id = platform_admin_role_id
          AND NEW.role_id IS DISTINCT FROM platform_admin_role_id THEN
+        -- Lock admin rows, then count others still holding the role.
+        PERFORM 1
+        FROM public.profiles AS p
+        WHERE p.role_id = platform_admin_role_id
+        FOR UPDATE;
+
         SELECT COUNT(*)::integer
         INTO other_admins
         FROM public.profiles AS p
@@ -116,7 +138,7 @@ REVOKE ALL ON FUNCTION public.restrict_profile_role_id_change() FROM anon;
 REVOKE ALL ON FUNCTION public.restrict_profile_role_id_change() FROM authenticated;
 
 COMMENT ON FUNCTION public.restrict_profile_role_id_change() IS
-  'BEFORE UPDATE on profiles: lock id/email/role_id. role_id changes require platform_admin or trusted writer; blocks demoting the last platform_admin (except postgres/supabase_admin). Replaces live WITH CHECK policy "Restrict role changes to platform_admin".';
+  'BEFORE UPDATE on profiles: lock id/email/role_id. role_id changes require platform_admin or trusted writer; blocks demoting the last platform_admin (advisory xact lock + FOR UPDATE; postgres/supabase_admin exempt). Replaces live WITH CHECK policy "Restrict role changes to platform_admin".';
 
 DROP TRIGGER IF EXISTS trg_restrict_profile_role_id_change ON public.profiles;
 CREATE TRIGGER trg_restrict_profile_role_id_change
@@ -135,6 +157,7 @@ SET search_path = ''
 AS $$
 DECLARE
   new_role_id integer;
+  has_updated_at boolean;
 BEGIN
   IF NOT public.is_platform_admin() THEN
     RAISE EXCEPTION 'platform_admin required'
@@ -152,11 +175,24 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  UPDATE public.profiles AS p
-  SET
-    role_id = new_role_id,
-    updated_at = now()
-  WHERE p.id = p_user_id;
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns AS c
+    WHERE c.table_schema = 'public'
+      AND c.table_name = 'profiles'
+      AND c.column_name = 'updated_at'
+  )
+  INTO has_updated_at;
+
+  IF has_updated_at THEN
+    EXECUTE
+      'UPDATE public.profiles SET role_id = $1, updated_at = now() WHERE id = $2'
+      USING new_role_id, p_user_id;
+  ELSE
+    UPDATE public.profiles AS p
+    SET role_id = new_role_id
+    WHERE p.id = p_user_id;
+  END IF;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'profile not found: %', p_user_id
@@ -170,7 +206,7 @@ REVOKE ALL ON FUNCTION public.set_user_role(uuid, text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.set_user_role(uuid, text) TO authenticated;
 
 COMMENT ON FUNCTION public.set_user_role(uuid, text) IS
-  'platform_admin-only: set profiles.role_id by user_roles.code. Prefer this over PostgREST PATCH (own-only SELECT would filter other rows). Last-admin guard lives in restrict_profile_role_id_change trigger.';
+  'platform_admin-only: set profiles.role_id by user_roles.code. Prefer this over PostgREST PATCH (own-only SELECT would filter other rows). Sets updated_at only if that column exists. Last-admin guard lives in restrict_profile_role_id_change trigger.';
 
 -- ---------------------------------------------------------------------------
 -- Signup: create profile with default role "user" (ignore user_metadata roles)
@@ -183,6 +219,8 @@ SET search_path = ''
 AS $$
 DECLARE
   default_role_id integer;
+  email_nullable boolean;
+  profile_email text;
 BEGIN
   SELECT r.id
   INTO default_role_id
@@ -195,9 +233,28 @@ BEGIN
       USING ERRCODE = 'P0001';
   END IF;
 
-  -- email may be null for phone / OAuth-without-email; store empty string if NOT NULL.
+  -- Phone / OAuth-without-email: NEW.email is NULL.
+  -- Prefer real NULL when the column allows it (avoids '' UNIQUE collisions and
+  -- blank owner-picker rows). If NOT NULL, use a non-colliding placeholder.
+  IF NEW.email IS NOT NULL THEN
+    profile_email := NEW.email;
+  ELSE
+    SELECT (c.is_nullable = 'YES')
+    INTO email_nullable
+    FROM information_schema.columns AS c
+    WHERE c.table_schema = 'public'
+      AND c.table_name = 'profiles'
+      AND c.column_name = 'email';
+
+    IF coalesce(email_nullable, true) THEN
+      profile_email := NULL;
+    ELSE
+      profile_email := NEW.id::text || '@no-email.invalid';
+    END IF;
+  END IF;
+
   INSERT INTO public.profiles (id, email, role_id)
-  VALUES (NEW.id, COALESCE(NEW.email, ''), default_role_id)
+  VALUES (NEW.id, profile_email, default_role_id)
   ON CONFLICT (id) DO NOTHING;
 
   RETURN NEW;
@@ -209,10 +266,12 @@ REVOKE ALL ON FUNCTION public.handle_new_user() FROM anon;
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM authenticated;
 
 COMMENT ON FUNCTION public.handle_new_user() IS
-  'AFTER INSERT on auth.users: insert profiles row with role_id for user_roles.code = user. Does not read role from raw_user_meta_data. Email copied once (not kept in sync with later Auth email changes).';
+  'AFTER INSERT on auth.users: insert profiles row with role_id for user_roles.code = user. Does not read role from raw_user_meta_data. Email: keep NULL when nullable; else id||@no-email.invalid (never ''''). Copied once — not synced with later Auth email changes.';
 
 -- Install signup trigger: replace only handle_new_user callers; refuse other
 -- auth.users triggers (including a differently wired on_auth_user_created).
+-- Does NOT silently DROP TRIGGER on_auth_user_created when it points elsewhere —
+-- that case RAISE; review/remove the conflicting trigger, then re-apply.
 DO $$
 DECLARE
   r record;
@@ -326,14 +385,81 @@ REVOKE ALL ON TABLE public.profiles FROM anon, authenticated;
 REVOKE ALL ON TABLE public.user_roles FROM anon, authenticated;
 
 GRANT SELECT ON TABLE public.profiles TO authenticated;
--- User-editable columns only (not role_id, email, id, created_at).
-GRANT UPDATE (
-  full_name,
-  default_rig_length,
-  preferred_site_type_id,
-  notification_preferences,
-  bookmarked_campgrounds
-) ON TABLE public.profiles TO authenticated;
+
+-- Dynamic column UPDATE grants from live information_schema (avoids aborting on
+-- missing cols; includes unexpected user-editable live cols).
+DO $$
+DECLARE
+  deny_cols text[] := ARRAY[
+    'id',
+    'role_id',
+    'email',
+    'created_at',
+    'updated_at'
+  ];
+  expected_editable text[] := ARRAY[
+    'full_name',
+    'default_rig_length',
+    'preferred_site_type_id',
+    'notification_preferences',
+    'bookmarked_campgrounds'
+  ];
+  live_cols text[];
+  grant_cols text[];
+  missing_expected text[];
+  unexpected_live text[];
+  grant_list text;
+BEGIN
+  SELECT coalesce(array_agg(c.column_name::text ORDER BY c.column_name), ARRAY[]::text[])
+  INTO live_cols
+  FROM information_schema.columns AS c
+  WHERE c.table_schema = 'public'
+    AND c.table_name = 'profiles';
+
+  SELECT coalesce(array_agg(c ORDER BY c), ARRAY[]::text[])
+  INTO grant_cols
+  FROM unnest(live_cols) AS c
+  WHERE NOT (c = ANY (deny_cols));
+
+  IF coalesce(array_length(grant_cols, 1), 0) = 0 THEN
+    RAISE EXCEPTION
+      'No profiles columns left to GRANT UPDATE after deny-list; live cols were: %',
+      array_to_string(live_cols, ', ')
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT coalesce(array_agg(c ORDER BY c), ARRAY[]::text[])
+  INTO missing_expected
+  FROM unnest(expected_editable) AS c
+  WHERE NOT (c = ANY (live_cols));
+
+  IF coalesce(array_length(missing_expected, 1), 0) > 0 THEN
+    RAISE NOTICE
+      'Expected editable profiles columns missing on live (skipped): %',
+      array_to_string(missing_expected, ', ');
+  END IF;
+
+  SELECT coalesce(array_agg(c ORDER BY c), ARRAY[]::text[])
+  INTO unexpected_live
+  FROM unnest(live_cols) AS c
+  WHERE NOT (c = ANY (deny_cols) OR c = ANY (expected_editable));
+
+  IF coalesce(array_length(unexpected_live, 1), 0) > 0 THEN
+    RAISE NOTICE
+      'Live profiles columns outside expected editable set (still granted UPDATE): %',
+      array_to_string(unexpected_live, ', ');
+  END IF;
+
+  SELECT string_agg(format('%I', c), ', ' ORDER BY c)
+  INTO grant_list
+  FROM unnest(grant_cols) AS c;
+
+  RAISE NOTICE 'GRANT UPDATE (%) ON public.profiles TO authenticated', grant_list;
+  EXECUTE format(
+    'GRANT UPDATE (%s) ON TABLE public.profiles TO authenticated',
+    grant_list
+  );
+END $$;
 
 GRANT SELECT ON TABLE public.user_roles TO authenticated;
 

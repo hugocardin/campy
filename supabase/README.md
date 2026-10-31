@@ -87,18 +87,21 @@ After applying, walk through `probes/admin-catalog-rls.md`.
 
 | Relation | SELECT | Client writes | Role assignment |
 | --- | --- | --- | --- |
-| `profiles` | own row (`authenticated`) | column `GRANT UPDATE` only: `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (not `role_id` / `email` / `id`) | **`set_user_role(user_id, role_code)`** RPC (`SECURITY DEFINER`, `platform_admin` only). Own-only SELECT would make cross-user `PATCH` match 0 rows. |
+| `profiles` | own row (`authenticated`) | dynamic `GRANT UPDATE` on live cols except server-owned (`id`, `role_id`, `email`, `created_at`, `updated_at`); expected editable: `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` | **`set_user_role(user_id, role_code)`** RPC (`SECURITY DEFINER`, `platform_admin` only). Own-only SELECT would make cross-user `PATCH` match 0 rows. |
 | `user_roles` | `authenticated` only (not `anon`) | none — `REVOKE ALL` then no write grants | n/a |
 
-**Defense in depth:** `BEFORE UPDATE` trigger `trg_restrict_profile_role_id_change` locks `id` / `email` / `role_id`, allows trusted writers (`service_role` JWT or `session_user` ∈ (`postgres`,`supabase_admin`)) or `is_platform_admin()`, and refuses demoting the **last** `platform_admin` (DB owners can still recover in SQL Editor).
+**Defense in depth:** `BEFORE UPDATE` trigger `trg_restrict_profile_role_id_change` locks `id` / `email` / `role_id`, allows trusted writers (`auth.role()` / jwt claims = `service_role`, or `session_user` ∈ (`postgres`,`supabase_admin`)) or `is_platform_admin()`, and refuses demoting the **last** `platform_admin` (advisory xact lock + `FOR UPDATE`; DB owners can still recover in SQL Editor).
 
-**Grants:** `REVOKE ALL` on both tables from `anon`/`authenticated`, then minimal grants above (clears default `TRUNCATE` / `REFERENCES` / `TRIGGER` too).
+**Grants:** `REVOKE ALL` on both tables from `anon`/`authenticated`, then minimal grants (clears default `TRUNCATE` / `REFERENCES` / `TRIGGER` too). Column UPDATE list is built from `information_schema` at apply time.
 
-**Signup:** `handle_new_user` on `auth.users` AFTER INSERT → `profiles` with `user_roles.code = 'user'` (`COALESCE` email to `''`). Ignores `raw_user_meta_data` role keys. Migration **`DROP TRIGGER IF EXISTS on_auth_user_created`**, drops other `handle_new_user` callers, then **RAISE** if any other non-internal `auth.users` trigger remains (avoids dual-trigger / metadata role races with `ON CONFLICT DO NOTHING`).
+**Signup:** `handle_new_user` on `auth.users` AFTER INSERT → `profiles` with `user_roles.code = 'user'`. Email-less: keep `NULL` if `profiles.email` is nullable; otherwise `id::text || '@no-email.invalid'` (never `''`). Ignores `raw_user_meta_data` role keys.
+
+Migration drops triggers that call `public.handle_new_user`. It does **not** silently `DROP TRIGGER on_auth_user_created` when that name points at a different function — it **RAISE**s instead. Same for any other leftover non-internal `auth.users` trigger. Review and remove conflicting triggers, then re-apply.
 
 **Notes / failure modes:**
 
 - `profiles.email` is copied **once** at signup — later Auth email changes are **not** synced (owner picker / admin listing can drift until a sync path exists).
+- Snapshot `information_schema.columns` / `pg_indexes` for `profiles.email` before apply (nullability + unique).
 - If `user_roles` has no `code = 'user'` row, **every signup fails closed** (`P0001`) — keep that seed row.
 - After `REVOKE ALL … FROM anon` on `profiles`, confirm anon `GET /v_campgrounds` still works (view may join profiles as invoker).
 
