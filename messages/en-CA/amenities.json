@@ -8,6 +8,11 @@
     "amenityPlaceholder": "e.g. WiFi, Pet friendly, Fire pit"
   },
 
+  "errors": {
+    "codeRequired": "Amenity Name is required but was not provided.",
+    "categoryRequired": "Category is required but was not provided."
+  },
+
   "actions": {
     "confirmAmenityDeletion": "Delete amenity \"{code}\"? This action cannot be undone.",
     "deleteAmenityTitle": "Delete amenity"

@@ -10,13 +10,19 @@ import {
 } from "@formatjs/icu-messageformat-parser";
 import { createTranslator } from "next-intl";
 import {
+  AmenityMissingField,
   getActionErrorId,
-  resolveFieldLabel,
+  resolveFieldMessage,
   safeTranslationValues,
   translateErrorCode,
   withErrorReference,
   type ErrorTranslator,
 } from "./action-error-ui";
+
+const messagesRoot = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../messages",
+);
 
 function mockTranslator(
   messages: Record<string, string>,
@@ -54,62 +60,134 @@ function collectArgumentNames(
   return into;
 }
 
-/** Flatten nested message objects to dotted leaf paths (string values only). */
+/**
+ * Flatten nested message objects to dotted leaf paths.
+ * Non-string, non-plain-object leaves fail loudly (catalogue must stay stringly).
+ */
 function collectStringLeaves(
   value: unknown,
   prefix = "",
   out: Record<string, string> = {},
 ): Record<string, string> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    if (prefix && typeof value === "string") {
-      out[prefix] = value;
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      collectStringLeaves(child, path, out);
     }
     return out;
   }
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    collectStringLeaves(child, path, out);
+
+  if (prefix && typeof value === "string") {
+    out[prefix] = value;
+    return out;
   }
-  return out;
+
+  assert.fail(
+    `${prefix || "(root)"} must be a string or plain object, got ${
+      Array.isArray(value) ? "array" : value === null ? "null" : typeof value
+    }`,
+  );
 }
 
+const amenityFieldMessages = {
+  [AmenityMissingField.code]: "Amenity Name is required but was not provided.",
+  [AmenityMissingField.category]:
+    "Category is required but was not provided.",
+};
+
 describe("safeTranslationValues", () => {
-  it("allowlists only labeled field values and drops unexpected keys", () => {
+  it("allowlists field only when a caller fieldMessages entry exists", () => {
     assert.deepEqual(
-      safeTranslationValues({
-        field: "code",
-        errorId: "uuid",
-        message: "secret path /tmp/x",
-        email: "user@example.com",
-        hint: "do not show",
-      }),
-      { field: "code" },
+      safeTranslationValues(
+        {
+          field: AmenityMissingField.code,
+          errorId: "uuid",
+          message: "secret path /tmp/x",
+          email: "user@example.com",
+          hint: "do not show",
+        },
+        amenityFieldMessages,
+      ),
+      { field: AmenityMissingField.code },
     );
-    assert.deepEqual(safeTranslationValues({ field: "category" }), {
-      field: "category",
-    });
-    assert.deepEqual(safeTranslationValues({ field: "id" }), {});
     assert.deepEqual(
-      safeTranslationValues({ message: "leak", errno: 61 }),
+      safeTranslationValues(
+        { field: AmenityMissingField.category },
+        amenityFieldMessages,
+      ),
+      { field: AmenityMissingField.category },
+    );
+    assert.deepEqual(
+      safeTranslationValues({ field: "id" }, amenityFieldMessages),
+      {},
+    );
+    assert.deepEqual(
+      safeTranslationValues({ field: AmenityMissingField.code }),
+      {},
+    );
+    assert.deepEqual(
+      safeTranslationValues({ message: "leak", errno: 61 }, amenityFieldMessages),
+      {},
+    );
+  });
+
+  it("drops empty-string fieldMessages entries", () => {
+    assert.deepEqual(
+      safeTranslationValues(
+        { field: AmenityMissingField.code },
+        { [AmenityMissingField.code]: "   " },
+      ),
       {},
     );
   });
 });
 
-describe("resolveFieldLabel", () => {
-  const t = mockTranslator({
-    "fields.code": "Amenity Name",
-    "fields.category": "Category",
-  });
-
-  it("maps allowlisted field keys to translated form labels", () => {
-    assert.equal(resolveFieldLabel("code", t), "Amenity Name");
-    assert.equal(resolveFieldLabel("category", t), "Category");
+describe("resolveFieldMessage", () => {
+  it("returns caller-supplied messages for namespaced fields", () => {
+    assert.equal(
+      resolveFieldMessage(AmenityMissingField.code, amenityFieldMessages),
+      amenityFieldMessages[AmenityMissingField.code],
+    );
+    assert.equal(
+      resolveFieldMessage(AmenityMissingField.category, amenityFieldMessages),
+      amenityFieldMessages[AmenityMissingField.category],
+    );
   });
 
   it("returns undefined for unlabeled/internal fields", () => {
-    assert.equal(resolveFieldLabel("id", t), undefined);
-    assert.equal(resolveFieldLabel("owner_id", t), undefined);
+    assert.equal(resolveFieldMessage("id", amenityFieldMessages), undefined);
+    assert.equal(
+      resolveFieldMessage("owner_id", amenityFieldMessages),
+      undefined,
+    );
+    assert.equal(resolveFieldMessage("code", amenityFieldMessages), undefined);
+  });
+
+  it("ignores prototype keys and empty-string messages", () => {
+    assert.equal(
+      resolveFieldMessage("constructor", amenityFieldMessages),
+      undefined,
+    );
+    assert.equal(
+      resolveFieldMessage("__proto__", amenityFieldMessages),
+      undefined,
+    );
+    assert.equal(
+      resolveFieldMessage("toString", amenityFieldMessages),
+      undefined,
+    );
+    assert.equal(
+      resolveFieldMessage(AmenityMissingField.code, {
+        [AmenityMissingField.code]: "",
+      }),
+      undefined,
+    );
+    assert.equal(
+      resolveFieldMessage(AmenityMissingField.code, {
+        [AmenityMissingField.code]: "  \n",
+      }),
+      undefined,
+    );
   });
 });
 
@@ -118,9 +196,6 @@ describe("translateErrorCode", () => {
     DB_DUPLICATE_VALUE: "This value already exists.",
     COMMON_MISSING_FIELD:
       "A required value was missing. Please check your input and try again.",
-    COMMON_MISSING_NAMED_FIELD: "{field} is required but was not provided.",
-    "fields.code": "Amenity Name",
-    "fields.category": "Category",
   });
 
   it("translates known codes and falls back otherwise", () => {
@@ -134,47 +209,71 @@ describe("translateErrorCode", () => {
 
   it("uses a generic message for internal fields like id", () => {
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", { field: "id" }),
+      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", { field: "id" }, {
+        fieldMessages: amenityFieldMessages,
+      }),
       "A required value was missing. Please check your input and try again.",
     );
   });
 
-  it("interpolates translated form labels, not raw column names", () => {
+  it("uses caller-supplied form messages for namespaced amenity fields", () => {
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", {
-        field: "code",
-      }),
+      translateErrorCode(
+        "COMMON_MISSING_FIELD",
+        t,
+        "Error",
+        { field: AmenityMissingField.code },
+        { fieldMessages: amenityFieldMessages },
+      ),
       "Amenity Name is required but was not provided.",
     );
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", {
-        field: "category",
-      }),
+      translateErrorCode(
+        "COMMON_MISSING_FIELD",
+        t,
+        "Error",
+        { field: AmenityMissingField.category },
+        { fieldMessages: amenityFieldMessages },
+      ),
       "Category is required but was not provided.",
     );
   });
 
-  it("falls back to generic when a labeled field has no catalogue entry", () => {
-    const noLabels = mockTranslator({
-      COMMON_MISSING_FIELD:
-        "A required value was missing. Please check your input and try again.",
-      COMMON_MISSING_NAMED_FIELD: "{field} is required but was not provided.",
-    });
+  it("falls back to generic when no fieldMessages map is provided", () => {
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", noLabels, "Error", {
-        field: "code",
+      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", {
+        field: AmenityMissingField.code,
       }),
+      "A required value was missing. Please check your input and try again.",
+    );
+  });
+
+  it("falls back to generic when the mapped message is empty", () => {
+    assert.equal(
+      translateErrorCode(
+        "COMMON_MISSING_FIELD",
+        t,
+        "Error",
+        { field: AmenityMissingField.code },
+        { fieldMessages: { [AmenityMissingField.code]: "" } },
+      ),
       "A required value was missing. Please check your input and try again.",
     );
   });
 
   it("does not interpolate unexpected details keys into the message", () => {
-    const message = translateErrorCode("COMMON_MISSING_FIELD", t, "Error", {
-      field: "id",
-      message: "duplicate key value violates unique constraint",
-      email: "admin@example.com",
-      hint: "Check RLS",
-    });
+    const message = translateErrorCode(
+      "COMMON_MISSING_FIELD",
+      t,
+      "Error",
+      {
+        field: "id",
+        message: "duplicate key value violates unique constraint",
+        email: "admin@example.com",
+        hint: "Check RLS",
+      },
+      { fieldMessages: amenityFieldMessages },
+    );
     assert.equal(
       message,
       "A required value was missing. Please check your input and try again.",
@@ -185,16 +284,40 @@ describe("translateErrorCode", () => {
     assert.equal(message.includes("id is required"), false);
   });
 
-  it("does not interpolate unexpected keys even when field is labeled", () => {
-    const message = translateErrorCode("COMMON_MISSING_FIELD", t, "Error", {
-      field: "code",
-      message: "secret Postgres detail",
-      email: "user@example.com",
-    });
+  it("does not leak unexpected keys when a named field message is used", () => {
+    const message = translateErrorCode(
+      "COMMON_MISSING_FIELD",
+      t,
+      "Error",
+      {
+        field: AmenityMissingField.code,
+        message: "secret Postgres detail",
+        email: "user@example.com",
+      },
+      { fieldMessages: amenityFieldMessages },
+    );
     assert.equal(message, "Amenity Name is required but was not provided.");
     assert.equal(message.includes("secret"), false);
     assert.equal(message.includes("user@example.com"), false);
-    assert.equal(message.includes("code is required"), false);
+    assert.equal(message.includes("amenity.code"), false);
+  });
+
+  it("ignores prototype field keys even if present on the messages object", () => {
+    const sneaky = Object.assign(Object.create({ constructor: "boom" }), {
+      [AmenityMissingField.code]:
+        "Amenity Name is required but was not provided.",
+    }) as Record<string, string>;
+
+    assert.equal(
+      translateErrorCode(
+        "COMMON_MISSING_FIELD",
+        t,
+        "Error",
+        { field: "constructor" },
+        { fieldMessages: sneaky },
+      ),
+      "A required value was missing. Please check your input and try again.",
+    );
   });
 
   it("falls back when the translator returns a next-intl missing-message key", () => {
@@ -206,13 +329,13 @@ describe("translateErrorCode", () => {
     );
   });
 
-  it("falls back when the translator throws", () => {
+  it("falls back when the translator throws on the generic catalogue key", () => {
     const bad = ((key: string) => {
       throw new Error(`INVALID_MESSAGE: ${key}`);
     }) as ErrorTranslator;
     bad.has = () => true;
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", bad, "Error"),
+      translateErrorCode("COMMON_MISSING_FIELD", bad, "Error", { field: "id" }),
       "Error",
     );
   });
@@ -230,17 +353,48 @@ describe("withErrorReference", () => {
   });
 });
 
+describe("amenity form label reuse", () => {
+  it("required messages include the visible form labels", () => {
+    const amenities = JSON.parse(
+      readFileSync(join(messagesRoot, "en-CA/amenities.json"), "utf8"),
+    ) as {
+      form: { amenityLabel: string };
+      errors: { codeRequired: string; categoryRequired: string };
+    };
+    const amenityCategories = JSON.parse(
+      readFileSync(join(messagesRoot, "en-CA/amenityCategories.json"), "utf8"),
+    ) as { singular: string };
+
+    assert.equal(
+      amenities.errors.codeRequired.startsWith(amenities.form.amenityLabel),
+      true,
+      "codeRequired must reuse amenities.form.amenityLabel",
+    );
+    assert.equal(
+      amenities.errors.categoryRequired.startsWith(amenityCategories.singular),
+      true,
+      "categoryRequired must reuse amenityCategories.singular (form Label)",
+    );
+  });
+});
+
 describe("en-CA errors catalogue", () => {
   it("formats every key via createTranslator without malformed ICU", () => {
-    const errorsPath = join(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../messages/en-CA/errors.json",
-    );
+    const errorsPath = join(messagesRoot, "en-CA/errors.json");
     const errors = JSON.parse(readFileSync(errorsPath, "utf8")) as Record<
       string,
       unknown
     >;
     const leaves = collectStringLeaves(errors);
+
+    // Flat code→message map: no nested objects (e.g. former fields.*).
+    for (const key of Object.keys(errors)) {
+      assert.equal(
+        typeof errors[key],
+        "string",
+        `errors.${key} must be a flat string (got ${typeof errors[key]})`,
+      );
+    }
 
     const t = createTranslator({
       locale: "en-CA",
@@ -253,7 +407,7 @@ describe("en-CA errors catalogue", () => {
       const argNames = [...collectArgumentNames(elements)];
       const values: Record<string, string> = {};
       for (const name of argNames) {
-        values[name] = name === "field" ? "Amenity Name" : "sample";
+        values[name] = "sample";
       }
 
       const message = argNames.length > 0 ? t(key, values) : t(key);
@@ -268,33 +422,74 @@ describe("en-CA errors catalogue", () => {
     }
   });
 
-  it("maps COMMON_MISSING_FIELD through real form labels via createTranslator", () => {
-    const errorsPath = join(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../messages/en-CA/errors.json",
+  it("fails loudly when a catalogue leaf is not a string", () => {
+    assert.throws(
+      () => collectStringLeaves({ DB_DUPLICATE_VALUE: null }),
+      /DB_DUPLICATE_VALUE must be a string/,
     );
-    const errors = JSON.parse(readFileSync(errorsPath, "utf8")) as Record<
-      string,
-      unknown
-    >;
+    assert.throws(
+      () => collectStringLeaves({ fields: { code: ["Amenity Name"] } }),
+      /fields\.code must be a string/,
+    );
+  });
+
+  it("maps COMMON_MISSING_FIELD through amenity form messages", () => {
+    const errors = JSON.parse(
+      readFileSync(join(messagesRoot, "en-CA/errors.json"), "utf8"),
+    ) as Record<string, unknown>;
+    const amenities = JSON.parse(
+      readFileSync(join(messagesRoot, "en-CA/amenities.json"), "utf8"),
+    ) as {
+      form: { amenityLabel: string };
+      errors: { codeRequired: string; categoryRequired: string };
+    };
+    const amenityCategories = JSON.parse(
+      readFileSync(join(messagesRoot, "en-CA/amenityCategories.json"), "utf8"),
+    ) as { singular: string };
+
     const t = createTranslator({
       locale: "en-CA",
       messages: { errors },
       namespace: "errors",
     }) as ErrorTranslator;
 
+    const fieldMessages = {
+      [AmenityMissingField.code]: amenities.errors.codeRequired,
+      [AmenityMissingField.category]: amenities.errors.categoryRequired,
+    };
+
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", { field: "code" }),
-      "Amenity Name is required but was not provided.",
+      translateErrorCode(
+        "COMMON_MISSING_FIELD",
+        t,
+        "Error",
+        { field: AmenityMissingField.code },
+        { fieldMessages },
+      ),
+      amenities.errors.codeRequired,
     );
     assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", {
-        field: "category",
+      translateErrorCode(
+        "COMMON_MISSING_FIELD",
+        t,
+        "Error",
+        { field: AmenityMissingField.category },
+        { fieldMessages },
+      ),
+      amenities.errors.categoryRequired,
+    );
+    assert.equal(
+      amenities.errors.codeRequired.includes(amenities.form.amenityLabel),
+      true,
+    );
+    assert.equal(
+      amenities.errors.categoryRequired.includes(amenityCategories.singular),
+      true,
+    );
+    assert.equal(
+      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", { field: "id" }, {
+        fieldMessages,
       }),
-      "Category is required but was not provided.",
-    );
-    assert.equal(
-      translateErrorCode("COMMON_MISSING_FIELD", t, "Error", { field: "id" }),
       "A required value was missing. Please check your input and try again.",
     );
   });

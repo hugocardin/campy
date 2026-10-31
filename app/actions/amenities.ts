@@ -2,6 +2,7 @@
 
 import {
   ActionResult,
+  AmenityMissingField,
   CommonErrorCode,
   DbErrorCode,
   resultError,
@@ -38,12 +39,12 @@ export async function createAmenityAction(
   try {
     if (!input.code) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
-        field: "code",
+        field: AmenityMissingField.code,
       });
     }
     if (!input.category_id) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
-        field: "category",
+        field: AmenityMissingField.category,
       });
     }
 
