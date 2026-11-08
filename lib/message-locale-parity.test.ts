@@ -632,9 +632,10 @@ function assertFrCategoryArgsPreserveEn(
     }
 
     for (const exactKey of enPlural.exactKeys) {
-      const enExact = enPlural.exactArgs[exactKey] ?? [];
-      const frExact = new Set(frPlural.exactArgs[exactKey] ?? []);
-      const missingExact = enExact.filter((arg) => !frExact.has(arg));
+      const enExact: string[] = enPlural.exactArgs[exactKey] ?? [];
+      const frExactArgs: string[] = frPlural.exactArgs[exactKey] ?? [];
+      const frExact = new Set<string>(frExactArgs);
+      const missingExact: string[] = enExact.filter((arg) => !frExact.has(arg));
       assert.equal(
         missingExact.length,
         0,

@@ -1,7 +1,7 @@
 import { UserProfileNoRole } from "@/entities/user-profile";
 import { USER_ROLE_OWNER } from "@/lib/constants";
 import { ActionResult, resultSuccess } from "@/lib/errors";
-import { supabaseAdmin } from "@/lib/supabase/admin_server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import {
   handleDbResponse,
   handleUnexpectedError,
@@ -26,7 +26,7 @@ export const getOwners = async (): Promise<
 > => {
   try {
     const result = await handleDbResponse(
-      supabaseAdmin
+      getSupabaseAdmin()
         .from("profiles")
         .select("id, full_name, email, user_roles!inner(code)")
         .eq("user_roles.code", USER_ROLE_OWNER),

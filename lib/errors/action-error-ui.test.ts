@@ -324,7 +324,7 @@ describe("translateErrorCode", () => {
   });
 
   it("falls back when the translator returns a next-intl missing-message key", () => {
-    const bad = ((key: string) => `errors.${key}`) as ErrorTranslator;
+    const bad = ((key: string) => `errors.${key}`) as unknown as ErrorTranslator;
     bad.has = () => true;
     assert.equal(
       translateErrorCode("COMMON_MISSING_FIELD", bad, "Error"),
@@ -335,7 +335,7 @@ describe("translateErrorCode", () => {
   it("falls back when the translator throws on the generic catalogue key", () => {
     const bad = ((key: string) => {
       throw new Error(`INVALID_MESSAGE: ${key}`);
-    }) as ErrorTranslator;
+    }) as unknown as ErrorTranslator;
     bad.has = () => true;
     assert.equal(
       translateErrorCode("COMMON_MISSING_FIELD", bad, "Error", { field: "id" }),
@@ -440,7 +440,7 @@ describe("en-CA errors catalogue", () => {
         `errors.${key} must not contain ICU arguments (have: ${argNames.join(", ")})`,
       );
 
-      const message = t(key);
+      const message = (t as (msgKey: string) => string)(key);
 
       assert.ok(message.length > 0, `${key} produced an empty message`);
       assert.equal(message.includes("{"), false, `${key} left a '{' in output`);
