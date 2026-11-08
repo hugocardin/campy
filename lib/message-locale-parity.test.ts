@@ -14,11 +14,21 @@ import {
 const messagesRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "messages");
 
 /**
- * Namespaces that currently ship a fr-CA file. Missing en-CA namespaces are
- * intentionally not failures here — issue #2 tracks completing the fr-CA catalogue.
- * Do not treat this list as "fr-CA is complete".
+ * Namespaces that currently ship a fr-CA file. Keep in sync with
+ * `messages/fr-CA/*.json` (and with the namespaces loaded in `i18n/request.ts`).
  */
-const EXISTING_FR_CA_FILES = ["auth.json", "common.json"] as const;
+const EXISTING_FR_CA_FILES = [
+  "adminDashboard.json",
+  "amenities.json",
+  "amenityCategories.json",
+  "auth.json",
+  "campgrounds.json",
+  "common.json",
+  "errors.json",
+  "profile.json",
+  "search.json",
+  "sites.json",
+] as const;
 
 /**
  * Full `${namespace}.${path}` keys that may legitimately share the same string
@@ -29,6 +39,11 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "common.brand",
   "common.logoAlt",
   "auth.form.passwordPlaceholder",
+  "campgrounds.form.descriptionLabel",
+  "campgrounds.form.websitePlaceholder",
+  "campgrounds.form.latitudeLabel",
+  "campgrounds.form.longitudeLabel",
+  "sites.form.descriptionLabel",
 ]);
 
 /**
@@ -941,12 +956,12 @@ describe("ICU plural structural pairing", () => {
   });
 });
 
-describe("fr-CA message parity (existing namespaces only)", () => {
+describe("fr-CA message parity", () => {
   const frFiles = readdirSync(join(messagesRoot, "fr-CA"))
     .filter((name) => name.endsWith(".json"))
     .sort();
 
-  it("documents which fr-CA namespaces exist (missing ones are issue #2, not failures)", () => {
+  it("ships every namespace loaded by i18n/request.ts", () => {
     assert.deepEqual(frFiles, [...EXISTING_FR_CA_FILES]);
   });
 

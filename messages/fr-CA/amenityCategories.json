@@ -1,0 +1,27 @@
+{
+  "singular": "Catégorie",
+  "plural": "Catégories",
+  "noResult": "Aucune catégorie",
+
+  "form": {
+    "categoryLabel": "Catégorie",
+    "selectAmenityCategoryPlaceholder": "Choisir une catégorie",
+    "createCategoryPlaceholder": "ex. Services, Installations, Activités"
+  },
+
+  "actions": {
+    "deleteAmenityCategoryTitle": "Supprimer la catégorie de commodité",
+    "confirmAmenityCategoryDeletion": "Supprimer la catégorie de commodité « {category} »? Cette action est irréversible."
+  },
+
+  "AdminAmenityCategoryPage": {
+    "pageHeader": {
+      "title": "Gérer les catégories de commodités",
+      "description": "Ajouter, modifier ou retirer des catégories de commodités"
+    },
+    "meta": {
+      "title": "Catégories de commodités | Admin | Campy",
+      "description": "Gérer les catégories de commodités disponibles."
+    }
+  }
+}

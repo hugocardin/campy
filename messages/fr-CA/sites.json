@@ -1,0 +1,88 @@
+{
+  "singular": "Emplacement",
+  "plural": "Emplacements",
+  "noResult": "Aucun emplacement",
+
+  "form": {
+    "nameLabel": "Nom",
+    "namePlaceholder": "Entrez le nom de l'emplacement",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Décrivez l'emplacement...",
+    "maxRigLengthLabel": "Longueur max. du véhicule (pieds)",
+    "maxRigLengthPlaceholder": "ex. 35",
+    "siteTypeLabel": "Type d'emplacement",
+    "siteTypePlaceholder": "Sélectionnez un type",
+    "pricePerNightLabel": "Prix par nuit",
+    "pricePerNightPlaceholder": "ex. 45.00",
+    "minStayNightLabel": "Nombre minimal de nuits",
+    "minStayNightPlaceholder": "ex. 2"
+  },
+
+  "errors": {
+    "nameRequired": "Le nom est requis",
+    "typeRequired": "Le type est requis",
+    "priceRequired": "Le prix est requis",
+    "invalidMaxLength": "Longueur max. du véhicule invalide",
+    "invalidPricePerNight": "Prix par nuit invalide",
+    "invalidMinStayNights": "Nombre minimal de nuits invalide"
+  },
+
+  "actions": {
+    "createSite": "Créer un emplacement"
+  },
+
+  "AdminSitesPage": {
+    "pageHeader": {
+      "title": "{name} - Gérer les emplacements du camping",
+      "description": "Propriétaire : {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Gérer les emplacements du camping | Admin | Campy",
+      "description": "Gérer les emplacements du camping"
+    }
+  },
+
+  "AdminSiteDetailsPage": {
+    "pageHeader": {
+      "title": "Emplacement : {name}",
+      "description": "Du camping : {name}"
+    },
+    "meta": {
+      "title": "Détails de l'emplacement | Admin | Campy",
+      "description": "Voir les détails de l'emplacement"
+    }
+  },
+
+  "AdminSiteCreatePage": {
+    "pageHeader": {
+      "title": "{name} - Créer un emplacement",
+      "description": "Propriétaire : {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Créer un emplacement | Admin | Campy",
+      "description": "Créer un emplacement du camping"
+    }
+  },
+
+  "AdminSiteAmenitiesPage": {
+    "pageHeader": {
+      "title": "Gérer les commodités de l'emplacement {name}",
+      "description": "Emplacement : {description}"
+    },
+    "meta": {
+      "title": "Gérer les commodités de l'emplacement | Admin | Campy",
+      "description": "Gérer les commodités d'un emplacement"
+    }
+  },
+
+  "AdminSiteEditPage": {
+    "pageHeader": {
+      "title": "Modifier l'emplacement {name}",
+      "description": "Emplacement : {description}"
+    },
+    "meta": {
+      "title": "Modifier les informations de l'emplacement | Admin | Campy",
+      "description": "Modifier les informations d'un emplacement"
+    }
+  }
+}

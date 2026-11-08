@@ -1,0 +1,16 @@
+{
+  "amenitiesDescription": "Gérer la liste des commodités disponibles",
+  "amenityCategoriesDescription": "Organiser les commodités en groupes (Services, Installations, etc.)",
+  "campgroundDescription": "Organiser les campings",
+
+  "AdminDashboardPage": {
+    "pageHeader": {
+      "title": "Tableau de bord administrateur",
+      "description": "Accès rapide aux outils de gestion administrateur"
+    },
+    "meta": {
+      "title": "Tableau de bord administrateur | Admin | Campy",
+      "description": "Gérer les données en tant qu'administrateur"
+    }
+  }
+}
