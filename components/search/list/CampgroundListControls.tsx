@@ -47,6 +47,7 @@ export default function CampgroundListControls({
   const [lastPushedQ, setLastPushedQ] = useState(qParam);
 
   const debounceTimeoutRef = useRef<number | null>(null);
+  const latestParamsRef = useRef({ sort: sortParam, province: provinceParam });
 
   // Sync input from URL only for external changes (back/forward / Clear).
   // Skip when qParam is what we ourselves pushed — typing during an in-flight
@@ -57,6 +58,12 @@ export default function CampgroundListControls({
       setSearch(qParam);
     }
   }
+
+  // Keep sort/province for debounce timeouts; replaceQuery also writes this
+  // synchronously so selects aren't undone by a stale scheduled search.
+  useEffect(() => {
+    latestParamsRef.current = { sort: sortParam, province: provinceParam };
+  }, [sortParam, provinceParam]);
 
   function clearDebounce() {
     if (debounceTimeoutRef.current != null) {
@@ -72,6 +79,10 @@ export default function CampgroundListControls({
   }) {
     const trimmedQ = next.q.trim();
     setLastPushedQ(trimmedQ);
+    latestParamsRef.current = {
+      sort: next.sort,
+      province: next.province,
+    };
 
     const params = new URLSearchParams();
     if (trimmedQ) {
@@ -91,22 +102,25 @@ export default function CampgroundListControls({
   }
 
   useEffect(() => {
-    if (search.trim() === qParam) return;
+    const trimmed = search.trim();
+    // Skip while URL catches up to a value we already pushed (incl. Clear).
+    if (trimmed === qParam || trimmed === lastPushedQ) return;
 
     clearDebounce();
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
+      const { sort, province } = latestParamsRef.current;
       replaceQuery({
         q: search,
-        sort: sortParam,
-        province: provinceParam,
+        sort,
+        province,
       });
     }, 300);
 
     return clearDebounce;
     // Select/Clear cancel via clearDebounce before their own replaceQuery.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search`
-  }, [search, qParam]);
+  }, [search, qParam, lastPushedQ]);
 
   return (
     <div
@@ -130,7 +144,7 @@ export default function CampgroundListControls({
           replaceQuery({
             q: search,
             sort: parseCampgroundSort(value),
-            province: provinceParam,
+            province: latestParamsRef.current.province,
           });
         }}
       >
@@ -151,7 +165,7 @@ export default function CampgroundListControls({
           clearDebounce();
           replaceQuery({
             q: search,
-            sort: sortParam,
+            sort: latestParamsRef.current.sort,
             province: value === ALL_PROVINCES ? "" : value,
           });
         }}
@@ -176,7 +190,11 @@ export default function CampgroundListControls({
           onClick={() => {
             clearDebounce();
             setSearch("");
-            replaceQuery({ q: "", sort: sortParam, province: "" });
+            replaceQuery({
+              q: "",
+              sort: latestParamsRef.current.sort,
+              province: "",
+            });
           }}
         >
           {t("clearFilters")}

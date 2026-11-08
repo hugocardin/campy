@@ -24,13 +24,13 @@ function normalizeWebsiteInput(
   if (!trimmed) {
     return { success: true, data: null };
   }
-  const safe = toSafeHttpUrl(trimmed);
-  if (!safe) {
+  // Safety check only — persist the trimmed original (not url.toString()).
+  if (!toSafeHttpUrl(trimmed)) {
     return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
       field: "campground.website",
     });
   }
-  return { success: true, data: safe };
+  return { success: true, data: trimmed };
 }
 
 function revalidateCampgroundPublicAndAdmin(id: string) {

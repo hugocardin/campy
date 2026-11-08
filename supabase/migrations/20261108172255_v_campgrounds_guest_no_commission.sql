@@ -1,6 +1,7 @@
 -- Guest campground reads must not expose commission terms.
 -- DROP+CREATE required: CREATE OR REPLACE cannot remove view columns.
--- Authenticated keeps full table SELECT on campgrounds (platform admin).
+-- Applied on Campy as version 20261108172255.
+-- Follow-up 20261108173136 adds security_invoker + authenticated guest-column grants.
 
 BEGIN;
 
