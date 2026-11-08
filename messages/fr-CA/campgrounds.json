@@ -37,7 +37,8 @@
     "nameRequired": "Le nom du camping est requis",
     "ownerRequired": "Le propriétaire du camping est requis",
     "latitudeInvalid": "La latitude doit être entre -90 et +90",
-    "longitudeInvalid": "La longitude doit être entre -180 et +180"
+    "longitudeInvalid": "La longitude doit être entre -180 et +180",
+    "websiteInvalid": "Entrez une URL de site web valide (http ou https)."
   },
 
   "actions": {
@@ -105,6 +106,12 @@
   "CampgroundDetailsPage": {
     "sitesHeading": "Emplacements",
     "noDescription": "Aucune description fournie.",
+    "loadErrorTitle": "Impossible de charger ce camping",
+    "loadErrorDescription": "Une erreur s'est produite lors du chargement de cette page. Veuillez réessayer.",
+    "loadErrorRetry": "Réessayer",
+    "loadErrorBackHome": "Retour à la recherche",
+    "sitesLoadError": "Impossible de charger les emplacements de ce camping. Veuillez réessayer.",
+    "amenitiesLoadError": "Impossible de charger les commodités de ce camping. Veuillez réessayer.",
     "meta": {
       "title": "{name} sur Campy",
       "description": "Consultez les détails et les emplacements de {name}.",

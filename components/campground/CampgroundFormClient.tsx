@@ -23,6 +23,7 @@ import {
   translateErrorCode,
   withErrorReference,
 } from "@/lib/errors";
+import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 
@@ -83,6 +84,8 @@ export default function CampgroundFormClient({
       return setError(t_campgrounds("errors.latitudeInvalid"));
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180)
       return setError(t_campgrounds("errors.longitudeInvalid"));
+    if (form.website.trim() && !toSafeHttpUrl(form.website))
+      return setError(t_campgrounds("errors.websiteInvalid"));
 
     const payload: CampgroundCreateUpdateInput = {
       id: initialData?.id,
@@ -107,7 +110,17 @@ export default function CampgroundFormClient({
       if (!result.success) {
         setError(
           withErrorReference(
-            translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
+            translateErrorCode(
+              result.errorCode,
+              t_errors,
+              tc("error"),
+              result.details,
+              {
+                fieldMessages: {
+                  "campground.website": t_campgrounds("errors.websiteInvalid"),
+                },
+              },
+            ),
             result.details,
             (errorId) => tc("errorReference", { errorId }),
           ),

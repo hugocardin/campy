@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/table";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Site } from "@/entities/sites";
+import { useRouter } from "@/i18n/navigation";
 import { routes } from "@/lib/routes";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 
 type Props = {
   campground: CampgroundAdmin;

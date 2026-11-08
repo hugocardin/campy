@@ -29,6 +29,11 @@ type PageProps = {
   params: Promise<{ locale: string; id: string }>;
 };
 
+type Translator = {
+  (key: string): string;
+  has: (key: string) => boolean;
+};
+
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params;
   const t = await getTranslations(PAGE_NAMESPACE);
@@ -55,7 +60,11 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-function groupAmenities(amenities: Amenity[]) {
+function groupAmenitiesForLocale(
+  amenities: Amenity[],
+  tAmenities: Translator,
+  locale: string,
+) {
   const grouped = amenities.reduce(
     (acc, amenity) => {
       const category = amenity.category_code?.trim() || "";
@@ -66,14 +75,18 @@ function groupAmenities(amenities: Amenity[]) {
     {} as Record<string, Amenity[]>,
   );
 
-  return Object.fromEntries(
-    Object.entries(grouped)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([category, items]) => [
-        category,
-        items.sort((a, b) => a.code.localeCompare(b.code)),
-      ]),
-  );
+  return Object.entries(grouped)
+    .map(([category, items]) => {
+      const categoryLabel = translateCode(tAmenities, "categories", category);
+      const sortedItems = [...items].sort((a, b) =>
+        translateCode(tAmenities, "codes", a.code).localeCompare(
+          translateCode(tAmenities, "codes", b.code),
+          locale,
+        ),
+      );
+      return { category, categoryLabel, items: sortedItems };
+    })
+    .sort((a, b) => a.categoryLabel.localeCompare(b.categoryLabel, locale));
 }
 
 export default async function CampgroundDetailsPage({ params }: PageProps) {
@@ -93,22 +106,36 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
     if (campgroundResult.errorCode === DbErrorCode.DB_NOT_FOUND) {
       notFound();
     }
-    throw new Error(
-      campgroundResult.errorCode ?? "campground_load_failed",
-    );
+    throw new Error(campgroundResult.errorCode ?? "campground_load_failed");
   }
 
   const campground = campgroundResult.data;
-  const sites = sitesResult.success ? sitesResult.data : [];
-  const amenities = amenitiesResult.success ? amenitiesResult.data : [];
-  const groupedAmenities = groupAmenities(amenities);
   const safeWebsite = toSafeHttpUrl(campground.website);
+  const websiteLabel = campground.website?.trim() || safeWebsite;
 
   const t = await getTranslations(PAGE_NAMESPACE);
   const tc = await getTranslations("common");
   const tCampgrounds = await getTranslations("campgrounds");
   const tAmenities = await getTranslations("amenities");
   const tSites = await getTranslations("sites");
+
+  if (!sitesResult.success) {
+    console.error("sites load failed", sitesResult.errorCode, sitesResult.details);
+  }
+  if (!amenitiesResult.success) {
+    console.error(
+      "amenities load failed",
+      amenitiesResult.errorCode,
+      amenitiesResult.details,
+    );
+  }
+
+  const sites = sitesResult.success ? sitesResult.data : null;
+  const amenities = amenitiesResult.success ? amenitiesResult.data : null;
+  const groupedAmenities =
+    amenities != null
+      ? groupAmenitiesForLocale(amenities, tAmenities, locale)
+      : [];
 
   const priceFormatter = new Intl.NumberFormat(locale, {
     style: "currency",
@@ -168,7 +195,7 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                         rel="noopener noreferrer"
                         className="text-primary hover:underline break-all"
                       >
-                        {safeWebsite}
+                        {websiteLabel}
                       </a>
                     </div>
                   ) : null}
@@ -222,16 +249,18 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
               <CardTitle>{tAmenities("plural")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-8 pt-2">
-              {amenities.length === 0 ? (
+              {amenities == null ? (
+                <p className="text-sm text-destructive">{t("amenitiesLoadError")}</p>
+              ) : amenities.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
                   {tAmenities("noResult")}
                 </p>
               ) : (
                 <div className="space-y-6">
-                  {Object.entries(groupedAmenities).map(([category, items]) => (
+                  {groupedAmenities.map(({ category, categoryLabel, items }) => (
                     <div key={category} className="pb-2">
                       <h4 className="font-medium text-base mb-2.5 border-b pb-1 border-muted">
-                        {translateCode(tAmenities, "categories", category)}
+                        {categoryLabel}
                       </h4>
                       <div className="flex flex-wrap gap-2.5">
                         {items.map((amenity) => (
@@ -256,7 +285,9 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
               <CardTitle>{t("sitesHeading")}</CardTitle>
             </CardHeader>
             <CardContent>
-              {sites.length === 0 ? (
+              {sites == null ? (
+                <p className="text-sm text-destructive">{t("sitesLoadError")}</p>
+              ) : sites.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
                   {tSites("noResult")}
                 </p>

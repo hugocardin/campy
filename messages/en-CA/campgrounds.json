@@ -37,7 +37,8 @@
     "nameRequired": "Campground name is required",
     "ownerRequired": "Campground owner is required",
     "latitudeInvalid": "Latitude must be between -90 and +90",
-    "longitudeInvalid": "Longitude must be between -180 and +180"
+    "longitudeInvalid": "Longitude must be between -180 and +180",
+    "websiteInvalid": "Enter a valid website URL (http or https)."
   },
 
   "actions": {
@@ -105,6 +106,12 @@
   "CampgroundDetailsPage": {
     "sitesHeading": "Sites",
     "noDescription": "No description provided.",
+    "loadErrorTitle": "Couldn't load this campground",
+    "loadErrorDescription": "Something went wrong while loading this page. Please try again.",
+    "loadErrorRetry": "Try again",
+    "loadErrorBackHome": "Back to search",
+    "sitesLoadError": "We couldn't load sites for this campground. Please try again.",
+    "amenitiesLoadError": "We couldn't load amenities for this campground. Please try again.",
     "meta": {
       "title": "{name} | Campy",
       "description": "View details and sites at {name}.",

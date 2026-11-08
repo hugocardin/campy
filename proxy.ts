@@ -10,12 +10,15 @@ import { routes } from "./lib/routes";
 
 const handleI18nRouting = createMiddleware(routing);
 
+/** Known static asset extensions — not a blanket "any path with a dot". */
+const STATIC_ASSET_EXT =
+  /\.(?:png|jpe?g|gif|svg|ico|webp|css|js|mjs|map|txt|xml|woff2?|ttf|eot)$/i;
+
 /** Exact guest detail only — not `/campgrounds/<id>/book` etc. */
 function isPublicCampgroundDetailPath(pathnameWithoutLocale: string): boolean {
   const prefix = `${routes.campgrounds()}/`;
   if (!pathnameWithoutLocale.startsWith(prefix)) return false;
   const rest = pathnameWithoutLocale.slice(prefix.length);
-  // Single segment that is a UUID (no nested paths).
   return !rest.includes("/") && isUuid(rest);
 }
 
@@ -67,13 +70,12 @@ export default async function middleware(request: NextRequest) {
   const isPublic =
     isPublicPath(pathnameWithoutLocale) ||
     pathname.startsWith("/_next") ||
-    pathname.includes(".");
+    STATIC_ASSET_EXT.test(pathname);
 
   if (isPublic) {
     return response;
   }
 
-  // Require login
   if (!user) {
     const locale =
       response.headers.get("x-next-intl-locale") || routing.defaultLocale;
@@ -85,7 +87,6 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Admin-only routes (compare without locale — paths are /en-CA/platformAdmin/...)
   if (pathnameWithoutLocale.startsWith(routes.platformAdmin.root())) {
     const result = await getUserRoleName(user.id);
 
@@ -102,5 +103,7 @@ export default async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpe?g|gif|svg|ico|webp|css|js|mjs|map|txt|xml|woff2?|ttf|eot)$).*)",
+  ],
 };

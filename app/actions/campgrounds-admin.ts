@@ -17,6 +17,22 @@ import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "next-intl/server";
 
+function normalizeWebsiteInput(
+  website: string | null | undefined,
+): ActionResult<string | null> {
+  const trimmed = website?.trim() ?? "";
+  if (!trimmed) {
+    return { success: true, data: null };
+  }
+  const safe = toSafeHttpUrl(trimmed);
+  if (!safe) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "campground.website",
+    });
+  }
+  return { success: true, data: safe };
+}
+
 function revalidateCampgroundPublicAndAdmin(id: string) {
   revalidateLocalizedPath(routes.home());
   revalidateLocalizedPath(routes.campgroundDetail(id));
@@ -79,6 +95,11 @@ export async function updateCampgroundAction(
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
     }
 
+    const websiteResult = normalizeWebsiteInput(input.website);
+    if (!websiteResult.success) {
+      return websiteResult;
+    }
+
     const supabase = await createClient();
 
     // Build the geography point in WKT format (Well-Known Text)
@@ -99,7 +120,7 @@ export async function updateCampgroundAction(
           city: input.city || null,
           province: input.province || null,
           country: input.country || null,
-          website: toSafeHttpUrl(input.website),
+          website: websiteResult.data,
           phone: input.phone || null,
           updated_at: new Date().toISOString(),
 
@@ -138,6 +159,11 @@ export async function createCampgroundAction(
   let newCampgroundId;
 
   try {
+    const websiteResult = normalizeWebsiteInput(input.website);
+    if (!websiteResult.success) {
+      return websiteResult;
+    }
+
     const locationWKT = `POINT(${input.location.lng} ${input.location.lat})`;
     const supabase = await createClient();
 
@@ -152,7 +178,7 @@ export async function createCampgroundAction(
           city: input.city?.trim() || null,
           province: input.province?.trim() || null,
           country: input.country?.trim() || null,
-          website: toSafeHttpUrl(input.website),
+          website: websiteResult.data,
           phone: input.phone?.trim() || null,
           location: `SRID=4326;${locationWKT}`,
           created_at: new Date().toISOString(),

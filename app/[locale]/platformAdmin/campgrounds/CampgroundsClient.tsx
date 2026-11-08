@@ -9,10 +9,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CampgroundAdmin } from "@/entities/campground-admin";
+import { useRouter } from "@/i18n/navigation";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 
 type Props = {
   campgrounds: CampgroundAdmin[];

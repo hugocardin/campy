@@ -44,14 +44,24 @@ export default function CampgroundListControls({
 
   const [search, setSearch] = useState(qParam);
   const [prevQParam, setPrevQParam] = useState(qParam);
-  const skipDebounceRef = useRef(false);
+  const [lastPushedQ, setLastPushedQ] = useState(qParam);
 
-  // Keep the input aligned when the URL changes (back/forward), but do not
-  // wipe a trailing space the user is mid-typing after debounce trims `q`.
+  const debounceTimeoutRef = useRef<number | null>(null);
+
+  // Sync input from URL only for external changes (back/forward / Clear).
+  // Skip when qParam is what we ourselves pushed — typing during an in-flight
+  // navigation must not be overwritten.
   if (qParam !== prevQParam) {
     setPrevQParam(qParam);
-    if (search.trim() !== qParam) {
+    if (qParam !== lastPushedQ && search.trim() !== qParam) {
       setSearch(qParam);
+    }
+  }
+
+  function clearDebounce() {
+    if (debounceTimeoutRef.current != null) {
+      window.clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
     }
   }
 
@@ -60,10 +70,12 @@ export default function CampgroundListControls({
     sort: CampgroundSort;
     province: string;
   }) {
-    const params = new URLSearchParams();
+    const trimmedQ = next.q.trim();
+    setLastPushedQ(trimmedQ);
 
-    if (next.q.trim()) {
-      params.set("q", next.q.trim());
+    const params = new URLSearchParams();
+    if (trimmedQ) {
+      params.set("q", trimmedQ);
     }
     if (next.sort && next.sort !== "name") {
       params.set("sort", next.sort);
@@ -79,29 +91,21 @@ export default function CampgroundListControls({
   }
 
   useEffect(() => {
-    if (skipDebounceRef.current) {
-      skipDebounceRef.current = false;
-      return;
-    }
-
-    // Trailing spaces alone should not rewrite the URL (or fight the input).
     if (search.trim() === qParam) return;
 
-    const handle = window.setTimeout(() => {
-      // Read latest sort/province from the URL at fire time (not the render
-      // that scheduled this timeout) so a pending debounce cannot clobber a
-      // select change made within the 300 ms window.
-      const latest = new URLSearchParams(window.location.search);
+    clearDebounce();
+    debounceTimeoutRef.current = window.setTimeout(() => {
+      debounceTimeoutRef.current = null;
       replaceQuery({
         q: search,
-        sort: parseCampgroundSort(latest.get("sort") ?? undefined),
-        province: latest.get("province") ?? "",
+        sort: sortParam,
+        province: provinceParam,
       });
     }, 300);
 
-    return () => window.clearTimeout(handle);
-    // Debounce the search box; sort/province are read at fire time.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional debounce on `search`
+    return clearDebounce;
+    // Select/Clear cancel via clearDebounce before their own replaceQuery.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search`
   }, [search, qParam]);
 
   return (
@@ -121,13 +125,14 @@ export default function CampgroundListControls({
 
       <Select
         value={sortParam}
-        onValueChange={(value) =>
+        onValueChange={(value) => {
+          clearDebounce();
           replaceQuery({
             q: search,
             sort: parseCampgroundSort(value),
             province: provinceParam,
-          })
-        }
+          });
+        }}
       >
         <SelectTrigger className="w-45">
           <SelectValue placeholder={t("sortLabel")} />
@@ -142,13 +147,14 @@ export default function CampgroundListControls({
 
       <Select
         value={provinceParam || ALL_PROVINCES}
-        onValueChange={(value) =>
+        onValueChange={(value) => {
+          clearDebounce();
           replaceQuery({
             q: search,
             sort: sortParam,
             province: value === ALL_PROVINCES ? "" : value,
-          })
-        }
+          });
+        }}
       >
         <SelectTrigger className="w-45">
           <SelectValue placeholder={t("provinceLabel")} />
@@ -168,7 +174,7 @@ export default function CampgroundListControls({
           type="button"
           variant="outline"
           onClick={() => {
-            skipDebounceRef.current = true;
+            clearDebounce();
             setSearch("");
             replaceQuery({ q: "", sort: sortParam, province: "" });
           }}

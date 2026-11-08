@@ -112,14 +112,12 @@ export const getCampgrounds = cache(
 
       if (term) {
         // Quote values so spaces / apostrophes stay inside one PostgREST filter.
+        // Always include province.ilike (harmless with .eq province filter).
+        // Empty-state hint for mismatched province+q is parked as a follow-up.
         const pattern = `"%${term}%"`;
-        // When a province filter is set, skip province in the text OR so a
-        // province-name search (e.g. "Ontario") + mismatched filter (BC) does
-        // not silently AND-constrain province twice.
-        const textFilter = provinceFilter
-          ? `name.ilike.${pattern},city.ilike.${pattern}`
-          : `name.ilike.${pattern},city.ilike.${pattern},province.ilike.${pattern}`;
-        query = query.or(textFilter);
+        query = query.or(
+          `name.ilike.${pattern},city.ilike.${pattern},province.ilike.${pattern}`,
+        );
       }
 
       if (provinceFilter) {
