@@ -1,4 +1,7 @@
-import { toCampgroundDomain } from "@/data/campgrounds/get-campgrounds";
+import {
+  GUEST_CAMPGROUND_COLUMNS,
+  toCampgroundDomain,
+} from "@/data/campgrounds/get-campgrounds";
 import { Campground } from "@/entities/campground";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import {
@@ -15,7 +18,11 @@ export const getCampgroundById = cache(
       const supabase = await createClient();
 
       const result = await handleDbSingle(
-        supabase.from("v_campgrounds").select("*").eq("id", id).single(),
+        supabase
+          .from("v_campgrounds")
+          .select(GUEST_CAMPGROUND_COLUMNS)
+          .eq("id", id)
+          .single(),
       );
 
       if (!result.success) {

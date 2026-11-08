@@ -13,8 +13,12 @@ import { getAmenitiesForCampground } from "@/data/campgrounds/get-campground-ame
 import { getCampgroundById } from "@/data/campgrounds/get-campground";
 import { getSitesOfCampground } from "@/data/campgrounds/get-campground-sites";
 import { Amenity } from "@/entities/amenity";
+import { DbErrorCode } from "@/lib/errors";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
+import { isUuid } from "@/lib/is-uuid";
 import { routes } from "@/lib/routes";
+import { toSafeHttpUrl } from "@/lib/safe-http-url";
+import { translateCode } from "@/lib/translate-code";
 import { MapPin } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -28,6 +32,14 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params;
   const t = await getTranslations(PAGE_NAMESPACE);
+
+  if (!isUuid(id)) {
+    return {
+      title: t("meta.titleFallback"),
+      description: t("meta.descriptionFallback"),
+    };
+  }
+
   const result = await getCampgroundById(id);
 
   if (!result.success) {
@@ -66,6 +78,11 @@ function groupAmenities(amenities: Amenity[]) {
 
 export default async function CampgroundDetailsPage({ params }: PageProps) {
   const { locale, id } = await params;
+
+  if (!isUuid(id)) {
+    notFound();
+  }
+
   const [campgroundResult, sitesResult, amenitiesResult] = await Promise.all([
     getCampgroundById(id),
     getSitesOfCampground(id),
@@ -73,13 +90,19 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
   ]);
 
   if (!campgroundResult.success) {
-    notFound();
+    if (campgroundResult.errorCode === DbErrorCode.DB_NOT_FOUND) {
+      notFound();
+    }
+    throw new Error(
+      campgroundResult.errorCode ?? "campground_load_failed",
+    );
   }
 
   const campground = campgroundResult.data;
   const sites = sitesResult.success ? sitesResult.data : [];
   const amenities = amenitiesResult.success ? amenitiesResult.data : [];
   const groupedAmenities = groupAmenities(amenities);
+  const safeWebsite = toSafeHttpUrl(campground.website);
 
   const t = await getTranslations(PAGE_NAMESPACE);
   const tc = await getTranslations("common");
@@ -134,18 +157,18 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                     </p>
                   </div>
 
-                  {campground.website ? (
+                  {safeWebsite ? (
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground mb-1">
                         {tCampgrounds("form.websiteLabel")}
                       </h3>
                       <a
-                        href={campground.website}
+                        href={safeWebsite}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline break-all"
                       >
-                        {campground.website}
+                        {safeWebsite}
                       </a>
                     </div>
                   ) : null}
@@ -207,8 +230,8 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                 <div className="space-y-6">
                   {Object.entries(groupedAmenities).map(([category, items]) => (
                     <div key={category} className="pb-2">
-                      <h4 className="font-medium text-base mb-2.5 capitalize border-b pb-1 border-muted">
-                        {category}
+                      <h4 className="font-medium text-base mb-2.5 border-b pb-1 border-muted">
+                        {translateCode(tAmenities, "categories", category)}
                       </h4>
                       <div className="flex flex-wrap gap-2.5">
                         {items.map((amenity) => (
@@ -217,7 +240,7 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                             variant="secondary"
                             className="text-sm px-3 py-1"
                           >
-                            {amenity.code}
+                            {translateCode(tAmenities, "codes", amenity.code)}
                           </Badge>
                         ))}
                       </div>
@@ -265,10 +288,18 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                             {site.name}
                           </TableCell>
                           <TableCell>{site.description}</TableCell>
-                          <TableCell>{site.site_type_code}</TableCell>
+                          <TableCell>
+                            {translateCode(
+                              tSites,
+                              "types",
+                              site.site_type_code,
+                            )}
+                          </TableCell>
                           <TableCell>
                             {site.max_rig_length != null
-                              ? site.max_rig_length
+                              ? tSites("rigLengthFeet", {
+                                  length: Number(site.max_rig_length),
+                                })
                               : "—"}
                           </TableCell>
                           <TableCell>

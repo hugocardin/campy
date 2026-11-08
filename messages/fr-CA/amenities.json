@@ -3,6 +3,20 @@
   "plural": "Commodités",
   "noResult": "Aucune commodité",
 
+  "categories": {
+    "SERVICES": "Services offerts",
+    "FACILITIES": "Installations",
+    "ACTIVITIES": "Activités"
+  },
+
+  "codes": {
+    "WIFI": "Wi‑Fi (sans fil)",
+    "FIRE_PIT": "Feu de camp",
+    "PET_FRIENDLY": "Animaux acceptés",
+    "POOL": "Piscine",
+    "SOCCER": "Soccer / football"
+  },
+
   "form": {
     "amenityLabel": "Nom de la commodité",
     "amenityPlaceholder": "ex. Wi-Fi, Animaux acceptés, Feu de camp"

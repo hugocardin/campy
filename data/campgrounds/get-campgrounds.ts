@@ -16,6 +16,10 @@ import { cache } from "react";
 export type { CampgroundListFilters, CampgroundSort } from "@/lib/campground-search";
 export { parseCampgroundSort } from "@/lib/campground-search";
 
+/** Guest-safe columns — never select commission_* from v_campgrounds. */
+export const GUEST_CAMPGROUND_COLUMNS =
+  "id, name, description, address, city, province, country, latitude, longitude, website, phone" as const;
+
 type CampgroundRow = {
   id: string;
   name: string;
@@ -24,13 +28,24 @@ type CampgroundRow = {
   city: string | null;
   province: string | null;
   country: string | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   website: string | null;
   phone: string | null;
 };
 
+function toCoord(value: number | null): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function toCampgroundDomain(row: CampgroundRow): Campground {
+  const lat = toCoord(row.latitude);
+  const lng = toCoord(row.longitude);
+  const location =
+    lat != null && lng != null ? { lat, lng } : null;
+
   return {
     id: row.id,
     name: row.name,
@@ -39,15 +54,16 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
     city: row.city,
     province: row.province,
     country: row.country,
-    location: {
-      lat: Number(row.latitude),
-      lng: Number(row.longitude),
-    },
+    location,
     website: row.website ?? "",
     phone: row.phone ?? "",
   };
 }
 
+/**
+ * Follow-up (parked): distinct view/RPC, `unstable_cache` / revalidate, and
+ * Quebec/Québec/QC + fr-CA label normalization. Fine at demo scale.
+ */
 export const getCampgroundProvinces = cache(
   async (): Promise<ActionResult<string[]>> => {
     try {
@@ -90,14 +106,20 @@ export const getCampgrounds = cache(
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       const provinceFilter = province?.trim().slice(0, 100) || "";
 
-      let query = supabase.from("v_campgrounds").select("*");
+      let query = supabase
+        .from("v_campgrounds")
+        .select(GUEST_CAMPGROUND_COLUMNS);
 
       if (term) {
         // Quote values so spaces / apostrophes stay inside one PostgREST filter.
         const pattern = `"%${term}%"`;
-        query = query.or(
-          `name.ilike.${pattern},city.ilike.${pattern},province.ilike.${pattern}`,
-        );
+        // When a province filter is set, skip province in the text OR so a
+        // province-name search (e.g. "Ontario") + mismatched filter (BC) does
+        // not silently AND-constrain province twice.
+        const textFilter = provinceFilter
+          ? `name.ilike.${pattern},city.ilike.${pattern}`
+          : `name.ilike.${pattern},city.ilike.${pattern},province.ilike.${pattern}`;
+        query = query.or(textFilter);
       }
 
       if (provinceFilter) {

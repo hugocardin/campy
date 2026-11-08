@@ -4,16 +4,33 @@ import { routing } from "./i18n/routing";
 import { createServerClient } from "@supabase/ssr";
 import { getUserRoleName } from "@/data/users/get-user-role";
 import { USER_ROLE_PLATEFORMADMIN } from "./lib/constants";
+import { isUuid } from "./lib/is-uuid";
 import { stripLocalePrefix } from "./lib/locale-path";
 import { routes } from "./lib/routes";
 
 const handleI18nRouting = createMiddleware(routing);
 
-const publicBasePaths = [
-  routes.home(),
-  routes.auth(),
-  routes.campgrounds(),
-];
+/** Exact guest detail only — not `/campgrounds/<id>/book` etc. */
+function isPublicCampgroundDetailPath(pathnameWithoutLocale: string): boolean {
+  const prefix = `${routes.campgrounds()}/`;
+  if (!pathnameWithoutLocale.startsWith(prefix)) return false;
+  const rest = pathnameWithoutLocale.slice(prefix.length);
+  // Single segment that is a UUID (no nested paths).
+  return !rest.includes("/") && isUuid(rest);
+}
+
+function isPublicPath(pathnameWithoutLocale: string): boolean {
+  if (pathnameWithoutLocale === routes.home()) return true;
+
+  if (
+    pathnameWithoutLocale === routes.auth() ||
+    pathnameWithoutLocale.startsWith(`${routes.auth()}/`)
+  ) {
+    return true;
+  }
+
+  return isPublicCampgroundDetailPath(pathnameWithoutLocale);
+}
 
 export default async function middleware(request: NextRequest) {
   const response = handleI18nRouting(request);
@@ -48,11 +65,7 @@ export default async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isPublic =
-    publicBasePaths.some(
-      (base) =>
-        pathnameWithoutLocale === base ||
-        pathnameWithoutLocale.startsWith(base + "/"),
-    ) ||
+    isPublicPath(pathnameWithoutLocale) ||
     pathname.startsWith("/_next") ||
     pathname.includes(".");
 

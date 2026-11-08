@@ -6,6 +6,7 @@ import { ActionResult, DbErrorCode, resultError } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
+import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import {
   handleDbNoData,
   handleDbResponse,
@@ -98,7 +99,7 @@ export async function updateCampgroundAction(
           city: input.city || null,
           province: input.province || null,
           country: input.country || null,
-          website: input.website || null,
+          website: toSafeHttpUrl(input.website),
           phone: input.phone || null,
           updated_at: new Date().toISOString(),
 
@@ -151,7 +152,7 @@ export async function createCampgroundAction(
           city: input.city?.trim() || null,
           province: input.province?.trim() || null,
           country: input.country?.trim() || null,
-          website: input.website?.trim() || null,
+          website: toSafeHttpUrl(input.website),
           phone: input.phone?.trim() || null,
           location: `SRID=4326;${locationWKT}`,
           created_at: new Date().toISOString(),

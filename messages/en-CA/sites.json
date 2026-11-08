@@ -2,6 +2,14 @@
   "singular": "Site",
   "plural": "Sites",
   "noResult": "No site",
+  "rigLengthFeet": "{length} ft",
+
+  "types": {
+    "TENT": "Tent",
+    "RV": "RV",
+    "RV_AND_TENT": "RV and tent",
+    "LODGING": "Lodging"
+  },
 
   "form": {
     "nameLabel": "Name",

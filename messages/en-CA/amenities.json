@@ -3,6 +3,20 @@
   "plural": "Amenities",
   "noResult": "No amenity",
 
+  "categories": {
+    "SERVICES": "Services",
+    "FACILITIES": "Facilities",
+    "ACTIVITIES": "Activities"
+  },
+
+  "codes": {
+    "WIFI": "Wi‑Fi",
+    "FIRE_PIT": "Fire pit",
+    "PET_FRIENDLY": "Pet friendly",
+    "POOL": "Pool",
+    "SOCCER": "Soccer"
+  },
+
   "form": {
     "amenityLabel": "Amenity Name",
     "amenityPlaceholder": "e.g. WiFi, Pet friendly, Fire pit"

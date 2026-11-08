@@ -17,7 +17,7 @@ import { usePathname, useRouter } from "@/i18n/navigation";
 import { Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 type Props = {
   resultCount: number;
@@ -44,11 +44,15 @@ export default function CampgroundListControls({
 
   const [search, setSearch] = useState(qParam);
   const [prevQParam, setPrevQParam] = useState(qParam);
+  const skipDebounceRef = useRef(false);
 
-  // Keep the input aligned when the URL changes (back/forward / clear).
+  // Keep the input aligned when the URL changes (back/forward), but do not
+  // wipe a trailing space the user is mid-typing after debounce trims `q`.
   if (qParam !== prevQParam) {
     setPrevQParam(qParam);
-    setSearch(qParam);
+    if (search.trim() !== qParam) {
+      setSearch(qParam);
+    }
   }
 
   function replaceQuery(next: {
@@ -75,20 +79,30 @@ export default function CampgroundListControls({
   }
 
   useEffect(() => {
-    if (search === qParam) return;
+    if (skipDebounceRef.current) {
+      skipDebounceRef.current = false;
+      return;
+    }
+
+    // Trailing spaces alone should not rewrite the URL (or fight the input).
+    if (search.trim() === qParam) return;
 
     const handle = window.setTimeout(() => {
+      // Read latest sort/province from the URL at fire time (not the render
+      // that scheduled this timeout) so a pending debounce cannot clobber a
+      // select change made within the 300 ms window.
+      const latest = new URLSearchParams(window.location.search);
       replaceQuery({
         q: search,
-        sort: sortParam,
-        province: provinceParam,
+        sort: parseCampgroundSort(latest.get("sort") ?? undefined),
+        province: latest.get("province") ?? "",
       });
     }, 300);
 
     return () => window.clearTimeout(handle);
-    // Debounce the search box only; sort/province updates call replaceQuery directly.
+    // Debounce the search box; sort/province are read at fire time.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional debounce on `search`
-  }, [search]);
+  }, [search, qParam]);
 
   return (
     <div
@@ -154,6 +168,7 @@ export default function CampgroundListControls({
           type="button"
           variant="outline"
           onClick={() => {
+            skipDebounceRef.current = true;
             setSearch("");
             replaceQuery({ q: "", sort: sortParam, province: "" });
           }}

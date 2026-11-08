@@ -15,17 +15,23 @@ type Props = {
   className?: string;
 };
 
+type LocatedCampground = Campground & {
+  location: { lat: number; lng: number };
+};
+
 const DEFAULT_CENTER: LatLngTuple = [56.1304, -106.3468]; // Canada
 const DEFAULT_ZOOM = 4;
 
-function hasValidCoords(campground: Campground): boolean {
-  const { lat, lng } = campground.location;
-  return (
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    Math.abs(lat) <= 90 &&
-    Math.abs(lng) <= 180
-  );
+function hasValidCoords(
+  campground: Campground,
+): campground is LocatedCampground {
+  const loc = campground.location;
+  if (!loc) return false;
+  const { lat, lng } = loc;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  // Reject Null Island — usually means Number(null) or missing geocode.
+  if (lat === 0 && lng === 0) return false;
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 }
 
 function FitMarkers({ positions }: { positions: LatLngTuple[] }) {
@@ -46,12 +52,11 @@ function FitMarkers({ positions }: { positions: LatLngTuple[] }) {
   return null;
 }
 
-// Bundlers break Leaflet's default icon URLs; pin to published package assets.
+// Served from /public/leaflet (copied from leaflet/dist/images) — not unpkg.
 const DefaultIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconUrl: "/leaflet/marker-icon.png",
+  iconRetinaUrl: "/leaflet/marker-icon-2x.png",
+  shadowUrl: "/leaflet/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
