@@ -103,7 +103,7 @@
   },
 
   "CampgroundDetailsPage": {
-    "sitesHeading": "Emplacements disponibles",
+    "sitesHeading": "Emplacements",
     "noDescription": "Aucune description fournie.",
     "meta": {
       "title": "{name} sur Campy",

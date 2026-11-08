@@ -35,7 +35,7 @@ export default async function Home({ searchParams }: PageProps) {
   const province = firstParam(params.province);
 
   const [campgroundsResult, provincesResult] = await Promise.all([
-    getCampgrounds({ q, sort, province }),
+    getCampgrounds(q, sort, province),
     getCampgroundProvinces(),
   ]);
 

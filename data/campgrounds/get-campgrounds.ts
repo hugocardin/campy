@@ -1,7 +1,7 @@
 import { Campground } from "@/entities/campground";
 import {
   CAMPGROUND_SORT_CONFIG,
-  CampgroundListFilters,
+  CampgroundSort,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
 } from "@/lib/campground-search";
@@ -19,11 +19,11 @@ export { parseCampgroundSort } from "@/lib/campground-search";
 type CampgroundRow = {
   id: string;
   name: string;
-  description: string;
-  address: string;
-  city: string;
-  province: string;
-  country: string;
+  description: string | null;
+  address: string | null;
+  city: string | null;
+  province: string | null;
+  country: string | null;
   latitude: number;
   longitude: number;
   website: string | null;
@@ -76,29 +76,32 @@ export const getCampgroundProvinces = cache(
   },
 );
 
+/** Primitives (not an object) so React `cache` can dedupe by argument identity. */
 export const getCampgrounds = cache(
   async (
-    filters: CampgroundListFilters = {},
+    q?: string,
+    sort: CampgroundSort = "name",
+    province?: string,
   ): Promise<ActionResult<Campground[]>> => {
     try {
       const supabase = await createClient();
-      const sort = parseCampgroundSort(filters.sort);
-      const { column, ascending } = CAMPGROUND_SORT_CONFIG[sort];
-      const q = filters.q ? sanitizeCampgroundSearchTerm(filters.q) : "";
-      const province = filters.province?.trim().slice(0, 100) || "";
+      const resolvedSort = parseCampgroundSort(sort);
+      const { column, ascending } = CAMPGROUND_SORT_CONFIG[resolvedSort];
+      const term = q ? sanitizeCampgroundSearchTerm(q) : "";
+      const provinceFilter = province?.trim().slice(0, 100) || "";
 
       let query = supabase.from("v_campgrounds").select("*");
 
-      if (q) {
-        // Quote values so spaces in the search term stay inside one PostgREST filter.
-        const pattern = `"%${q}%"`;
+      if (term) {
+        // Quote values so spaces / apostrophes stay inside one PostgREST filter.
+        const pattern = `"%${term}%"`;
         query = query.or(
           `name.ilike.${pattern},city.ilike.${pattern},province.ilike.${pattern}`,
         );
       }
 
-      if (province) {
-        query = query.eq("province", province);
+      if (provinceFilter) {
+        query = query.eq("province", provinceFilter);
       }
 
       query = query.order(column, { ascending });

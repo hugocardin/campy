@@ -13,6 +13,7 @@ import { getAmenitiesForCampground } from "@/data/campgrounds/get-campground-ame
 import { getCampgroundById } from "@/data/campgrounds/get-campground";
 import { getSitesOfCampground } from "@/data/campgrounds/get-campground-sites";
 import { Amenity } from "@/entities/amenity";
+import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes } from "@/lib/routes";
 import { MapPin } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -91,9 +92,11 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
     currency: "CAD",
   });
 
-  const locationLine = [campground.city, campground.province, campground.country]
-    .filter(Boolean)
-    .join(", ");
+  const locationLine = formatCampgroundLocation(
+    campground.city,
+    campground.province,
+    campground.country,
+  );
 
   return (
     <div className="h-full overflow-auto">

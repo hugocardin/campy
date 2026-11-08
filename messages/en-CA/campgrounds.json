@@ -103,7 +103,7 @@
   },
 
   "CampgroundDetailsPage": {
-    "sitesHeading": "Available sites",
+    "sitesHeading": "Sites",
     "noDescription": "No description provided.",
     "meta": {
       "title": "{name} | Campy",

@@ -2,6 +2,7 @@
 
 import { Campground } from "@/entities/campground";
 import { Link } from "@/i18n/navigation";
+import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes } from "@/lib/routes";
 import L, { type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -94,7 +95,11 @@ export default function CampgroundsMap({ campgrounds, className }: Props) {
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          // Demo OK on OSM's public tiles. Switch to a provider with an
+          // SLA/API key (or self-host) before launch — public tile usage
+          // policy is not for production booking traffic. Prefer the
+          // non-{s} URL; the subdomain pattern is deprecated by OSM.
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitMarkers positions={positions} />
         {withCoords.map((campground) => (
@@ -108,7 +113,10 @@ export default function CampgroundsMap({ campgrounds, className }: Props) {
                   {campground.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {campground.city}, {campground.province}
+                  {formatCampgroundLocation(
+                    campground.city,
+                    campground.province,
+                  )}
                 </p>
                 <Link
                   href={routes.campgroundDetail(campground.id)}

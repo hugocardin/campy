@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Campground } from "@/entities/campground";
 import { Link } from "@/i18n/navigation";
+import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes } from "@/lib/routes";
 import { useTranslations } from "next-intl";
 
@@ -37,7 +38,7 @@ export default function CampgroundCard({ campground }: Props) {
         <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5 shrink-0" />
           <span>
-            {campground.city}, {campground.province}
+            {formatCampgroundLocation(campground.city, campground.province)}
           </span>
         </div>
       </CardContent>
