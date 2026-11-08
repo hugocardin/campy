@@ -8,5 +8,21 @@
       "title": "Campy – Find and Book Campgrounds",
       "description": "Find & book you trips in Canada. Start your adventure today."
     }
+  },
+  "controls": {
+    "searchPlaceholder": "Search by name, city, or province…",
+    "sortLabel": "Sort by",
+    "sortNameAsc": "Name (A–Z)",
+    "sortNameDesc": "Name (Z–A)",
+    "sortCity": "City (A–Z)",
+    "sortProvince": "Province (A–Z)",
+    "provinceLabel": "Filter by province",
+    "provinceAll": "All provinces",
+    "clearFilters": "Clear",
+    "resultCount": "{count, plural, =0 {No campgrounds} one {Showing # campground} other {Showing # campgrounds}}",
+    "noResults": "No campgrounds match your search.",
+    "viewCampground": "View campground",
+    "mapLoading": "Loading map…",
+    "mapEmpty": "No campgrounds with map locations to show."
   }
 }

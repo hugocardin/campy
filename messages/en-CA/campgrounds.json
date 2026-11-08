@@ -100,5 +100,16 @@
       "title": "Edit Campground | Admin | Campy",
       "description": "Edit campground."
     }
+  },
+
+  "CampgroundDetailsPage": {
+    "sitesHeading": "Available sites",
+    "noDescription": "No description provided.",
+    "meta": {
+      "title": "{name} | Campy",
+      "description": "View details and sites at {name}.",
+      "titleFallback": "Campground | Campy",
+      "descriptionFallback": "View campground details on Campy."
+    }
   }
 }

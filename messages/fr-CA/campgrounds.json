@@ -100,5 +100,16 @@
       "title": "Modifier le camping | Administration | Campy",
       "description": "Modifier le camping."
     }
+  },
+
+  "CampgroundDetailsPage": {
+    "sitesHeading": "Emplacements disponibles",
+    "noDescription": "Aucune description fournie.",
+    "meta": {
+      "title": "{name} sur Campy",
+      "description": "Consultez les détails et les emplacements de {name}.",
+      "titleFallback": "Camping | Campy",
+      "descriptionFallback": "Consultez les détails d'un camping sur Campy."
+    }
   }
 }

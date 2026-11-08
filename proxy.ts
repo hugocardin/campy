@@ -9,7 +9,11 @@ import { routes } from "./lib/routes";
 
 const handleI18nRouting = createMiddleware(routing);
 
-const publicBasePaths = [routes.home(), routes.auth()];
+const publicBasePaths = [
+  routes.home(),
+  routes.auth(),
+  routes.campgrounds(),
+];
 
 export default async function middleware(request: NextRequest) {
   const response = handleI18nRouting(request);
