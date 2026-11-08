@@ -1,0 +1,104 @@
+{
+  "singular": "Camping",
+  "plural": "Campings",
+  "noResult": "Aucun camping",
+
+  "form": {
+    "nameLabel": "Nom",
+    "namePlaceholder": "Entrez le nom du camping",
+    "ownerLabel": "Propriétaire",
+    "ownerPlaceholder": "Sélectionnez un propriétaire",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Décrivez le camping...",
+    "websiteLabel": "Site web",
+    "websitePlaceholder": "https://...",
+    "phoneLabel": "Téléphone",
+    "phonePlaceholder": "ex. 555-555-5555",
+    "addressLabel": "Adresse",
+    "addressPlaceholder": "ex. 123, rue Principale",
+    "cityLabel": "Ville",
+    "cityPlaceholder": "ex. Montréal, Ottawa, Vancouver...",
+    "provinceLabel": "Province / État",
+    "provincePlaceholder": "ex. Québec, Ontario, Colombie-Britannique...",
+    "countryLabel": "Pays",
+    "countryPlaceholder": "ex. Canada, États-Unis...",
+    "latitudeLabel": "Latitude",
+    "latitudePlaceholder": "ex. 45.4215",
+    "latitudeRange": "Intervalle\u00A0: -90° à +90°",
+    "longitudeLabel": "Longitude",
+    "longitudePlaceholder": "ex. -75.6972",
+    "longitudeRange": "Intervalle\u00A0: -180° à +180°",
+    "locationLabel": "Emplacement",
+    "active": "Actif",
+    "inactive": "Inactif"
+  },
+
+  "errors": {
+    "nameRequired": "Le nom du camping est requis",
+    "ownerRequired": "Le propriétaire du camping est requis",
+    "latitudeInvalid": "La latitude doit être entre -90 et +90",
+    "longitudeInvalid": "La longitude doit être entre -180 et +180"
+  },
+
+  "actions": {
+    "createCampground": "Créer un camping",
+    "confirmDeActivateAction": "{action, select, activate {Voulez-vous vraiment activer «\u00A0{name}\u00A0»?} other {Voulez-vous vraiment désactiver «\u00A0{name}\u00A0»?}}",
+    "activate": "Activer",
+    "deactivate": "Désactiver"
+  },
+
+  "AdminCampgroundsPage": {
+    "pageHeader": {
+      "title": "Gérer les campings",
+      "description": "Ajouter, modifier ou retirer des campings"
+    },
+    "meta": {
+      "title": "Campings | Administration | Campy",
+      "description": "Gérer les campings."
+    }
+  },
+
+  "AdminCampgroundCreatePage": {
+    "pageHeader": {
+      "title": "Créer un nouveau camping",
+      "description": "Créer un nouveau camping"
+    },
+    "meta": {
+      "title": "Créer un camping | Administration | Campy",
+      "description": "Créer un camping."
+    }
+  },
+
+  "AdminCampgroundDetailsPage": {
+    "pageHeader": {
+      "title": "Camping\u00A0: {name}",
+      "description": "Propriétaire\u00A0: {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Gérer le camping | Administration | Campy",
+      "description": "Gérer le camping."
+    }
+  },
+
+  "AdminCampgroundAmenitiesPage": {
+    "pageHeader": {
+      "title": "{name} - Gérer les commodités du camping",
+      "description": "Propriétaire\u00A0: {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Gérer les commodités du camping | Administration | Campy",
+      "description": "Gérer les commodités du camping."
+    }
+  },
+
+  "AdminCampgroundEditPage": {
+    "pageHeader": {
+      "title": "Modifier {name}",
+      "description": "Propriétaire\u00A0: {ownerName} ({ownerEmail})"
+    },
+    "meta": {
+      "title": "Modifier le camping | Administration | Campy",
+      "description": "Modifier le camping."
+    }
+  }
+}

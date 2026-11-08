@@ -1,0 +1,32 @@
+{
+  "singular": "Commodité",
+  "plural": "Commodités",
+  "noResult": "Aucune commodité",
+
+  "form": {
+    "amenityLabel": "Nom de la commodité",
+    "amenityPlaceholder": "ex. Wi-Fi, Animaux acceptés, Feu de camp"
+  },
+
+  "errors": {
+    "codeRequired": "Le nom de la commodité est requis, mais n'a pas été fourni.",
+    "categoryRequired": "La catégorie est requise, mais n'a pas été fournie.",
+    "codeTooLong": "Le nom de la commodité doit compter au plus {max} caractères."
+  },
+
+  "actions": {
+    "confirmAmenityDeletion": "Supprimer la commodité «\u00A0{code}\u00A0»? Cette action est irréversible.",
+    "deleteAmenityTitle": "Supprimer la commodité"
+  },
+
+  "AdminAmenitiesPage": {
+    "pageHeader": {
+      "title": "Gérer les commodités",
+      "description": "Ajouter, modifier ou retirer des commodités"
+    },
+    "meta": {
+      "title": "Commodités | Administration | Campy",
+      "description": "Gérer les commodités disponibles."
+    }
+  }
+}

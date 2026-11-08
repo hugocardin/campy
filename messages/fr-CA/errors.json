@@ -1,0 +1,26 @@
+{
+  "GENERIC_SERVER_ERROR": "Une erreur s'est produite. Veuillez réessayer plus tard.",
+
+  "COMMON_MISSING_FIELD": "Une valeur requise est manquante. Vérifiez votre saisie et réessayez.",
+  "COMMON_FIELD_TOO_LONG": "Une valeur est trop longue. Veuillez la raccourcir et réessayer.",
+
+  "DB_DUPLICATE_VALUE": "Cette valeur existe déjà. Veuillez en choisir une autre.",
+  "DB_INVALID_REFERENCE": "L'enregistrement référencé n'existe pas.",
+  "DB_NOT_NULL_VIOLATION": "Ce champ est requis et ne peut pas être vide.",
+  "DB_CHECK_VIOLATION": "La valeur saisie ne respecte pas les conditions requises.",
+  "DB_NOT_FOUND": "L'élément demandé est introuvable.",
+  "DB_PERMISSION_DENIED": "Vous n'avez pas la permission d'effectuer cette action.",
+  "DB_SESSION_EXPIRED": "Votre session a expiré. Veuillez vous reconnecter.",
+  "DB_RESOURCE_IN_USE": "Cet élément est encore utilisé et ne peut pas être supprimé.",
+  "DB_UNHANDLED_DATABASE_ERROR": "Une erreur de base de données s'est produite. Veuillez réessayer.",
+  "DB_CONNECTION_ERROR": "Impossible de se connecter au serveur. Vérifiez votre connexion Internet.",
+
+  "AUTH_INVALID_CREDENTIALS": "Le courriel ou le mot de passe saisi est incorrect.",
+  "AUTH_EMAIL_ALREADY_EXISTS": "Un compte avec cette adresse courriel existe déjà.",
+  "AUTH_WEAK_PASSWORD": "Votre mot de passe est trop faible. Renforcez-le (au moins 8 caractères avec des chiffres et des symboles).",
+  "AUTH_EMAIL_NOT_CONFIRMED": "Vérifiez votre courriel et confirmez votre compte avant de vous connecter.",
+  "AUTH_TOO_MANY_REQUESTS": "Trop de tentatives échouées. Attendez quelques minutes avant de réessayer.",
+  "AUTH_INVALID_EMAIL": "Veuillez entrer une adresse courriel valide.",
+  "AUTH_NETWORK_ERROR": "Erreur réseau. Vérifiez votre connexion et réessayez.",
+  "AUTH_UNKNOWN_AUTH_ERROR": "Une erreur d'authentification s'est produite. Veuillez réessayer."
+}

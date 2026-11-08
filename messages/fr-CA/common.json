@@ -9,7 +9,7 @@
   "details": "Détails",
   "edit": "Modifier",
   "error": "Erreur",
-  "errorReference": "Référence : {errorId}",
+  "errorReference": "Référence\u00A0: {errorId}",
   "somethingWentWrong": "Une erreur s'est produite",
   "logoAlt": "Logo Campy",
   "save": "Enregistrer",

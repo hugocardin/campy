@@ -45,7 +45,7 @@
   "AdminSiteDetailsPage": {
     "pageHeader": {
       "title": "Site: {name}",
-      "description": "From campground : {name}"
+      "description": "From campground: {campgroundName}"
     },
     "meta": {
       "title": "Site details | Admin | Campy",
