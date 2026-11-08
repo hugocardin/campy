@@ -15,7 +15,7 @@
   },
 
   "actions": {
-    "confirmAmenityDeletion": "Supprimer la commodité « {code} »? Cette action est irréversible.",
+    "confirmAmenityDeletion": "Supprimer la commodité «\u00A0{code}\u00A0»? Cette action est irréversible.",
     "deleteAmenityTitle": "Supprimer la commodité"
   },
 
@@ -25,7 +25,7 @@
       "description": "Ajouter, modifier ou retirer des commodités"
     },
     "meta": {
-      "title": "Commodités | Admin | Campy",
+      "title": "Commodités | Administration | Campy",
       "description": "Gérer les commodités disponibles."
     }
   }

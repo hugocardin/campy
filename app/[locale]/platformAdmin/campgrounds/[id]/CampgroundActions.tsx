@@ -33,11 +33,8 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     const action = campground.active
       ? inactivateCampgroundAction
       : activateCampgroundAction;
-    const actionName = campground.active
-      ? "actions.deactivate"
-      : "actions.activate";
     const confirmMessage = t_campgrounds("actions.confirmDeActivateAction", {
-      actionName,
+      action: campground.active ? "deactivate" : "activate",
       name: campground.name,
     });
 

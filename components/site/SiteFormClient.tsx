@@ -88,7 +88,7 @@ export default function SiteFormClient({
       return setError(t_sites("errors.invalidMinStayNights"));
     }
     if (isNaN(siteTypeIdNum)) {
-      return setError(t_sites("typeRequired"));
+      return setError(t_sites("errors.typeRequired"));
     }
 
     const payload: SiteCreateUpdateInput = {

@@ -15,7 +15,7 @@
     "phoneLabel": "Téléphone",
     "phonePlaceholder": "ex. 555-555-5555",
     "addressLabel": "Adresse",
-    "addressPlaceholder": "ex. 123 Rue Principale",
+    "addressPlaceholder": "ex. 123, rue Principale",
     "cityLabel": "Ville",
     "cityPlaceholder": "ex. Montréal, Ottawa, Vancouver...",
     "provinceLabel": "Province / État",
@@ -23,11 +23,11 @@
     "countryLabel": "Pays",
     "countryPlaceholder": "ex. Canada, États-Unis...",
     "latitudeLabel": "Latitude",
-    "latitudePlaceholder": "ex. 45.4215",
-    "latitudeRange": "Intervalle : -90° à +90°",
+    "latitudePlaceholder": "ex. 45,4215",
+    "latitudeRange": "Intervalle\u00A0: -90° à +90°",
     "longitudeLabel": "Longitude",
-    "longitudePlaceholder": "ex. -75.6972",
-    "longitudeRange": "Intervalle : -180° à +180°",
+    "longitudePlaceholder": "ex. -75,6972",
+    "longitudeRange": "Intervalle\u00A0: -180° à +180°",
     "locationLabel": "Emplacement",
     "active": "Actif",
     "inactive": "Inactif"
@@ -42,7 +42,7 @@
 
   "actions": {
     "createCampground": "Créer un camping",
-    "confirmDeActivateAction": "Voulez-vous vraiment {actionName} « {name} »?",
+    "confirmDeActivateAction": "{action, select, activate {Voulez-vous vraiment activer «\u00A0{name}\u00A0»?} other {Voulez-vous vraiment désactiver «\u00A0{name}\u00A0»?}}",
     "activate": "Activer",
     "deactivate": "Désactiver"
   },
@@ -53,7 +53,7 @@
       "description": "Ajouter, modifier ou retirer des campings"
     },
     "meta": {
-      "title": "Campings | Admin | Campy",
+      "title": "Campings | Administration | Campy",
       "description": "Gérer les campings."
     }
   },
@@ -64,18 +64,18 @@
       "description": "Créer un nouveau camping"
     },
     "meta": {
-      "title": "Créer un camping | Admin | Campy",
+      "title": "Créer un camping | Administration | Campy",
       "description": "Créer un camping."
     }
   },
 
   "AdminCampgroundDetailsPage": {
     "pageHeader": {
-      "title": "Camping : {name}",
-      "description": "Propriétaire : {ownerName} ({ownerEmail})"
+      "title": "Camping\u00A0: {name}",
+      "description": "Propriétaire\u00A0: {ownerName} ({ownerEmail})"
     },
     "meta": {
-      "title": "Gérer le camping | Admin | Campy",
+      "title": "Gérer le camping | Administration | Campy",
       "description": "Gérer le camping."
     }
   },
@@ -83,21 +83,21 @@
   "AdminCampgroundAmenitiesPage": {
     "pageHeader": {
       "title": "{name} - Gérer les commodités du camping",
-      "description": "Propriétaire : {ownerName} ({ownerEmail})"
+      "description": "Propriétaire\u00A0: {ownerName} ({ownerEmail})"
     },
     "meta": {
-      "title": "Gérer les commodités du camping | Admin | Campy",
-      "description": "Gérer le camping."
+      "title": "Gérer les commodités du camping | Administration | Campy",
+      "description": "Gérer les commodités du camping."
     }
   },
 
   "AdminCampgroundEditPage": {
     "pageHeader": {
       "title": "Modifier {name}",
-      "description": "Propriétaire : {ownerName} ({ownerEmail})"
+      "description": "Propriétaire\u00A0: {ownerName} ({ownerEmail})"
     },
     "meta": {
-      "title": "Modifier le camping | Admin | Campy",
+      "title": "Modifier le camping | Administration | Campy",
       "description": "Modifier le camping."
     }
   }

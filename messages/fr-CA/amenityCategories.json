@@ -11,7 +11,7 @@
 
   "actions": {
     "deleteAmenityCategoryTitle": "Supprimer la catégorie de commodité",
-    "confirmAmenityCategoryDeletion": "Supprimer la catégorie de commodité « {category} »? Cette action est irréversible."
+    "confirmAmenityCategoryDeletion": "Supprimer la catégorie de commodité «\u00A0{category}\u00A0»? Cette action est irréversible."
   },
 
   "AdminAmenityCategoryPage": {
@@ -20,7 +20,7 @@
       "description": "Ajouter, modifier ou retirer des catégories de commodités"
     },
     "meta": {
-      "title": "Catégories de commodités | Admin | Campy",
+      "title": "Catégories de commodités | Administration | Campy",
       "description": "Gérer les catégories de commodités disponibles."
     }
   }

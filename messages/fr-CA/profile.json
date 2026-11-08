@@ -6,7 +6,7 @@
     "fullname": "Nom complet",
     "email": "Courriel",
     "role": "Rôle",
-    "joined": "Inscrit le"
+    "joined": "Date d'inscription"
   },
 
   "ProfilePage": {

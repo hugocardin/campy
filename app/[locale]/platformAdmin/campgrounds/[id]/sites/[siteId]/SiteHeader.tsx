@@ -19,7 +19,7 @@ export function SiteHeader({ site, campground }: SiteHeaderProps) {
     <BackHeader
       title={t_page("pageHeader.title", { name: site.name })}
       description={t_page("pageHeader.description", {
-        name: campground.name,
+        campgroundName: campground.name,
       })}
       backTo={routes.platformAdmin.campgroundSites(campground.id)}
       rightContent={

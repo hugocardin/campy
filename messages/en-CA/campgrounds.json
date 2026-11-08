@@ -42,7 +42,7 @@
 
   "actions": {
     "createCampground": "Create Campground",
-    "confirmDeActivateAction": "Are you sure you want to {actionName} \"{name}\"?",
+    "confirmDeActivateAction": "{action, select, activate {Are you sure you want to activate \"{name}\"?} other {Are you sure you want to deactivate \"{name}\"?}}",
     "activate": "Activate",
     "deactivate": "Deactivate"
   },
@@ -87,7 +87,7 @@
     },
     "meta": {
       "title": "Manage Campground's amenities | Admin | Campy",
-      "description": "Manage campground."
+      "description": "Manage the campground's amenities."
     }
   },
 

@@ -12,23 +12,7 @@ import {
 } from "@formatjs/icu-messageformat-parser";
 
 const messagesRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "messages");
-
-/**
- * Namespaces that currently ship a fr-CA file. Keep in sync with
- * `messages/fr-CA/*.json` (and with the namespaces loaded in `i18n/request.ts`).
- */
-const EXISTING_FR_CA_FILES = [
-  "adminDashboard.json",
-  "amenities.json",
-  "amenityCategories.json",
-  "auth.json",
-  "campgrounds.json",
-  "common.json",
-  "errors.json",
-  "profile.json",
-  "search.json",
-  "sites.json",
-] as const;
+const requestTsPath = join(dirname(fileURLToPath(import.meta.url)), "..", "i18n", "request.ts");
 
 /**
  * Full `${namespace}.${path}` keys that may legitimately share the same string
@@ -37,7 +21,6 @@ const EXISTING_FR_CA_FILES = [
 const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "common.actions",
   "common.brand",
-  "common.logoAlt",
   "auth.form.passwordPlaceholder",
   "campgrounds.form.descriptionLabel",
   "campgrounds.form.websitePlaceholder",
@@ -45,6 +28,24 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "campgrounds.form.longitudeLabel",
   "sites.form.descriptionLabel",
 ]);
+
+function listLocaleJsonFiles(locale: string): string[] {
+  return readdirSync(join(messagesRoot, locale))
+    .filter((name) => name.endsWith(".json"))
+    .sort();
+}
+
+/** Namespace filenames imported by `i18n/request.ts` (deduped, sorted). */
+function namespacesLoadedByRequestTs(): string[] {
+  const source = readFileSync(requestTsPath, "utf8");
+  const found = new Set<string>();
+  for (const match of source.matchAll(
+    /messages\/\$\{locale\}\/([A-Za-z0-9_-]+)\.json/g,
+  )) {
+    found.add(`${match[1]}.json`);
+  }
+  return [...found].sort();
+}
 
 /**
  * Expected fr-CA plural categories (CLDR 38+). Cardinal `many` covers large round
@@ -957,33 +958,43 @@ describe("ICU plural structural pairing", () => {
 });
 
 describe("fr-CA message parity", () => {
-  const frFiles = readdirSync(join(messagesRoot, "fr-CA"))
-    .filter((name) => name.endsWith(".json"))
-    .sort();
+  const enFiles = listLocaleJsonFiles("en-CA");
+  const frFiles = listLocaleJsonFiles("fr-CA");
 
-  it("ships every namespace loaded by i18n/request.ts", () => {
-    assert.deepEqual(frFiles, [...EXISTING_FR_CA_FILES]);
+  it("ships every en-CA namespace (and matches i18n/request.ts)", () => {
+    assert.deepEqual(frFiles, enFiles);
+    assert.deepEqual(namespacesLoadedByRequestTs(), enFiles);
   });
 
   it("hardcoded fr-CA PluralRules categories agree with this Node runtime", () => {
     assertRuntimePluralRulesAgree();
   });
 
-  it("identical-value allowlist entries exist in en-CA leaves", () => {
+  it("identical-value allowlist entries remain identical across locales", () => {
     for (const key of IDENTICAL_VALUE_ALLOWLIST) {
       const dot = key.indexOf(".");
       assert.ok(dot > 0, `allowlist key must be namespace.path, got ${key}`);
       const namespace = key.slice(0, dot);
       const path = key.slice(dot + 1);
-      const leaves = collectLeaves(loadNamespace("en-CA", namespace));
+      const enLeaves = collectLeaves(loadNamespace("en-CA", namespace));
+      const frLeaves = collectLeaves(loadNamespace("fr-CA", namespace));
       assert.ok(
-        leaves.has(path),
+        enLeaves.has(path),
         `allowlist entry "${key}" is stale — not present in messages/en-CA/${namespace}.json`,
+      );
+      assert.ok(
+        frLeaves.has(path),
+        `allowlist entry "${key}" is stale — not present in messages/fr-CA/${namespace}.json`,
+      );
+      assert.equal(
+        frLeaves.get(path),
+        enLeaves.get(path),
+        `allowlist entry "${key}" is stale — fr-CA is no longer identical to en-CA (remove from allowlist or restore the shared value)`,
       );
     }
   });
 
-  for (const file of EXISTING_FR_CA_FILES) {
+  for (const file of enFiles) {
     const namespace = file.replace(/\.json$/, "");
 
     it(`${namespace}: keys, ICU shape, and non-empty/non-stub values`, () => {
