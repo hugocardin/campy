@@ -10,17 +10,27 @@ let adminClient: SupabaseClient | undefined;
  */
 export function getSupabaseAdmin(): SupabaseClient {
   if (!adminClient) {
-    adminClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-          detectSessionInUrl: false,
-        },
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url) {
+      throw new Error(
+        "Missing NEXT_PUBLIC_SUPABASE_URL — required for the Supabase service-role client.",
+      );
+    }
+    if (!serviceRoleKey) {
+      throw new Error(
+        "Missing SUPABASE_SERVICE_ROLE_KEY — required for the Supabase service-role client.",
+      );
+    }
+
+    adminClient = createClient(url, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
       },
-    );
+    });
   }
   return adminClient;
 }
