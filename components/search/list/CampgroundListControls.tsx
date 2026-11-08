@@ -51,11 +51,15 @@ export default function CampgroundListControls({
 
   // Sync input from URL only for external changes (back/forward / Clear).
   // Skip when qParam is what we ourselves pushed — typing during an in-flight
-  // navigation must not be overwritten.
+  // navigation must not be overwritten. External URL changes also reset
+  // lastPushedQ so re-typing the old query still navigates.
   if (qParam !== prevQParam) {
     setPrevQParam(qParam);
-    if (qParam !== lastPushedQ && search.trim() !== qParam) {
-      setSearch(qParam);
+    if (qParam !== lastPushedQ) {
+      setLastPushedQ(qParam);
+      if (search.trim() !== qParam) {
+        setSearch(qParam);
+      }
     }
   }
 

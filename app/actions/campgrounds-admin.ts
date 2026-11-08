@@ -42,7 +42,10 @@ function revalidateCampgroundPublicAndAdmin(id: string) {
   revalidateLocalizedPath(routes.platformAdmin.campgroundEdit(id));
 }
 
-async function changeCampgroundStatus(id: string, activeFlagToSet: boolean) {
+async function changeCampgroundStatus(
+  id: string,
+  activeFlagToSet: boolean,
+): Promise<ActionResult> {
   const auth = await requirePlatformAdmin();
   if (!auth.success) {
     return auth;
@@ -51,20 +54,23 @@ async function changeCampgroundStatus(id: string, activeFlagToSet: boolean) {
   try {
     const supabase = await createClient();
 
+    // Explicit columns only — bare `.select()` is `select=*`, which needs
+    // commission_* and fails after authenticated lost table-level SELECT.
     const result = await handleDbSingle(
       supabase
         .from("campgrounds")
         .update({ active: activeFlagToSet })
         .eq("id", id)
-        .select()
+        .select("id, active")
         .single(),
     );
 
-    if (result.success) {
-      revalidateCampgroundPublicAndAdmin(id);
+    if (!result.success) {
+      return result;
     }
 
-    return result;
+    revalidateCampgroundPublicAndAdmin(id);
+    return { success: true, data: undefined };
   } catch (err) {
     return handleUnexpectedError(err);
   }

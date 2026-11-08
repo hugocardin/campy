@@ -1,7 +1,7 @@
 -- Guest campground reads must not expose commission terms.
 -- DROP+CREATE required: CREATE OR REPLACE cannot remove view columns.
 -- Applied on Campy as version 20261108172255.
--- Follow-up 20261108173136 adds security_invoker + authenticated guest-column grants.
+-- Follow-up 20261108173147 adds security_invoker + authenticated guest-column grants.
 
 BEGIN;
 
