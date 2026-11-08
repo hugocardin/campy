@@ -91,7 +91,7 @@ ROLLBACK;
 | Non-admin `rpc/get_campgrounds_admin` | **`42501`** (permission denied), not empty list |
 | Platform admin `rpc/get_campgrounds_admin` | Rows **with** `owner_email` / `owner_full_name`, ordered by `name` |
 | Anon/auth catalog writes | `42501` or 0 rows mutated |
-| Non-admin `UPDATE` own `profiles.role_id` | Fail — **parked** until profiles/user_roles migrations + live dump |
+| Non-admin `UPDATE` own `profiles.role_id` | Fail `42501` — see `probes/profiles-user-roles-rls.md` (`20261031035111`) |
 | App RLS-blocked `.single()` update | `DB_NOT_FOUND` (PGRST116 mapped), not unhandled |
 
 Throwaway rows only: create via **service role**, attempt mutate as normal user, clean up with service role.
