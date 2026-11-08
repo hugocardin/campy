@@ -153,7 +153,7 @@ describe("handleUnexpectedError", () => {
       message: "JSON object requested, multiple (or no) rows returned",
       details: "The result contains 0 rows",
       hint: null,
-    } as PostgrestError);
+    } as unknown as PostgrestError);
     assertSafeFailure(result, DbErrorCode.DB_NOT_FOUND);
   });
 
@@ -163,7 +163,7 @@ describe("handleUnexpectedError", () => {
       message: "JSON object requested, multiple (or no) rows returned",
       details: "The result contains 2 rows",
       hint: null,
-    } as PostgrestError);
+    } as unknown as PostgrestError);
     assertSafeFailure(result, DbErrorCode.DB_UNHANDLED_DATABASE_ERROR);
   });
 
@@ -173,12 +173,12 @@ describe("handleUnexpectedError", () => {
       message: "JSON object requested, multiple (or no) rows returned",
       details: null,
       hint: null,
-    } as PostgrestError);
+    } as unknown as PostgrestError);
     assertSafeFailure(result, DbErrorCode.DB_UNHANDLED_DATABASE_ERROR);
   });
 
   it("logs an allowlisted cause summary for fetch failures", () => {
-    const logged: unknown[] = [];
+    const logged: unknown[][] = [];
     const original = console.error;
     console.error = (...args: unknown[]) => {
       logged.push(args);
