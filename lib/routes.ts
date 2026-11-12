@@ -1,5 +1,6 @@
 export const routes = {
   home: () => "/",
+  campgrounds: () => "/campgrounds",
   campgroundDetail: (id: string) => `/campgrounds/${id}`,
 
   auth: () => "/auth",

@@ -3,6 +3,7 @@
 
   "COMMON_MISSING_FIELD": "Une valeur requise est manquante. Vérifiez votre saisie et réessayez.",
   "COMMON_FIELD_TOO_LONG": "Une valeur est trop longue. Veuillez la raccourcir et réessayer.",
+  "COMMON_INVALID_FIELD": "Une des valeurs saisies n'est pas valide. Vérifiez et réessayez.",
 
   "DB_DUPLICATE_VALUE": "Cette valeur existe déjà. Veuillez en choisir une autre.",
   "DB_INVALID_REFERENCE": "L'enregistrement référencé n'existe pas.",

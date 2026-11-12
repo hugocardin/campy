@@ -2,6 +2,14 @@
   "singular": "Emplacement",
   "plural": "Emplacements",
   "noResult": "Aucun emplacement",
+  "rigLengthFeet": "{length} pi",
+
+  "types": {
+    "TENT": "Tente",
+    "RV": "VR",
+    "RV_AND_TENT": "VR et tente",
+    "LODGING": "Hébergement"
+  },
 
   "form": {
     "nameLabel": "Nom",

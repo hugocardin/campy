@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
+import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -57,21 +58,25 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
                 </p>
               </div>
 
-              {campground.website && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    {t_campgrounds("form.websiteLabel")}
-                  </h3>
-                  <a
-                    href={campground.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline break-all"
-                  >
-                    {campground.website}
-                  </a>
-                </div>
-              )}
+              {(() => {
+                const safeWebsite = toSafeHttpUrl(campground.website);
+                if (!safeWebsite) return null;
+                return (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                      {t_campgrounds("form.websiteLabel")}
+                    </h3>
+                    <a
+                      href={safeWebsite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline break-all"
+                    >
+                      {campground.website.trim() || safeWebsite}
+                    </a>
+                  </div>
+                );
+              })()}
 
               {campground.phone && (
                 <div>

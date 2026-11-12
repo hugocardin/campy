@@ -122,9 +122,10 @@ function containsUnsubstitutedPlaceholder(message: string): boolean {
  * (e.g. malformed catalogue entry → next-intl returns `errors.CODE`, or a
  * leftover `{arg}` placeholder when details are not interpolated).
  *
- * For `COMMON_MISSING_FIELD` / `COMMON_FIELD_TOO_LONG`, prefers a caller-supplied
- * per-field message (form-local, entity-namespaced) when present; otherwise the
- * generic catalogue entry. Details are never interpolated into ICU.
+ * For `COMMON_MISSING_FIELD` / `COMMON_FIELD_TOO_LONG` / `COMMON_INVALID_FIELD`,
+ * prefers a caller-supplied per-field message (form-local, entity-namespaced)
+ * when present; otherwise the generic catalogue entry. Details are never
+ * interpolated into ICU.
  */
 export function translateErrorCode(
   errorCode: string | undefined,
@@ -138,7 +139,10 @@ export function translateErrorCode(
   }
 
   try {
-    if (errorCode === CommonErrorCode.COMMON_MISSING_FIELD) {
+    if (
+      errorCode === CommonErrorCode.COMMON_MISSING_FIELD ||
+      errorCode === CommonErrorCode.COMMON_INVALID_FIELD
+    ) {
       const rawField = details?.field;
       if (typeof rawField === "string" && rawField.length > 0) {
         const named = resolveFieldMessage(rawField, options?.fieldMessages);

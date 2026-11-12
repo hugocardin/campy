@@ -8,5 +8,21 @@
       "title": "Campy – Trouvez et réservez des campings",
       "description": "Trouvez et réservez vos voyages au Canada. Commencez votre aventure dès aujourd'hui."
     }
+  },
+  "controls": {
+    "searchPlaceholder": "Rechercher par nom, ville ou province…",
+    "sortLabel": "Trier par",
+    "sortNameAsc": "Nom (A à Z)",
+    "sortNameDesc": "Nom (Z à A)",
+    "sortCity": "Ville (A à Z)",
+    "sortProvince": "Province (A à Z)",
+    "provinceLabel": "Filtrer par province",
+    "provinceAll": "Toutes les provinces",
+    "clearFilters": "Effacer",
+    "resultCount": "{count, plural, =0 {Aucun camping} one {Affichage de # camping} many {Affichage de # campings} other {Affichage de # campings}}",
+    "noResults": "Aucun camping ne correspond à votre recherche.",
+    "viewCampground": "Voir le camping",
+    "mapLoading": "Chargement de la carte…",
+    "mapEmpty": "Aucun camping avec des coordonnées à afficher."
   }
 }

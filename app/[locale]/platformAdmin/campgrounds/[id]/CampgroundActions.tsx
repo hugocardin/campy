@@ -13,7 +13,7 @@ import { translateErrorCode, withErrorReference } from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import { Power, PowerOff } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useState, useTransition } from "react";
 
 type CampgroundActionsProps = {

@@ -6,6 +6,7 @@ import { ActionResult, DbErrorCode, resultError } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
+import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import {
   handleDbNoData,
   handleDbResponse,
@@ -16,6 +17,22 @@ import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "next-intl/server";
 
+function normalizeWebsiteInput(
+  website: string | null | undefined,
+): ActionResult<string | null> {
+  const trimmed = website?.trim() ?? "";
+  if (!trimmed) {
+    return { success: true, data: null };
+  }
+  // Safety check only — persist the trimmed original (not url.toString()).
+  if (!toSafeHttpUrl(trimmed)) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "campground.website",
+    });
+  }
+  return { success: true, data: trimmed };
+}
+
 function revalidateCampgroundPublicAndAdmin(id: string) {
   revalidateLocalizedPath(routes.home());
   revalidateLocalizedPath(routes.campgroundDetail(id));
@@ -25,7 +42,10 @@ function revalidateCampgroundPublicAndAdmin(id: string) {
   revalidateLocalizedPath(routes.platformAdmin.campgroundEdit(id));
 }
 
-async function changeCampgroundStatus(id: string, activeFlagToSet: boolean) {
+async function changeCampgroundStatus(
+  id: string,
+  activeFlagToSet: boolean,
+): Promise<ActionResult> {
   const auth = await requirePlatformAdmin();
   if (!auth.success) {
     return auth;
@@ -34,20 +54,23 @@ async function changeCampgroundStatus(id: string, activeFlagToSet: boolean) {
   try {
     const supabase = await createClient();
 
+    // Explicit columns only — bare `.select()` is `select=*`, which needs
+    // commission_* and fails after authenticated lost table-level SELECT.
     const result = await handleDbSingle(
       supabase
         .from("campgrounds")
         .update({ active: activeFlagToSet })
         .eq("id", id)
-        .select()
+        .select("id, active")
         .single(),
     );
 
-    if (result.success) {
-      revalidateCampgroundPublicAndAdmin(id);
+    if (!result.success) {
+      return result;
     }
 
-    return result;
+    revalidateCampgroundPublicAndAdmin(id);
+    return { success: true, data: undefined };
   } catch (err) {
     return handleUnexpectedError(err);
   }
@@ -78,6 +101,11 @@ export async function updateCampgroundAction(
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
     }
 
+    const websiteResult = normalizeWebsiteInput(input.website);
+    if (!websiteResult.success) {
+      return websiteResult;
+    }
+
     const supabase = await createClient();
 
     // Build the geography point in WKT format (Well-Known Text)
@@ -98,7 +126,7 @@ export async function updateCampgroundAction(
           city: input.city || null,
           province: input.province || null,
           country: input.country || null,
-          website: input.website || null,
+          website: websiteResult.data,
           phone: input.phone || null,
           updated_at: new Date().toISOString(),
 
@@ -137,6 +165,11 @@ export async function createCampgroundAction(
   let newCampgroundId;
 
   try {
+    const websiteResult = normalizeWebsiteInput(input.website);
+    if (!websiteResult.success) {
+      return websiteResult;
+    }
+
     const locationWKT = `POINT(${input.location.lng} ${input.location.lat})`;
     const supabase = await createClient();
 
@@ -151,7 +184,7 @@ export async function createCampgroundAction(
           city: input.city?.trim() || null,
           province: input.province?.trim() || null,
           country: input.country?.trim() || null,
-          website: input.website?.trim() || null,
+          website: websiteResult.data,
           phone: input.phone?.trim() || null,
           location: `SRID=4326;${locationWKT}`,
           created_at: new Date().toISOString(),

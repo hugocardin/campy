@@ -1,19 +1,43 @@
 import CampgroundCardSkeleton from "@/components/search/CampgroundCardSkeleton";
 import CampgroundList from "@/components/search/CampgroundList";
+import CampgroundsMapDynamic from "@/components/search/CampgroundsMapDynamic";
+import CampgroundListControls from "@/components/search/list/CampgroundListControls";
+import {
+  getCampgroundProvinces,
+  getCampgrounds,
+} from "@/data/campgrounds/get-campgrounds";
+import { parseCampgroundSort } from "@/lib/campground-search";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
 import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
-import CampgroundListControls from "../../components/search/list/CampgroundListControls";
-import { getCampgrounds } from "../../data/campgrounds/get-campgrounds";
 
 const PAGE_NAMESPACE = "search.SearchPage" as const;
 
 export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
-export default async function Home() {
-  const campgroundsResult = await getCampgrounds();
+type PageProps = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+function firstParam(
+  value: string | string[] | undefined,
+): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+export default async function Home({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const q = firstParam(params.q);
+  const sort = parseCampgroundSort(firstParam(params.sort));
+  const province = firstParam(params.province);
+
+  const [campgroundsResult, provincesResult] = await Promise.all([
+    getCampgrounds(q, sort, province),
+    getCampgroundProvinces(),
+  ]);
 
   if (!campgroundsResult.success) {
     const tc = await getTranslations("common");
@@ -44,37 +68,34 @@ export default async function Home() {
   }
 
   const campgrounds = campgroundsResult.data;
+  const provinces = provincesResult.success ? provincesResult.data : [];
+  const tControls = await getTranslations("search.controls");
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-col flex-1 px-4 sm:px-6 lg:px-8 py-6 overflow-auto">
-        {/* Controls */}
         <div className="shrink-0 mb-6 md:mb-8">
-          <CampgroundListControls />
+          <Suspense
+            fallback={
+              <div className="h-10 rounded-md bg-muted/40 animate-pulse" />
+            }
+          >
+            <CampgroundListControls
+              resultCount={campgrounds.length}
+              provinces={provinces}
+            />
+          </Suspense>
         </div>
 
-        {/* This is the main content area that should take all remaining space */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 flex-1 min-h-0">
-            {/* Map column */}
-            <div className="flex flex-col min-h-75 lg:min-h-0 rounded-xl border border-gray-200">
-              <div className="flex-1 relative">
-                <div className="absolute inset-0 flex items-center justify-center text-gray-500 bg-gray-50/50">
-                  <div className="text-center p-8">
-                    <p className="text-lg font-medium mb-2">Map placeholder</p>
-                    <p className="text-sm">
-                      Leaflet / Mapbox / Google Maps goes here
-                    </p>
-                  </div>
-                </div>
-
-                {/* When ready */}
-                {/* <MapComponent className="absolute inset-0 w-full h-full" campgrounds={campgrounds} /> */}
+            <div className="flex flex-col min-h-75 lg:min-h-0 rounded-xl border border-border overflow-hidden">
+              <div className="flex-1 relative min-h-75">
+                <CampgroundsMapDynamic campgrounds={campgrounds} />
               </div>
             </div>
 
-            {/* List column */}
-            <div className="flex flex-col min-h-0 rounded-xl border border-gray-200">
+            <div className="flex flex-col min-h-0 rounded-xl border border-border">
               <div className="flex-1">
                 <Suspense
                   fallback={
@@ -86,7 +107,13 @@ export default async function Home() {
                   }
                 >
                   <div className="p-6">
-                    <CampgroundList campgrounds={campgrounds!} />
+                    {campgrounds.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-12">
+                        {tControls("noResults")}
+                      </p>
+                    ) : (
+                      <CampgroundList campgrounds={campgrounds} />
+                    )}
                   </div>
                 </Suspense>
               </div>
