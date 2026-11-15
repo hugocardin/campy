@@ -18,6 +18,7 @@ import {
   parseCampgroundGeo,
   parseCampgroundSort,
   roundCampgroundCoord,
+  validateCampgroundGeo,
 } from "@/lib/campground-search";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed, Search } from "lucide-react";
@@ -161,24 +162,18 @@ export default function CampgroundListControls({
     if (trimmedQ) {
       params.set("q", trimmedQ);
     }
-    const geoActive = next.lat != null && next.lng != null;
-    const sortQuery = campgroundSortQueryValue(next.sort, geoActive);
+    const geo = validateCampgroundGeo(next.lat, next.lng, next.radiusKm);
+    const sortQuery = campgroundSortQueryValue(next.sort, Boolean(geo));
     if (sortQuery) {
       params.set("sort", sortQuery);
     }
     if (next.province) {
       params.set("province", next.province);
     }
-    if (
-      next.lat != null &&
-      next.lng != null &&
-      next.radiusKm != null &&
-      Number.isFinite(next.lat) &&
-      Number.isFinite(next.lng)
-    ) {
-      params.set("lat", String(roundCampgroundCoord(next.lat)));
-      params.set("lng", String(roundCampgroundCoord(next.lng)));
-      params.set("radiusKm", String(next.radiusKm));
+    if (geo) {
+      params.set("lat", String(geo.lat));
+      params.set("lng", String(geo.lng));
+      params.set("radiusKm", String(geo.radiusKm));
     }
 
     const query = params.toString();
