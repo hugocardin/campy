@@ -128,6 +128,7 @@ export function isCanadianProvinceCode(
 /**
  * Resolve a URL/query/DB string to a canonical 2-letter code when possible.
  * Returns null when the value is empty or not a known alias.
+ * Trims for fold/lookup only — callers keep exact DB strings for `.in()`.
  */
 export function resolveProvinceCode(
   raw: string | null | undefined,
@@ -155,10 +156,10 @@ export function provinceFilterKey(
  * Controlled alias strings to match against `campgrounds.province` for a code.
  * Unknown / malicious URL values resolve to [] — never pass raw user input.
  *
- * Merges distinct DB raw values whose fold maps to the same code (so odd
- * punctuation/casing in stored rows still matches via `.in()`). Near-me RPC
- * also lower(btrim)s aliases, so static lowercase duplicates are unnecessary.
- * Capped at {@link PROVINCE_ALIAS_MATCH_MAX}.
+ * When `rawDbProvinces` is provided, exact (untrimmed) DB spellings that fold
+ * to the code are added **first**, then static aliases. That way `.in()` can
+ * match padded values like `"Quebec "` and the cap prefers real DB spellings.
+ * Capped at {@link PROVINCE_ALIAS_MATCH_MAX}; warns if truncated.
  */
 export function provinceMatchValues(
   filterKey: string,
@@ -169,26 +170,37 @@ export function provinceMatchValues(
 
   const seen = new Set<string>();
   const out: string[] = [];
+  let truncated = false;
+
   const add = (value: string) => {
     if (!value || seen.has(value)) return;
-    if (out.length >= PROVINCE_ALIAS_MATCH_MAX) return;
+    if (out.length >= PROVINCE_ALIAS_MATCH_MAX) {
+      truncated = true;
+      return;
+    }
     seen.add(value);
     out.push(value);
   };
+
+  if (rawDbProvinces) {
+    for (const raw of rawDbProvinces) {
+      if (raw == null) continue;
+      // Keep exact DB spelling for `.in()`; trim only inside resolveProvinceCode.
+      if (!raw.trim()) continue;
+      if (resolveProvinceCode(raw) === code) {
+        add(raw);
+      }
+    }
+  }
 
   for (const alias of CANADIAN_PROVINCE_ALIASES[code]) {
     add(alias);
   }
 
-  if (rawDbProvinces) {
-    for (const raw of rawDbProvinces) {
-      if (raw == null) continue;
-      const trimmed = raw.trim().slice(0, 100);
-      if (!trimmed) continue;
-      if (resolveProvinceCode(trimmed) === code) {
-        add(trimmed);
-      }
-    }
+  if (truncated) {
+    console.warn(
+      `[canadian-provinces] provinceMatchValues truncated to ${PROVINCE_ALIAS_MATCH_MAX} for ${code}`,
+    );
   }
 
   return out;
@@ -210,7 +222,10 @@ export function uniqueProvinceFilterKeys(
   return [...keys].sort((a, b) => a.localeCompare(b, "en-CA"));
 }
 
-/** Distinct trimmed non-empty province strings (preserves DB spelling). */
+/**
+ * Distinct exact province strings from the DB (preserves padding/spelling).
+ * Skips null/whitespace-only; dedupes by exact string equality.
+ */
 export function distinctProvinceRaws(
   rawProvinces: Iterable<string | null | undefined>,
 ): string[] {
@@ -218,10 +233,10 @@ export function distinctProvinceRaws(
   const out: string[] = [];
   for (const raw of rawProvinces) {
     if (raw == null) continue;
-    const trimmed = raw.trim().slice(0, 100);
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    out.push(trimmed);
+    if (!raw.trim()) continue;
+    if (seen.has(raw)) continue;
+    seen.add(raw);
+    out.push(raw);
   }
   return out;
 }

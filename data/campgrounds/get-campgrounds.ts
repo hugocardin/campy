@@ -101,8 +101,9 @@ function sortCampgrounds(
 }
 
 /**
- * Distinct trimmed province strings from active guest view (DB spelling preserved).
- * Shared by filter option keys and alias expansion for matching.
+ * Exact distinct province strings from the guest view (padding preserved for
+ * `.in()` matching). Demo-scale full select is fine; parked follow-up:
+ * DISTINCT RPC/view + `unstable_cache` / revalidate when the catalog grows.
  */
 const getCampgroundProvinceRaws = cache(
   async (): Promise<ActionResult<string[]>> => {

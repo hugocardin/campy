@@ -57,11 +57,30 @@ describe("provinceMatchValues", () => {
     assert.deepEqual(provinceMatchValues('a",b.eq.c'), []);
   });
 
-  it("merges distinct DB raw values that fold to the code", () => {
-    const values = provinceMatchValues("QC", ["Québec!", "QC", "Ontario"]);
+  it("keeps untrimmed DB spellings for exact .in() matching", () => {
+    const values = provinceMatchValues("QC", ["Quebec "]);
+    assert.ok(values.includes("Quebec "));
+    assert.equal(values[0], "Quebec ");
+  });
+
+  it("merges distinct DB raw values that fold to the code before static aliases", () => {
+    const values = provinceMatchValues("QC", ["Québec!", "Ontario"]);
     assert.ok(values.includes("Québec!"));
-    assert.ok(values.includes("QC"));
     assert.ok(!values.includes("Ontario"));
+    assert.ok(values.indexOf("Québec!") < values.indexOf("QC"));
+  });
+
+  it("prefers DB raws when the cap would truncate", () => {
+    // Punctuation-only variants still fold to QC; exact strings stay distinct.
+    const padded = Array.from(
+      { length: 30 },
+      (_, i) => `Quebec${"!".repeat(i)} `,
+    );
+    const values = provinceMatchValues("QC", padded);
+    assert.equal(values.length, PROVINCE_ALIAS_MATCH_MAX);
+    for (const raw of padded) {
+      assert.ok(values.includes(raw), `missing DB raw ${JSON.stringify(raw)}`);
+    }
   });
 
   it("stays within PROVINCE_ALIAS_MATCH_MAX for every shipped code", () => {
@@ -83,10 +102,10 @@ describe("provinceMatchValues", () => {
 });
 
 describe("distinctProvinceRaws", () => {
-  it("trims and dedupes preserving spelling", () => {
+  it("preserves exact spelling including padding; skips blanks", () => {
     assert.deepEqual(
-      distinctProvinceRaws([" BC ", "BC", "Québec", null, ""]),
-      ["BC", "Québec"],
+      distinctProvinceRaws([" BC ", "BC", "Québec", " BC ", null, "", "   "]),
+      [" BC ", "BC", "Québec"],
     );
   });
 });
