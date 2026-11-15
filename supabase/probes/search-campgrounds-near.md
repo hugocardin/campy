@@ -2,8 +2,8 @@
 
 Migrations:
 
-- `20261115032320_search_campgrounds_near.sql` (initial)
-- `20261115033156_search_campgrounds_near_harden.sql` (explicit `RETURNS TABLE` + `distance_m`, clamp, LIMIT, ILIKE escape)
+- `20261115032643_search_campgrounds_near.sql` (initial; version matches live `schema_migrations`)
+- `20261115033324_search_campgrounds_near_harden.sql` (explicit `RETURNS TABLE` + `distance_m`, clamp, LIMIT, ILIKE escape)
 
 ## SQL
 

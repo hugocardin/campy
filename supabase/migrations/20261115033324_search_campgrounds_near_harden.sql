@@ -1,4 +1,4 @@
--- Harden search_campgrounds_near (follow-up to 20261115032320):
+-- Harden search_campgrounds_near (follow-up to 20261115032643):
 -- * DROP + CREATE — return type changes (SETOF v_campgrounds → explicit TABLE + distance_m)
 -- * Explicit guest columns only (no v.* / view dependency for grants)
 -- * Clamp radius_m to [0, 200000]; reject non-finite lat/lng/radius
