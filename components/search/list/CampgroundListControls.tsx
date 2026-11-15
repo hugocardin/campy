@@ -64,8 +64,8 @@ export default function CampgroundListControls({
 
   const qParam = searchParams.get("q") ?? "";
   const provinceParamRaw = searchParams.get("province") ?? "";
-  const provinceParam =
-    provinceFilterKey(provinceParamRaw) ?? provinceParamRaw;
+  // Unknown / malicious ?province= → treat as All (do not surface as an option).
+  const provinceParam = provinceFilterKey(provinceParamRaw) ?? "";
   const geo = parseCampgroundGeo({
     lat: searchParams.get("lat") ?? undefined,
     lng: searchParams.get("lng") ?? undefined,
@@ -256,10 +256,12 @@ export default function CampgroundListControls({
     );
   }
 
-  // Keep the active URL key selectable even if it isn't in the distinct list
-  // (e.g. ?province=Quebec → QC while catalog has only BC/AB).
+  // Known code from URL/alias may not be in the distinct list yet (empty catalog
+  // for that province); still show it. Never inject arbitrary unknown URL text.
   const provinceKeys =
-    provinceParam && !provinces.includes(provinceParam)
+    provinceParam &&
+    isCanadianProvinceCode(provinceParam) &&
+    !provinces.includes(provinceParam)
       ? [...provinces, provinceParam]
       : provinces;
   const provinceOptions = provinceKeys

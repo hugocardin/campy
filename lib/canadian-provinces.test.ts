@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  assertNoFoldedAliasCollisions,
   foldProvinceKey,
   isCanadianProvinceCode,
   provinceFilterKey,
   provinceMatchValues,
-  provinceOrFilter,
   resolveProvinceCode,
   uniqueProvinceFilterKeys,
 } from "./canadian-provinces";
@@ -22,11 +22,20 @@ describe("resolveProvinceCode", () => {
     assert.equal(resolveProvinceCode("unknown"), null);
     assert.equal(resolveProvinceCode(""), null);
   });
+
+  it("rejects malicious / wildcard URL values", () => {
+    assert.equal(resolveProvinceCode('a",b.eq.c'), null);
+    assert.equal(resolveProvinceCode("%"), null);
+    assert.equal(resolveProvinceCode("_%"), null);
+    assert.equal(resolveProvinceCode('x",active.eq.false'), null);
+  });
 });
 
 describe("provinceFilterKey / uniqueProvinceFilterKeys", () => {
-  it("collapses alias variants to one code", () => {
+  it("URL key is code-only; list still keeps unknown DB free text", () => {
     assert.equal(provinceFilterKey("Québec"), "QC");
+    assert.equal(provinceFilterKey("%"), null);
+    assert.equal(provinceFilterKey('a",b.eq.c'), null);
     assert.deepEqual(
       uniqueProvinceFilterKeys(["QC", "Quebec", "Québec", "BC", "bc", "Weird"]),
       ["BC", "QC", "Weird"],
@@ -34,21 +43,28 @@ describe("provinceFilterKey / uniqueProvinceFilterKeys", () => {
   });
 });
 
-describe("provinceMatchValues / provinceOrFilter", () => {
-  it("expands a code to aliases for DB matching", () => {
+describe("provinceMatchValues", () => {
+  it("expands a code to controlled aliases only", () => {
     const values = provinceMatchValues("QC");
     assert.ok(values.includes("QC"));
     assert.ok(values.includes("Quebec"));
     assert.ok(values.includes("Québec"));
-    assert.equal(provinceMatchValues("Customland")[0], "Customland");
+    assert.deepEqual(provinceMatchValues("Customland"), []);
+    assert.deepEqual(provinceMatchValues("%"), []);
+    assert.deepEqual(provinceMatchValues('a",b.eq.c'), []);
   });
 
-  it("builds a PostgREST or filter without wildcards", () => {
-    const fragment = provinceOrFilter("BC");
-    assert.ok(fragment);
-    assert.match(fragment!, /^province\.ilike\."BC"/);
-    assert.ok(fragment!.includes('province.ilike."British Columbia"'));
-    assert.ok(!fragment!.includes("%"));
+  it("merges distinct DB raw values that fold to the code", () => {
+    const values = provinceMatchValues("QC", ["Québec!", "QC", "Ontario"]);
+    assert.ok(values.includes("Québec!"));
+    assert.ok(values.includes("QC"));
+    assert.ok(!values.includes("Ontario"));
+  });
+});
+
+describe("folded alias collisions", () => {
+  it("assertNoFoldedAliasCollisions passes for the shipped map", () => {
+    assert.doesNotThrow(() => assertNoFoldedAliasCollisions());
   });
 });
 

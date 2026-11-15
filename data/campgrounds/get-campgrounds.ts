@@ -1,7 +1,7 @@
 import { Campground } from "@/entities/campground";
 import {
   provinceMatchValues,
-  provinceOrFilter,
+  resolveProvinceCode,
   uniqueProvinceFilterKeys,
 } from "@/lib/canadian-provinces";
 import {
@@ -143,9 +143,10 @@ export const getCampgrounds = cache(
         geoActive: Boolean(geo),
       });
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
-      const provinceFilter = province?.trim().slice(0, 100) || "";
-      const provinceAliases = provinceFilter
-        ? provinceMatchValues(provinceFilter)
+      // Unknown / malicious ?province= is ignored (All provinces).
+      const provinceCode = resolveProvinceCode(province);
+      const provinceAliases = provinceCode
+        ? provinceMatchValues(provinceCode)
         : [];
 
       if (geo) {
@@ -182,7 +183,8 @@ export const getCampgrounds = cache(
 
       if (term) {
         // Quote values so spaces / apostrophes stay inside one PostgREST filter.
-        // Always include province.ilike (harmless with .eq province filter).
+        // Province free-text search in `q` is separate from the province select
+        // filter below (`.in`), which ANDs with this `.or` as distinct params.
         // Empty-state hint for mismatched province+q is parked as a follow-up.
         const pattern = `"%${term}%"`;
         query = query.or(
@@ -190,11 +192,9 @@ export const getCampgrounds = cache(
         );
       }
 
-      if (provinceFilter) {
-        const orFilter = provinceOrFilter(provinceFilter);
-        if (orFilter) {
-          query = query.or(orFilter);
-        }
+      if (provinceAliases.length > 0) {
+        // Controlled aliases only (known codes) — never raw URL input.
+        query = query.in("province", provinceAliases);
       }
 
       query = query.order(column, { ascending });
