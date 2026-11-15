@@ -101,9 +101,9 @@ function sortCampgrounds(
 }
 
 /**
- * Exact distinct province strings from the guest view (padding preserved for
- * `.in()` matching). Demo-scale full select is fine; parked follow-up:
- * DISTINCT RPC/view + `unstable_cache` / revalidate when the catalog grows.
+ * Exact distinct province strings from the guest view (padding preserved).
+ * Used to expand alias lists for RPCs that match with lower(btrim).
+ * Demo-scale full select is fine; DISTINCT RPC/view parked (#24).
  */
 const getCampgroundProvinceRaws = cache(
   async (): Promise<ActionResult<string[]>> => {
@@ -164,8 +164,8 @@ export const getCampgrounds = cache(
 
       let provinceAliases: string[] = [];
       if (provinceCode) {
-        // Same distinct raws as the dropdown — fold-matching DB spellings join
-        // the static alias list so `.in()` / near-me lower(btrim) stay aligned.
+        // Exact DB spellings + static aliases → RPC text[] (lower(btrim) match).
+        // Never send raws through PostgREST `.in()` URL serialization.
         const raws = await getCampgroundProvinceRaws();
         const rawDb = raws.success ? raws.data : [];
         provinceAliases = provinceMatchValues(provinceCode, rawDb);
@@ -197,6 +197,24 @@ export const getCampgrounds = cache(
 
       const nonGeoSort =
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
+
+      // Province filter uses search_campgrounds RPC (same lower(btrim) as near-me).
+      if (provinceAliases.length > 0) {
+        const result = await handleDbResponse(
+          supabase.rpc("search_campgrounds", {
+            q: term || null,
+            province_aliases: provinceAliases,
+          }),
+        );
+
+        if (!result.success) {
+          return result;
+        }
+
+        const rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
+        return resultSuccess(sortCampgrounds(rows, nonGeoSort));
+      }
+
       const { column, ascending } = CAMPGROUND_SORT_CONFIG[nonGeoSort];
 
       let query = supabase
@@ -205,18 +223,11 @@ export const getCampgrounds = cache(
 
       if (term) {
         // Quote values so spaces / apostrophes stay inside one PostgREST filter.
-        // Province free-text search in `q` is separate from the province select
-        // filter below (`.in`), which ANDs with this `.or` as distinct params.
         // Empty-state hint for mismatched province+q is parked as a follow-up.
         const pattern = `"%${term}%"`;
         query = query.or(
           `name.ilike.${pattern},city.ilike.${pattern},province.ilike.${pattern}`,
         );
-      }
-
-      if (provinceAliases.length > 0) {
-        // Controlled aliases + distinct DB raws for this code — never raw URL.
-        query = query.in("province", provinceAliases);
       }
 
       query = query.order(column, { ascending });

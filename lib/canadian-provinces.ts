@@ -21,7 +21,7 @@ export const CANADIAN_PROVINCE_CODES = [
 
 export type CanadianProvinceCode = (typeof CANADIAN_PROVINCE_CODES)[number];
 
-/** Max aliases passed to PostgREST `.in` / near-me RPC (matches DB cap). */
+/** Max aliases passed to search_campgrounds / near-me RPC text[] (matches DB cap). */
 export const PROVINCE_ALIAS_MATCH_MAX = 32;
 
 /** Display / DB aliases per code (code itself included). */
@@ -128,7 +128,8 @@ export function isCanadianProvinceCode(
 /**
  * Resolve a URL/query/DB string to a canonical 2-letter code when possible.
  * Returns null when the value is empty or not a known alias.
- * Trims for fold/lookup only — callers keep exact DB strings for `.in()`.
+ * Trims for fold/lookup only — callers may still pass exact DB spellings
+ * into RPC `province_aliases` (matched with `lower(btrim(...))`).
  */
 export function resolveProvinceCode(
   raw: string | null | undefined,
@@ -157,8 +158,9 @@ export function provinceFilterKey(
  * Unknown / malicious URL values resolve to [] — never pass raw user input.
  *
  * When `rawDbProvinces` is provided, exact (untrimmed) DB spellings that fold
- * to the code are added **first**, then static aliases. That way `.in()` can
- * match padded values like `"Quebec "` and the cap prefers real DB spellings.
+ * to the code are added **first**, then static aliases. RPCs match with
+ * `lower(btrim(province)) = ANY(...)`, so padding is fine without PostgREST
+ * `.in()` URL serialization. Cap prefers real DB spellings.
  * Capped at {@link PROVINCE_ALIAS_MATCH_MAX}; warns if truncated.
  */
 export function provinceMatchValues(
@@ -185,7 +187,7 @@ export function provinceMatchValues(
   if (rawDbProvinces) {
     for (const raw of rawDbProvinces) {
       if (raw == null) continue;
-      // Keep exact DB spelling for `.in()`; trim only inside resolveProvinceCode.
+      // Keep exact DB spelling for RPC text[]; trim only inside resolveProvinceCode.
       if (!raw.trim()) continue;
       if (resolveProvinceCode(raw) === code) {
         add(raw);

@@ -57,7 +57,7 @@ describe("provinceMatchValues", () => {
     assert.deepEqual(provinceMatchValues('a",b.eq.c'), []);
   });
 
-  it("keeps untrimmed DB spellings for exact .in() matching", () => {
+  it("keeps untrimmed DB spellings for RPC text[] (lower(btrim) match)", () => {
     const values = provinceMatchValues("QC", ["Quebec "]);
     assert.ok(values.includes("Quebec "));
     assert.equal(values[0], "Quebec ");
