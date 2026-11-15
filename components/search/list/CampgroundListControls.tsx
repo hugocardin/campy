@@ -18,7 +18,6 @@ import {
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   CampgroundRadiusKm,
-  CampgroundSort,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   HookupFilterKey,
   anyHookupFilterActive,
@@ -128,16 +127,13 @@ export default function CampgroundListControls({
     }
   }
 
-  // Sync hookups from URL only for external changes (not our own pending push).
+  // Sync hookup *state* from URL only for external changes (not our pending push).
+  // Ref updates happen in an effect below (react-hooks/refs forbids ref writes in render).
   if (urlHookupsKey !== prevUrlHookupsKey) {
     setPrevUrlHookupsKey(urlHookupsKey);
     if (urlHookupsKey !== lastPushedHookupsKey) {
       setLastPushedHookupsKey(urlHookupsKey);
       setLocalHookups(urlHookups);
-      latestParamsRef.current = {
-        ...latestParamsRef.current,
-        ...urlHookups,
-      };
     } else {
       setLocalHookups(urlHookups);
     }
@@ -151,18 +147,20 @@ export default function CampgroundListControls({
     setPrevGeoRadius(undefined);
   }
 
-  // Sync non-hookup fields from URL/search. Hookups stay on the ref until
-  // replaceQuery or an external URL change updates them (avoids clobbering
-  // pending checkbox toggles while search debounce runs).
+  // Keep latestParamsRef aligned with URL/search + local hookups. Hookup local
+  // state is optimistic; this effect runs after render so pending toggles that
+  // already updated the ref via replaceQuery are not clobbered by stale URL.
   useEffect(() => {
     latestParamsRef.current = {
-      ...latestParamsRef.current,
       q: search,
       sort: sortParam,
       province: provinceParam,
       lat: geo?.lat,
       lng: geo?.lng,
       radiusKm: geo?.radiusKm ?? preferredRadius,
+      electricity: localHookups.electricity,
+      water: localHookups.water,
+      sewer: localHookups.sewer,
     };
   }, [
     search,
@@ -172,6 +170,9 @@ export default function CampgroundListControls({
     geo?.lng,
     geo?.radiusKm,
     preferredRadius,
+    localHookups.electricity,
+    localHookups.water,
+    localHookups.sewer,
   ]);
 
   useEffect(() => {
