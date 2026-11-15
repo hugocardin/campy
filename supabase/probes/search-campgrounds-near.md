@@ -5,6 +5,9 @@ Migrations:
 - `20261115032643_search_campgrounds_near.sql` (initial; version matches live `schema_migrations`)
 - `20261115033324_search_campgrounds_near_harden.sql` (explicit `RETURNS TABLE` + `distance_m`, clamp, LIMIT, ILIKE escape)
 - `20261115033824_search_campgrounds_near_reject_nan.sql` (reject NaN/±Inf on radius; cap q before escape)
+- `20261115183618_search_campgrounds_near_province_aliases.sql` (`province` text → `province_aliases text[]`)
+- `20261115184133_search_campgrounds_near_compat_and_harden.sql` (restore `province text` wrapper; lower(btrim) equality; alias caps)
+- `20261115184640_search_campgrounds_near_alias_fail_closed.sql` (>32 / empty-normalized → empty array, fail closed)
 
 ## SQL
 
@@ -24,11 +27,33 @@ SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 'Infinity'::
 -- Literal % is escaped (not "match all")
 SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 100000, '%', NULL);
 
+-- Compat overload (main/deployed named arg `province text`)
+SELECT name, province
+FROM public.search_campgrounds_near(49.28, -123.12, 100000, NULL, 'BC'::text);
+
+-- Province aliases overload (app expands QC → Quebec/Québec/…)
+SELECT name, province
+FROM public.search_campgrounds_near(
+  49.28, -123.12, 100000, NULL,
+  ARRAY['BC', 'British Columbia', 'Colombie-Britannique']::text[]
+);
+
+-- '%' must not match-all (equality, not ILIKE pattern)
+SELECT count(*) FROM public.search_campgrounds_near(
+  49.28, -123.12, 100000, NULL, ARRAY['%']::text[]
+);
+
 SELECT has_function_privilege(
   'anon',
   'public.search_campgrounds_near(double precision, double precision, double precision, text, text)',
   'execute'
-) AS anon_exec;
+) AS anon_exec_province;
+
+SELECT has_function_privilege(
+  'anon',
+  'public.search_campgrounds_near(double precision, double precision, double precision, text, text[])',
+  'execute'
+) AS anon_exec_aliases;
 
 SELECT prosecdef
 FROM pg_proc
@@ -38,10 +63,16 @@ WHERE pronamespace = 'public'::regnamespace
 
 ## PostgREST (anon)
 
-`POST /rest/v1/rpc/search_campgrounds_near` with body:
+`POST /rest/v1/rpc/search_campgrounds_near` with body (compat / main):
 
 ```json
 { "lat": 49.28, "lng": -123.12, "radius_m": 100000, "q": null, "province": null }
+```
+
+or (new clients):
+
+```json
+{ "lat": 49.28, "lng": -123.12, "radius_m": 100000, "q": null, "province_aliases": null }
 ```
 
 Expect 200, guest columns + `distance_m` (no commission). `prosecdef` must be false (SECURITY INVOKER).

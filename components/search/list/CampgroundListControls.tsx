@@ -10,6 +10,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  isCanadianProvinceCode,
+  provinceFilterKey,
+} from "@/lib/canadian-provinces";
+import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   CampgroundRadiusKm,
   CampgroundSort,
@@ -22,7 +26,7 @@ import {
 } from "@/lib/campground-search";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed, Search } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
@@ -49,6 +53,8 @@ export default function CampgroundListControls({
   provinces,
 }: Props) {
   const t = useTranslations("search.controls");
+  const tProvinces = useTranslations("search.provinces");
+  const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -57,7 +63,9 @@ export default function CampgroundListControls({
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const qParam = searchParams.get("q") ?? "";
-  const provinceParam = searchParams.get("province") ?? "";
+  const provinceParamRaw = searchParams.get("province") ?? "";
+  // Unknown / malicious ?province= → treat as All (do not surface as an option).
+  const provinceParam = provinceFilterKey(provinceParamRaw) ?? "";
   const geo = parseCampgroundGeo({
     lat: searchParams.get("lat") ?? undefined,
     lng: searchParams.get("lng") ?? undefined,
@@ -168,7 +176,10 @@ export default function CampgroundListControls({
       params.set("sort", sortQuery);
     }
     if (next.province) {
-      params.set("province", next.province);
+      params.set(
+        "province",
+        provinceFilterKey(next.province) ?? next.province,
+      );
     }
     if (geo) {
       params.set("lat", String(geo.lat));
@@ -245,6 +256,23 @@ export default function CampgroundListControls({
     );
   }
 
+  // Known code from URL/alias may not be in the distinct list yet (empty catalog
+  // for that province); still show it. Never inject arbitrary unknown URL text.
+  const provinceKeys =
+    provinceParam &&
+    isCanadianProvinceCode(provinceParam) &&
+    !provinces.includes(provinceParam)
+      ? [...provinces, provinceParam]
+      : provinces;
+  const provinceOptions = provinceKeys
+    .map((key) => ({
+      key,
+      label: isCanadianProvinceCode(key) ? tProvinces(key) : key,
+    }))
+    .sort((a, b) =>
+      a.label.localeCompare(b.label, locale, { sensitivity: "base" }),
+    );
+
   const hasFilters = Boolean(search || provinceParam || geo);
   const controlsDisabled = geoBusy;
 
@@ -308,14 +336,14 @@ export default function CampgroundListControls({
           });
         }}
       >
-        <SelectTrigger className="w-45">
+        <SelectTrigger className="w-56">
           <SelectValue placeholder={t("provinceLabel")} />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL_PROVINCES}>{t("provinceAll")}</SelectItem>
-          {provinces.map((province) => (
-            <SelectItem key={province} value={province}>
-              {province}
+          {provinceOptions.map(({ key, label }) => (
+            <SelectItem key={key} value={key}>
+              {label}
             </SelectItem>
           ))}
         </SelectContent>

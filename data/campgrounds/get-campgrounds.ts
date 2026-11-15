@@ -1,5 +1,11 @@
 import { Campground } from "@/entities/campground";
 import {
+  distinctProvinceRaws,
+  provinceMatchValues,
+  resolveProvinceCode,
+  uniqueProvinceFilterKeys,
+} from "@/lib/canadian-provinces";
+import {
   CAMPGROUND_SORT_CONFIG,
   CampgroundSort,
   campgroundRadiusMeters,
@@ -95,10 +101,11 @@ function sortCampgrounds(
 }
 
 /**
- * Follow-up (parked): distinct view/RPC, `unstable_cache` / revalidate, and
- * Quebec/Québec/QC + fr-CA label normalization. Fine at demo scale.
+ * Exact distinct province strings from the guest view (padding preserved).
+ * Used to expand alias lists for RPCs that match with lower(btrim).
+ * Demo-scale full select is fine; DISTINCT RPC/view parked (#24).
  */
-export const getCampgroundProvinces = cache(
+const getCampgroundProvinceRaws = cache(
   async (): Promise<ActionResult<string[]>> => {
     try {
       const supabase = await createClient();
@@ -111,18 +118,27 @@ export const getCampgroundProvinces = cache(
         return result;
       }
 
-      const provinces = [
-        ...new Set(
-          result.data
-            .map((row) => row.province?.trim())
-            .filter((p): p is string => Boolean(p)),
-        ),
-      ].sort((a, b) => a.localeCompare(b));
-
-      return resultSuccess(provinces);
+      return resultSuccess(
+        distinctProvinceRaws(result.data.map((row) => row.province)),
+      );
     } catch (err) {
       return handleUnexpectedError(err);
     }
+  },
+);
+
+/**
+ * Distinct province filter keys (canonical codes when known). Labels are
+ * locale-aware in the UI; matching expands aliases — see canadian-provinces.
+ * Follow-up: distinct view/RPC + `unstable_cache` / revalidate at scale.
+ */
+export const getCampgroundProvinces = cache(
+  async (): Promise<ActionResult<string[]>> => {
+    const raws = await getCampgroundProvinceRaws();
+    if (!raws.success) {
+      return raws;
+    }
+    return resultSuccess(uniqueProvinceFilterKeys(raws.data));
   },
 );
 
@@ -143,7 +159,17 @@ export const getCampgrounds = cache(
         geoActive: Boolean(geo),
       });
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
-      const provinceFilter = province?.trim().slice(0, 100) || "";
+      // Unknown / malicious ?province= is ignored (All provinces).
+      const provinceCode = resolveProvinceCode(province);
+
+      let provinceAliases: string[] = [];
+      if (provinceCode) {
+        // Exact DB spellings + static aliases → RPC text[] (lower(btrim) match).
+        // Never send raws through PostgREST `.in()` URL serialization.
+        const raws = await getCampgroundProvinceRaws();
+        const rawDb = raws.success ? raws.data : [];
+        provinceAliases = provinceMatchValues(provinceCode, rawDb);
+      }
 
       if (geo) {
         const result = await handleDbResponse(
@@ -152,7 +178,8 @@ export const getCampgrounds = cache(
             lng: geo.lng,
             radius_m: campgroundRadiusMeters(geo.radiusKm),
             q: term || null,
-            province: provinceFilter || null,
+            province_aliases:
+              provinceAliases.length > 0 ? provinceAliases : null,
           }),
         );
 
@@ -170,6 +197,25 @@ export const getCampgrounds = cache(
 
       const nonGeoSort =
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
+
+      // Province filter uses search_campgrounds RPC (same lower(btrim) as near-me).
+      // RPC has no LIMIT / ORDER BY — sort here like the unfiltered v_campgrounds path.
+      if (provinceAliases.length > 0) {
+        const result = await handleDbResponse(
+          supabase.rpc("search_campgrounds", {
+            q: term || null,
+            province_aliases: provinceAliases,
+          }),
+        );
+
+        if (!result.success) {
+          return result;
+        }
+
+        const rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
+        return resultSuccess(sortCampgrounds(rows, nonGeoSort));
+      }
+
       const { column, ascending } = CAMPGROUND_SORT_CONFIG[nonGeoSort];
 
       let query = supabase
@@ -178,16 +224,11 @@ export const getCampgrounds = cache(
 
       if (term) {
         // Quote values so spaces / apostrophes stay inside one PostgREST filter.
-        // Always include province.ilike (harmless with .eq province filter).
         // Empty-state hint for mismatched province+q is parked as a follow-up.
         const pattern = `"%${term}%"`;
         query = query.or(
           `name.ilike.${pattern},city.ilike.${pattern},province.ilike.${pattern}`,
         );
-      }
-
-      if (provinceFilter) {
-        query = query.eq("province", provinceFilter);
       }
 
       query = query.order(column, { ascending });
