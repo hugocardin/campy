@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 
 type Props = {
   campgrounds: Campground[];
+  searchCenter?: { lat: number; lng: number };
 };
 
 const CampgroundsMap = dynamic(() => import("./CampgroundsMap"), {
@@ -22,6 +23,11 @@ function MapLoading() {
   );
 }
 
-export default function CampgroundsMapDynamic({ campgrounds }: Props) {
-  return <CampgroundsMap campgrounds={campgrounds} />;
+export default function CampgroundsMapDynamic({
+  campgrounds,
+  searchCenter,
+}: Props) {
+  return (
+    <CampgroundsMap campgrounds={campgrounds} searchCenter={searchCenter} />
+  );
 }

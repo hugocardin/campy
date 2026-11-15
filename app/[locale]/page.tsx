@@ -6,7 +6,7 @@ import {
   getCampgroundProvinces,
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
-import { parseCampgroundSort } from "@/lib/campground-search";
+import { parseCampgroundGeo, parseCampgroundSort } from "@/lib/campground-search";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
 import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
@@ -33,9 +33,21 @@ export default async function Home({ searchParams }: PageProps) {
   const q = firstParam(params.q);
   const sort = parseCampgroundSort(firstParam(params.sort));
   const province = firstParam(params.province);
+  const geo = parseCampgroundGeo({
+    lat: firstParam(params.lat),
+    lng: firstParam(params.lng),
+    radiusKm: firstParam(params.radiusKm),
+  });
 
   const [campgroundsResult, provincesResult] = await Promise.all([
-    getCampgrounds(q, sort, province),
+    getCampgrounds(
+      q,
+      sort,
+      province,
+      geo?.lat,
+      geo?.lng,
+      geo?.radiusKm,
+    ),
     getCampgroundProvinces(),
   ]);
 
@@ -91,7 +103,12 @@ export default async function Home({ searchParams }: PageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 flex-1 min-h-0">
             <div className="flex flex-col min-h-75 lg:min-h-0 rounded-xl border border-border overflow-hidden">
               <div className="flex-1 relative min-h-75">
-                <CampgroundsMapDynamic campgrounds={campgrounds} />
+                <CampgroundsMapDynamic
+                  campgrounds={campgrounds}
+                  searchCenter={
+                    geo ? { lat: geo.lat, lng: geo.lng } : undefined
+                  }
+                />
               </div>
             </div>
 

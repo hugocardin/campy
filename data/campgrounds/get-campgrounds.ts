@@ -1,7 +1,11 @@
 import { Campground } from "@/entities/campground";
 import {
+  CAMPGROUND_RADIUS_KM_PRESETS,
   CAMPGROUND_SORT_CONFIG,
+  CampgroundGeo,
+  CampgroundRadiusKm,
   CampgroundSort,
+  campgroundRadiusMeters,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
 } from "@/lib/campground-search";
@@ -60,6 +64,22 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
   };
 }
 
+function sortCampgrounds(
+  campgrounds: Campground[],
+  sort: CampgroundSort,
+): Campground[] {
+  const { column, ascending } = CAMPGROUND_SORT_CONFIG[sort];
+  const dir = ascending ? 1 : -1;
+  return [...campgrounds].sort((a, b) => {
+    const av = (a[column] ?? "").toString();
+    const bv = (b[column] ?? "").toString();
+    const primary = av.localeCompare(bv) * dir;
+    if (primary !== 0) return primary;
+    if (column === "name") return 0;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 /**
  * Follow-up (parked): distinct view/RPC, `unstable_cache` / revalidate, and
  * Quebec/Québec/QC + fr-CA label normalization. Fine at demo scale.
@@ -98,6 +118,9 @@ export const getCampgrounds = cache(
     q?: string,
     sort: CampgroundSort = "name",
     province?: string,
+    lat?: number,
+    lng?: number,
+    radiusKm?: number,
   ): Promise<ActionResult<Campground[]>> => {
     try {
       const supabase = await createClient();
@@ -105,6 +128,42 @@ export const getCampgrounds = cache(
       const { column, ascending } = CAMPGROUND_SORT_CONFIG[resolvedSort];
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       const provinceFilter = province?.trim().slice(0, 100) || "";
+
+      const radiusPreset =
+        radiusKm != null &&
+        (CAMPGROUND_RADIUS_KM_PRESETS as readonly number[]).includes(radiusKm)
+          ? (radiusKm as CampgroundRadiusKm)
+          : undefined;
+      const geo: CampgroundGeo | undefined =
+        lat != null &&
+        lng != null &&
+        radiusPreset != null &&
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        Math.abs(lat) <= 90 &&
+        Math.abs(lng) <= 180 &&
+        !(lat === 0 && lng === 0)
+          ? { lat, lng, radiusKm: radiusPreset }
+          : undefined;
+
+      if (geo) {
+        const result = await handleDbResponse(
+          supabase.rpc("search_campgrounds_near", {
+            lat: geo.lat,
+            lng: geo.lng,
+            radius_m: campgroundRadiusMeters(geo.radiusKm),
+            q: term || null,
+            province: provinceFilter || null,
+          }),
+        );
+
+        if (!result.success) {
+          return result;
+        }
+
+        const rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
+        return resultSuccess(sortCampgrounds(rows, resolvedSort));
+      }
 
       let query = supabase
         .from("v_campgrounds")
