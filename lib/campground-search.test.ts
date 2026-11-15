@@ -4,10 +4,13 @@ import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   campgroundRadiusMeters,
+  formatDistanceKm,
   parseCampgroundGeo,
   parseCampgroundRadiusKm,
   parseCampgroundSort,
+  roundCampgroundCoord,
   sanitizeCampgroundSearchTerm,
+  validateCampgroundGeo,
 } from "./campground-search";
 
 describe("parseCampgroundSort", () => {
@@ -16,6 +19,13 @@ describe("parseCampgroundSort", () => {
     assert.equal(parseCampgroundSort("name-desc"), "name-desc");
     assert.equal(parseCampgroundSort(undefined), "name");
     assert.equal(parseCampgroundSort("nope"), "name");
+  });
+
+  it("defaults to distance when geo is active", () => {
+    assert.equal(parseCampgroundSort(undefined, { geoActive: true }), "distance");
+    assert.equal(parseCampgroundSort("distance", { geoActive: true }), "distance");
+    assert.equal(parseCampgroundSort("distance", { geoActive: false }), "name");
+    assert.equal(parseCampgroundSort("name", { geoActive: true }), "name");
   });
 });
 
@@ -38,10 +48,21 @@ describe("parseCampgroundRadiusKm", () => {
   });
 });
 
-describe("parseCampgroundGeo", () => {
-  it("requires valid lat, lng, and radiusKm together", () => {
+describe("roundCampgroundCoord", () => {
+  it("rounds to ~1 km privacy decimals", () => {
+    assert.equal(roundCampgroundCoord(49.282711), 49.28);
+    assert.equal(roundCampgroundCoord(-123.120735), -123.12);
+  });
+});
+
+describe("validateCampgroundGeo / parseCampgroundGeo", () => {
+  it("requires valid lat, lng, and radiusKm together and rounds", () => {
     assert.deepEqual(
-      parseCampgroundGeo({ lat: "49.28", lng: "-123.12", radiusKm: "50" }),
+      validateCampgroundGeo(49.2827, -123.1207, 50),
+      { lat: 49.28, lng: -123.12, radiusKm: 50 },
+    );
+    assert.deepEqual(
+      parseCampgroundGeo({ lat: "49.2827", lng: "-123.1207", radiusKm: "50" }),
       { lat: 49.28, lng: -123.12, radiusKm: 50 },
     );
     assert.equal(
@@ -60,6 +81,7 @@ describe("parseCampgroundGeo", () => {
       parseCampgroundGeo({ lat: "abc", lng: "-123", radiusKm: "50" }),
       undefined,
     );
+    assert.equal(validateCampgroundGeo(49.28, -123.12, 30), undefined);
   });
 });
 
@@ -67,5 +89,14 @@ describe("campgroundRadiusMeters", () => {
   it("converts km to meters", () => {
     assert.equal(campgroundRadiusMeters(25), 25000);
     assert.equal(campgroundRadiusMeters(100), 100000);
+  });
+});
+
+describe("formatDistanceKm", () => {
+  it("formats metres as whole km labels", () => {
+    assert.equal(formatDistanceKm(500), "<1");
+    assert.equal(formatDistanceKm(1200), "1");
+    assert.equal(formatDistanceKm(12500), "13");
+    assert.equal(formatDistanceKm(null), null);
   });
 });

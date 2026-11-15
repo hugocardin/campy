@@ -31,12 +31,14 @@ function firstParam(
 export default async function Home({ searchParams }: PageProps) {
   const params = await searchParams;
   const q = firstParam(params.q);
-  const sort = parseCampgroundSort(firstParam(params.sort));
   const province = firstParam(params.province);
   const geo = parseCampgroundGeo({
     lat: firstParam(params.lat),
     lng: firstParam(params.lng),
     radiusKm: firstParam(params.radiusKm),
+  });
+  const sort = parseCampgroundSort(firstParam(params.sort), {
+    geoActive: Boolean(geo),
   });
 
   const [campgroundsResult, provincesResult] = await Promise.all([
@@ -108,6 +110,7 @@ export default async function Home({ searchParams }: PageProps) {
                   searchCenter={
                     geo ? { lat: geo.lat, lng: geo.lng } : undefined
                   }
+                  radiusKm={geo?.radiusKm}
                 />
               </div>
             </div>

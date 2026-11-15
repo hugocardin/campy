@@ -15,8 +15,8 @@ import {
   CampgroundSort,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   parseCampgroundGeo,
-  parseCampgroundRadiusKm,
   parseCampgroundSort,
+  roundCampgroundCoord,
 } from "@/lib/campground-search";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed, Search } from "lucide-react";
@@ -55,37 +55,38 @@ export default function CampgroundListControls({
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const qParam = searchParams.get("q") ?? "";
-  const sortParam = parseCampgroundSort(
-    searchParams.get("sort") ?? undefined,
-  );
   const provinceParam = searchParams.get("province") ?? "";
   const geo = parseCampgroundGeo({
     lat: searchParams.get("lat") ?? undefined,
     lng: searchParams.get("lng") ?? undefined,
     radiusKm: searchParams.get("radiusKm") ?? undefined,
   });
-  const radiusParam =
-    geo?.radiusKm ??
-    parseCampgroundRadiusKm(searchParams.get("radiusKm") ?? undefined) ??
-    DEFAULT_CAMPGROUND_RADIUS_KM;
+  const sortParam = parseCampgroundSort(
+    searchParams.get("sort") ?? undefined,
+    { geoActive: Boolean(geo) },
+  );
 
+  const [preferredRadius, setPreferredRadius] = useState<CampgroundRadiusKm>(
+    geo?.radiusKm ?? DEFAULT_CAMPGROUND_RADIUS_KM,
+  );
+  const [prevGeoRadius, setPrevGeoRadius] = useState(geo?.radiusKm);
   const [search, setSearch] = useState(qParam);
   const [prevQParam, setPrevQParam] = useState(qParam);
   const [lastPushedQ, setLastPushedQ] = useState(qParam);
 
   const debounceTimeoutRef = useRef<number | null>(null);
-  const latestParamsRef = useRef<LatestParams>({
+  const geoRequestIdRef = useRef(0);
+  const cancelledRef = useRef(false);
+  const latestParamsRef = useRef<LatestParams & { q: string }>({
+    q: search,
     sort: sortParam,
     province: provinceParam,
     lat: geo?.lat,
     lng: geo?.lng,
-    radiusKm: radiusParam,
+    radiusKm: geo?.radiusKm ?? preferredRadius,
   });
 
   // Sync input from URL only for external changes (back/forward / Clear).
-  // Skip when qParam is what we ourselves pushed — typing during an in-flight
-  // navigation must not be overwritten. External URL changes also reset
-  // lastPushedQ so re-typing the old query still navigates.
   if (qParam !== prevQParam) {
     setPrevQParam(qParam);
     if (qParam !== lastPushedQ) {
@@ -96,17 +97,40 @@ export default function CampgroundListControls({
     }
   }
 
-  // Keep sort/province/geo for debounce timeouts; replaceQuery also writes this
-  // synchronously so selects aren't undone by a stale scheduled search.
+  // Keep preferred radius in sync when geo URL changes (e.g. back/forward).
+  if (geo?.radiusKm != null && geo.radiusKm !== prevGeoRadius) {
+    setPrevGeoRadius(geo.radiusKm);
+    setPreferredRadius(geo.radiusKm);
+  } else if (geo?.radiusKm == null && prevGeoRadius != null) {
+    setPrevGeoRadius(undefined);
+  }
+
   useEffect(() => {
     latestParamsRef.current = {
+      q: search,
       sort: sortParam,
       province: provinceParam,
       lat: geo?.lat,
       lng: geo?.lng,
-      radiusKm: radiusParam,
+      radiusKm: geo?.radiusKm ?? preferredRadius,
     };
-  }, [sortParam, provinceParam, geo?.lat, geo?.lng, radiusParam]);
+  }, [
+    search,
+    sortParam,
+    provinceParam,
+    geo?.lat,
+    geo?.lng,
+    geo?.radiusKm,
+    preferredRadius,
+  ]);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+      geoRequestIdRef.current += 1;
+    };
+  }, []);
 
   function clearDebounce() {
     if (debounceTimeoutRef.current != null) {
@@ -115,10 +139,16 @@ export default function CampgroundListControls({
     }
   }
 
+  function cancelGeolocation() {
+    geoRequestIdRef.current += 1;
+    setGeoBusy(false);
+  }
+
   function replaceQuery(next: QueryState) {
     const trimmedQ = next.q.trim();
     setLastPushedQ(trimmedQ);
     latestParamsRef.current = {
+      q: next.q,
       sort: next.sort,
       province: next.province,
       lat: next.lat,
@@ -130,8 +160,12 @@ export default function CampgroundListControls({
     if (trimmedQ) {
       params.set("q", trimmedQ);
     }
+    const geoActive = next.lat != null && next.lng != null;
     if (next.sort && next.sort !== "name") {
-      params.set("sort", next.sort);
+      // Default when geo: distance (omit from URL). Otherwise omit name.
+      if (!(geoActive && next.sort === "distance")) {
+        params.set("sort", next.sort);
+      }
     }
     if (next.province) {
       params.set("province", next.province);
@@ -139,18 +173,12 @@ export default function CampgroundListControls({
     if (
       next.lat != null &&
       next.lng != null &&
+      next.radiusKm != null &&
       Number.isFinite(next.lat) &&
       Number.isFinite(next.lng)
     ) {
-      params.set("lat", String(next.lat));
-      params.set("lng", String(next.lng));
-    }
-    // Persist radius whenever geo coords are active, or when the user picked
-    // a non-default preset ahead of Near me.
-    if (
-      next.radiusKm != null &&
-      (next.lat != null || next.radiusKm !== DEFAULT_CAMPGROUND_RADIUS_KM)
-    ) {
+      params.set("lat", String(roundCampgroundCoord(next.lat)));
+      params.set("lng", String(roundCampgroundCoord(next.lng)));
       params.set("radiusKm", String(next.radiusKm));
     }
 
@@ -162,7 +190,6 @@ export default function CampgroundListControls({
 
   useEffect(() => {
     const trimmed = search.trim();
-    // Skip while URL catches up to a value we already pushed (incl. Clear).
     if (trimmed === qParam || trimmed === lastPushedQ) return;
 
     clearDebounce();
@@ -180,7 +207,6 @@ export default function CampgroundListControls({
     }, 300);
 
     return clearDebounce;
-    // Select/Clear cancel via clearDebounce before their own replaceQuery.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search`
   }, [search, qParam, lastPushedQ]);
 
@@ -190,22 +216,30 @@ export default function CampgroundListControls({
       setGeoError(t("geoUnavailable"));
       return;
     }
+    const requestId = ++geoRequestIdRef.current;
     setGeoBusy(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (cancelledRef.current || requestId !== geoRequestIdRef.current) {
+          return;
+        }
         setGeoBusy(false);
         clearDebounce();
+        const radiusKm =
+          latestParamsRef.current.radiusKm ?? preferredRadius;
         replaceQuery({
-          q: search,
-          sort: latestParamsRef.current.sort,
+          q: latestParamsRef.current.q,
+          sort: "distance",
           province: latestParamsRef.current.province,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          radiusKm:
-            latestParamsRef.current.radiusKm ?? DEFAULT_CAMPGROUND_RADIUS_KM,
+          lat: roundCampgroundCoord(pos.coords.latitude),
+          lng: roundCampgroundCoord(pos.coords.longitude),
+          radiusKm,
         });
       },
       (err) => {
+        if (cancelledRef.current || requestId !== geoRequestIdRef.current) {
+          return;
+        }
         setGeoBusy(false);
         setGeoError(
           err.code === err.PERMISSION_DENIED
@@ -218,6 +252,7 @@ export default function CampgroundListControls({
   }
 
   const hasFilters = Boolean(search || provinceParam || geo);
+  const controlsDisabled = geoBusy;
 
   return (
     <div
@@ -231,16 +266,18 @@ export default function CampgroundListControls({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label={t("searchPlaceholder")}
+          disabled={controlsDisabled}
         />
       </div>
 
       <Select
         value={sortParam}
+        disabled={controlsDisabled}
         onValueChange={(value) => {
           clearDebounce();
           replaceQuery({
             q: search,
-            sort: parseCampgroundSort(value),
+            sort: parseCampgroundSort(value, { geoActive: Boolean(geo) }),
             province: latestParamsRef.current.province,
             lat: latestParamsRef.current.lat,
             lng: latestParamsRef.current.lng,
@@ -252,6 +289,9 @@ export default function CampgroundListControls({
           <SelectValue placeholder={t("sortLabel")} />
         </SelectTrigger>
         <SelectContent>
+          {geo ? (
+            <SelectItem value="distance">{t("sortDistance")}</SelectItem>
+          ) : null}
           <SelectItem value="name">{t("sortNameAsc")}</SelectItem>
           <SelectItem value="name-desc">{t("sortNameDesc")}</SelectItem>
           <SelectItem value="city">{t("sortCity")}</SelectItem>
@@ -261,6 +301,7 @@ export default function CampgroundListControls({
 
       <Select
         value={provinceParam || ALL_PROVINCES}
+        disabled={controlsDisabled}
         onValueChange={(value) => {
           clearDebounce();
           replaceQuery({
@@ -286,33 +327,40 @@ export default function CampgroundListControls({
         </SelectContent>
       </Select>
 
-      <Select
-        value={String(radiusParam)}
-        onValueChange={(value) => {
-          clearDebounce();
-          const nextRadius =
-            parseCampgroundRadiusKm(value) ?? DEFAULT_CAMPGROUND_RADIUS_KM;
-          replaceQuery({
-            q: search,
-            sort: latestParamsRef.current.sort,
-            province: latestParamsRef.current.province,
-            lat: latestParamsRef.current.lat,
-            lng: latestParamsRef.current.lng,
-            radiusKm: nextRadius,
-          });
-        }}
-      >
-        <SelectTrigger className="w-40" aria-label={t("radiusLabel")}>
-          <SelectValue placeholder={t("radiusLabel")} />
-        </SelectTrigger>
-        <SelectContent>
-          {CAMPGROUND_RADIUS_KM_PRESETS.map((km) => (
-            <SelectItem key={km} value={String(km)}>
-              {t("radiusKm", { km })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {geo ? (
+        <Select
+          value={String(geo.radiusKm)}
+          disabled={controlsDisabled}
+          onValueChange={(value) => {
+            clearDebounce();
+            const nextRadius = (CAMPGROUND_RADIUS_KM_PRESETS as readonly number[]).includes(
+              Number(value),
+            )
+              ? (Number(value) as CampgroundRadiusKm)
+              : DEFAULT_CAMPGROUND_RADIUS_KM;
+            setPreferredRadius(nextRadius);
+            replaceQuery({
+              q: search,
+              sort: latestParamsRef.current.sort,
+              province: latestParamsRef.current.province,
+              lat: latestParamsRef.current.lat,
+              lng: latestParamsRef.current.lng,
+              radiusKm: nextRadius,
+            });
+          }}
+        >
+          <SelectTrigger className="w-40" aria-label={t("radiusLabel")}>
+            <SelectValue placeholder={t("radiusLabel")} />
+          </SelectTrigger>
+          <SelectContent>
+            {CAMPGROUND_RADIUS_KM_PRESETS.map((km) => (
+              <SelectItem key={km} value={String(km)}>
+                {t("radiusKm", { km })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
 
       <Button
         type="button"
@@ -325,17 +373,18 @@ export default function CampgroundListControls({
         {geoBusy ? t("nearMeLocating") : t("nearMe")}
       </Button>
 
-      {hasFilters ? (
+      {hasFilters || geoBusy ? (
         <Button
           type="button"
           variant="outline"
           onClick={() => {
             clearDebounce();
+            cancelGeolocation();
             setSearch("");
             setGeoError(null);
             replaceQuery({
               q: "",
-              sort: latestParamsRef.current.sort,
+              sort: "name",
               province: "",
             });
           }}

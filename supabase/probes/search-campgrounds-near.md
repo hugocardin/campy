@@ -1,14 +1,25 @@
 # Probe: `search_campgrounds_near`
 
-Migration: `20261115032320_search_campgrounds_near.sql`
+Migrations:
+
+- `20261115032320_search_campgrounds_near.sql` (initial)
+- `20261115033156_search_campgrounds_near_harden.sql` (explicit `RETURNS TABLE` + `distance_m`, clamp, LIMIT, ILIKE escape)
 
 ## SQL
 
 ```sql
--- Within ~100 km of downtown Vancouver — expect Squamish / Maple Ridge parks
-SELECT name, city
-FROM public.search_campgrounds_near(49.28, -123.12, 100000, NULL, NULL)
-ORDER BY name;
+-- Within ~100 km of downtown Vancouver — expect Squamish / Maple Ridge parks, nearest first
+SELECT name, city, round(distance_m::numeric) AS distance_m
+FROM public.search_campgrounds_near(49.28, -123.12, 100000, NULL, NULL);
+
+-- Huge radius_m is clamped to 200 km
+SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 1e12, NULL, NULL);
+
+-- NaN rejected
+SELECT count(*) FROM public.search_campgrounds_near('NaN'::float8, -123.12, 50000, NULL, NULL);
+
+-- Literal % is escaped (not "match all")
+SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 100000, '%', NULL);
 
 SELECT has_function_privilege(
   'anon',
@@ -30,4 +41,4 @@ WHERE pronamespace = 'public'::regnamespace
 { "lat": 49.28, "lng": -123.12, "radius_m": 100000, "q": null, "province": null }
 ```
 
-Expect 200 and guest columns only (no commission). `prosecdef` must be false (SECURITY INVOKER).
+Expect 200, guest columns + `distance_m` (no commission). `prosecdef` must be false (SECURITY INVOKER).

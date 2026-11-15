@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Campground } from "@/entities/campground";
 import { Link } from "@/i18n/navigation";
+import { formatDistanceKm } from "@/lib/campground-search";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes } from "@/lib/routes";
 import { useTranslations } from "next-intl";
@@ -17,6 +18,7 @@ interface Props {
 
 export default function CampgroundCard({ campground }: Props) {
   const t = useTranslations("search.controls");
+  const distanceLabel = formatDistanceKm(campground.distanceMeters);
 
   return (
     <Card className="overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
@@ -41,6 +43,11 @@ export default function CampgroundCard({ campground }: Props) {
             {formatCampgroundLocation(campground.city, campground.province)}
           </span>
         </div>
+        {distanceLabel ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("distanceKm", { km: distanceLabel })}
+          </p>
+        ) : null}
       </CardContent>
 
       <CardFooter className="p-4 pt-0 flex items-center justify-start">

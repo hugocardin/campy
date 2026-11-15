@@ -12,10 +12,12 @@
   "controls": {
     "searchPlaceholder": "Rechercher par nom, ville ou province…",
     "sortLabel": "Trier par",
+    "sortDistance": "Distance (plus proche)",
     "sortNameAsc": "Nom (A à Z)",
     "sortNameDesc": "Nom (Z à A)",
     "sortCity": "Ville (A à Z)",
     "sortProvince": "Province (A à Z)",
+    "distanceKm": "À {km} km",
     "provinceLabel": "Filtrer par province",
     "provinceAll": "Toutes les provinces",
     "clearFilters": "Effacer",

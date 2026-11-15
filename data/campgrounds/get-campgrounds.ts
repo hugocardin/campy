@@ -1,13 +1,11 @@
 import { Campground } from "@/entities/campground";
 import {
-  CAMPGROUND_RADIUS_KM_PRESETS,
   CAMPGROUND_SORT_CONFIG,
-  CampgroundGeo,
-  CampgroundRadiusKm,
   CampgroundSort,
   campgroundRadiusMeters,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
+  validateCampgroundGeo,
 } from "@/lib/campground-search";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import {
@@ -36,6 +34,7 @@ type CampgroundRow = {
   longitude: number | null;
   website: string | null;
   phone: string | null;
+  distance_m?: number | null;
 };
 
 function toCoord(value: number | null): number | null {
@@ -49,6 +48,8 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
   const lng = toCoord(row.longitude);
   const location =
     lat != null && lng != null ? { lat, lng } : null;
+  const distanceMeters =
+    row.distance_m == null ? undefined : toCoord(row.distance_m);
 
   return {
     id: row.id,
@@ -59,6 +60,7 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
     province: row.province,
     country: row.country,
     location,
+    distanceMeters: distanceMeters ?? undefined,
     website: row.website ?? "",
     phone: row.phone ?? "",
   };
@@ -68,6 +70,18 @@ function sortCampgrounds(
   campgrounds: Campground[],
   sort: CampgroundSort,
 ): Campground[] {
+  if (sort === "distance") {
+    return [...campgrounds].sort((a, b) => {
+      const ad = a.distanceMeters;
+      const bd = b.distanceMeters;
+      if (ad == null && bd == null) return a.name.localeCompare(b.name);
+      if (ad == null) return 1;
+      if (bd == null) return -1;
+      if (ad !== bd) return ad - bd;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
   const { column, ascending } = CAMPGROUND_SORT_CONFIG[sort];
   const dir = ascending ? 1 : -1;
   return [...campgrounds].sort((a, b) => {
@@ -124,27 +138,12 @@ export const getCampgrounds = cache(
   ): Promise<ActionResult<Campground[]>> => {
     try {
       const supabase = await createClient();
-      const resolvedSort = parseCampgroundSort(sort);
-      const { column, ascending } = CAMPGROUND_SORT_CONFIG[resolvedSort];
+      const geo = validateCampgroundGeo(lat, lng, radiusKm);
+      const resolvedSort = parseCampgroundSort(sort, {
+        geoActive: Boolean(geo),
+      });
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       const provinceFilter = province?.trim().slice(0, 100) || "";
-
-      const radiusPreset =
-        radiusKm != null &&
-        (CAMPGROUND_RADIUS_KM_PRESETS as readonly number[]).includes(radiusKm)
-          ? (radiusKm as CampgroundRadiusKm)
-          : undefined;
-      const geo: CampgroundGeo | undefined =
-        lat != null &&
-        lng != null &&
-        radiusPreset != null &&
-        Number.isFinite(lat) &&
-        Number.isFinite(lng) &&
-        Math.abs(lat) <= 90 &&
-        Math.abs(lng) <= 180 &&
-        !(lat === 0 && lng === 0)
-          ? { lat, lng, radiusKm: radiusPreset }
-          : undefined;
 
       if (geo) {
         const result = await handleDbResponse(
@@ -162,8 +161,16 @@ export const getCampgrounds = cache(
         }
 
         const rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
+        // RPC already ORDER BY distance; re-sort only when user picked another key.
+        if (resolvedSort === "distance") {
+          return resultSuccess(rows);
+        }
         return resultSuccess(sortCampgrounds(rows, resolvedSort));
       }
+
+      const nonGeoSort =
+        resolvedSort === "distance" ? ("name" as const) : resolvedSort;
+      const { column, ascending } = CAMPGROUND_SORT_CONFIG[nonGeoSort];
 
       let query = supabase
         .from("v_campgrounds")

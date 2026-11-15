@@ -9,6 +9,7 @@ import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
 import {
+  Circle,
   CircleMarker,
   MapContainer,
   Marker,
@@ -20,6 +21,7 @@ import {
 type Props = {
   campgrounds: Campground[];
   searchCenter?: { lat: number; lng: number };
+  radiusKm?: number;
   className?: string;
 };
 
@@ -82,6 +84,7 @@ L.Marker.prototype.options.icon = DefaultIcon;
 export default function CampgroundsMap({
   campgrounds,
   searchCenter,
+  radiusKm,
   className,
 }: Props) {
   const t = useTranslations("search.controls");
@@ -96,9 +99,20 @@ export default function CampgroundsMap({
     [withCoords],
   );
 
-  const centerTuple: LatLngTuple | undefined = searchCenter
-    ? [searchCenter.lat, searchCenter.lng]
-    : undefined;
+  const centerLat = searchCenter?.lat;
+  const centerLng = searchCenter?.lng;
+  const centerTuple = useMemo<LatLngTuple | undefined>(
+    () =>
+      centerLat != null && centerLng != null
+        ? [centerLat, centerLng]
+        : undefined,
+    [centerLat, centerLng],
+  );
+
+  const radiusMeters =
+    radiusKm != null && Number.isFinite(radiusKm) && radiusKm > 0
+      ? radiusKm * 1000
+      : undefined;
 
   if (withCoords.length === 0 && !centerTuple) {
     return (
@@ -130,6 +144,18 @@ export default function CampgroundsMap({
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitMarkers positions={positions} searchCenter={centerTuple} />
+        {centerTuple && radiusMeters != null ? (
+          <Circle
+            center={centerTuple}
+            radius={radiusMeters}
+            pathOptions={{
+              color: "#0f766e",
+              fillColor: "#14b8a6",
+              fillOpacity: 0.08,
+              weight: 1.5,
+            }}
+          />
+        ) : null}
         {centerTuple ? (
           <CircleMarker
             center={centerTuple}
