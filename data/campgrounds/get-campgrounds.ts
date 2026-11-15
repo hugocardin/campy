@@ -1,5 +1,6 @@
 import { Campground } from "@/entities/campground";
 import {
+  distinctProvinceRaws,
   provinceMatchValues,
   resolveProvinceCode,
   uniqueProvinceFilterKeys,
@@ -100,11 +101,10 @@ function sortCampgrounds(
 }
 
 /**
- * Distinct province filter keys (canonical codes when known). Labels are
- * locale-aware in the UI; matching expands aliases — see canadian-provinces.
- * Follow-up: distinct view/RPC + `unstable_cache` / revalidate at scale.
+ * Distinct trimmed province strings from active guest view (DB spelling preserved).
+ * Shared by filter option keys and alias expansion for matching.
  */
-export const getCampgroundProvinces = cache(
+const getCampgroundProvinceRaws = cache(
   async (): Promise<ActionResult<string[]>> => {
     try {
       const supabase = await createClient();
@@ -118,11 +118,26 @@ export const getCampgroundProvinces = cache(
       }
 
       return resultSuccess(
-        uniqueProvinceFilterKeys(result.data.map((row) => row.province)),
+        distinctProvinceRaws(result.data.map((row) => row.province)),
       );
     } catch (err) {
       return handleUnexpectedError(err);
     }
+  },
+);
+
+/**
+ * Distinct province filter keys (canonical codes when known). Labels are
+ * locale-aware in the UI; matching expands aliases — see canadian-provinces.
+ * Follow-up: distinct view/RPC + `unstable_cache` / revalidate at scale.
+ */
+export const getCampgroundProvinces = cache(
+  async (): Promise<ActionResult<string[]>> => {
+    const raws = await getCampgroundProvinceRaws();
+    if (!raws.success) {
+      return raws;
+    }
+    return resultSuccess(uniqueProvinceFilterKeys(raws.data));
   },
 );
 
@@ -145,9 +160,15 @@ export const getCampgrounds = cache(
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       // Unknown / malicious ?province= is ignored (All provinces).
       const provinceCode = resolveProvinceCode(province);
-      const provinceAliases = provinceCode
-        ? provinceMatchValues(provinceCode)
-        : [];
+
+      let provinceAliases: string[] = [];
+      if (provinceCode) {
+        // Same distinct raws as the dropdown — fold-matching DB spellings join
+        // the static alias list so `.in()` / near-me lower(btrim) stay aligned.
+        const raws = await getCampgroundProvinceRaws();
+        const rawDb = raws.success ? raws.data : [];
+        provinceAliases = provinceMatchValues(provinceCode, rawDb);
+      }
 
       if (geo) {
         const result = await handleDbResponse(
@@ -193,7 +214,7 @@ export const getCampgrounds = cache(
       }
 
       if (provinceAliases.length > 0) {
-        // Controlled aliases only (known codes) — never raw URL input.
+        // Controlled aliases + distinct DB raws for this code — never raw URL.
         query = query.in("province", provinceAliases);
       }
 

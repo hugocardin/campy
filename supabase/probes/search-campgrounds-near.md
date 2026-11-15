@@ -7,6 +7,7 @@ Migrations:
 - `20261115033824_search_campgrounds_near_reject_nan.sql` (reject NaN/±Inf on radius; cap q before escape)
 - `20261115183618_search_campgrounds_near_province_aliases.sql` (`province` text → `province_aliases text[]`)
 - `20261115184133_search_campgrounds_near_compat_and_harden.sql` (restore `province text` wrapper; lower(btrim) equality; alias caps)
+- `20261115184640_search_campgrounds_near_alias_fail_closed.sql` (>32 / empty-normalized → empty array, fail closed)
 
 ## SQL
 

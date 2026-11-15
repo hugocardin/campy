@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  CANADIAN_PROVINCE_CODES,
+  PROVINCE_ALIAS_MATCH_MAX,
   assertNoFoldedAliasCollisions,
+  distinctProvinceRaws,
   foldProvinceKey,
   isCanadianProvinceCode,
   provinceFilterKey,
@@ -32,13 +35,13 @@ describe("resolveProvinceCode", () => {
 });
 
 describe("provinceFilterKey / uniqueProvinceFilterKeys", () => {
-  it("URL key is code-only; list still keeps unknown DB free text", () => {
+  it("URL and option list are code-only (unknown DB free text omitted)", () => {
     assert.equal(provinceFilterKey("Québec"), "QC");
     assert.equal(provinceFilterKey("%"), null);
     assert.equal(provinceFilterKey('a",b.eq.c'), null);
     assert.deepEqual(
       uniqueProvinceFilterKeys(["QC", "Quebec", "Québec", "BC", "bc", "Weird"]),
-      ["BC", "QC", "Weird"],
+      ["BC", "QC"],
     );
   });
 });
@@ -59,6 +62,32 @@ describe("provinceMatchValues", () => {
     assert.ok(values.includes("Québec!"));
     assert.ok(values.includes("QC"));
     assert.ok(!values.includes("Ontario"));
+  });
+
+  it("stays within PROVINCE_ALIAS_MATCH_MAX for every shipped code", () => {
+    for (const code of CANADIAN_PROVINCE_CODES) {
+      const values = provinceMatchValues(code);
+      assert.ok(
+        values.length <= PROVINCE_ALIAS_MATCH_MAX,
+        `${code} has ${values.length} aliases (max ${PROVINCE_ALIAS_MATCH_MAX})`,
+      );
+    }
+  });
+
+  it("does not pad with redundant lowercase duplicates of static aliases", () => {
+    const values = provinceMatchValues("BC");
+    assert.ok(values.includes("BC"));
+    assert.ok(!values.includes("bc"));
+    assert.ok(values.includes("British Columbia"));
+  });
+});
+
+describe("distinctProvinceRaws", () => {
+  it("trims and dedupes preserving spelling", () => {
+    assert.deepEqual(
+      distinctProvinceRaws([" BC ", "BC", "Québec", null, ""]),
+      ["BC", "Québec"],
+    );
   });
 });
 

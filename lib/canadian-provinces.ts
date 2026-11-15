@@ -21,6 +21,9 @@ export const CANADIAN_PROVINCE_CODES = [
 
 export type CanadianProvinceCode = (typeof CANADIAN_PROVINCE_CODES)[number];
 
+/** Max aliases passed to PostgREST `.in` / near-me RPC (matches DB cap). */
+export const PROVINCE_ALIAS_MATCH_MAX = 32;
+
 /** Display / DB aliases per code (code itself included). */
 export const CANADIAN_PROVINCE_ALIASES: Record<
   CanadianProvinceCode,
@@ -152,8 +155,10 @@ export function provinceFilterKey(
  * Controlled alias strings to match against `campgrounds.province` for a code.
  * Unknown / malicious URL values resolve to [] — never pass raw user input.
  *
- * Optionally merges distinct DB raw values whose fold maps to the same code
- * (so odd punctuation in stored rows still matches when filtered).
+ * Merges distinct DB raw values whose fold maps to the same code (so odd
+ * punctuation/casing in stored rows still matches via `.in()`). Near-me RPC
+ * also lower(btrim)s aliases, so static lowercase duplicates are unnecessary.
+ * Capped at {@link PROVINCE_ALIAS_MATCH_MAX}.
  */
 export function provinceMatchValues(
   filterKey: string,
@@ -166,15 +171,13 @@ export function provinceMatchValues(
   const out: string[] = [];
   const add = (value: string) => {
     if (!value || seen.has(value)) return;
+    if (out.length >= PROVINCE_ALIAS_MATCH_MAX) return;
     seen.add(value);
     out.push(value);
   };
 
   for (const alias of CANADIAN_PROVINCE_ALIASES[code]) {
     add(alias);
-    // `.in()` is case-sensitive; include lowercased forms for free-text DB rows.
-    const lower = alias.toLocaleLowerCase("en-CA");
-    if (lower !== alias) add(lower);
   }
 
   if (rawDbProvinces) {
@@ -193,20 +196,34 @@ export function provinceMatchValues(
 
 /**
  * Build the distinct filter option list from raw DB province strings.
- * Collapses aliases to one code; keeps unknown free-text DB values as-is
- * (URL unknowns are ignored separately via {@link provinceFilterKey}).
+ * Collapses aliases to known codes only — unknown free-text is omitted so the
+ * dropdown never offers a value the filter cannot apply (codes-only matching).
  */
 export function uniqueProvinceFilterKeys(
   rawProvinces: Iterable<string | null | undefined>,
 ): string[] {
   const keys = new Set<string>();
   for (const raw of rawProvinces) {
-    if (raw == null) continue;
-    const trimmed = raw.trim().slice(0, 100);
-    if (!trimmed) continue;
-    keys.add(resolveProvinceCode(trimmed) ?? trimmed);
+    const code = resolveProvinceCode(raw);
+    if (code) keys.add(code);
   }
   return [...keys].sort((a, b) => a.localeCompare(b, "en-CA"));
+}
+
+/** Distinct trimmed non-empty province strings (preserves DB spelling). */
+export function distinctProvinceRaws(
+  rawProvinces: Iterable<string | null | undefined>,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of rawProvinces) {
+    if (raw == null) continue;
+    const trimmed = raw.trim().slice(0, 100);
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
 }
 
 /** Exported for tests — builds the folded map and asserts no collisions. */
