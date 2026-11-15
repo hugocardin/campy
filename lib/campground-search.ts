@@ -13,6 +13,21 @@ export const DEFAULT_CAMPGROUND_RADIUS_KM: CampgroundRadiusKm = 50;
 /** ~1 km privacy rounding for URL / logs (2 decimal degrees). */
 export const CAMPGROUND_GEO_COORD_DECIMALS = 2;
 
+/** Stable amenity `code` values mapped to guest hookup filters. */
+export const HOOKUP_AMENITY_CODES = {
+  electricity: "ELECTRICITY",
+  water: "WATER",
+  sewer: "SEWER",
+} as const;
+
+export type HookupFilterKey = keyof typeof HOOKUP_AMENITY_CODES;
+
+export type CampgroundHookupFilters = {
+  electricity: boolean;
+  water: boolean;
+  sewer: boolean;
+};
+
 export type CampgroundListFilters = {
   q?: string;
   sort?: CampgroundSort;
@@ -20,6 +35,9 @@ export type CampgroundListFilters = {
   lat?: number;
   lng?: number;
   radiusKm?: CampgroundRadiusKm;
+  electricity?: boolean;
+  water?: boolean;
+  sewer?: boolean;
 };
 
 export type CampgroundGeo = {
@@ -164,4 +182,29 @@ export function formatDistanceKm(distanceM: number | null | undefined): string |
   const km = distanceM / 1000;
   if (km < 1) return "<1";
   return String(Math.round(km));
+}
+
+/**
+ * URL hookup flags: only `1` is true (reject `true` / `yes` / other truthy junk).
+ */
+export function parseHookupFlag(value: string | undefined): boolean {
+  return value === "1";
+}
+
+export function parseCampgroundHookups(params: {
+  electricity?: string;
+  water?: string;
+  sewer?: string;
+}): CampgroundHookupFilters {
+  return {
+    electricity: parseHookupFlag(params.electricity),
+    water: parseHookupFlag(params.water),
+    sewer: parseHookupFlag(params.sewer),
+  };
+}
+
+export function anyHookupFilterActive(
+  hookups: CampgroundHookupFilters,
+): boolean {
+  return hookups.electricity || hookups.water || hookups.sewer;
 }

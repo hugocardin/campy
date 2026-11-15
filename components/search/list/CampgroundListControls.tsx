@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -18,8 +20,11 @@ import {
   CampgroundRadiusKm,
   CampgroundSort,
   DEFAULT_CAMPGROUND_RADIUS_KM,
+  HookupFilterKey,
+  anyHookupFilterActive,
   campgroundSortQueryValue,
   parseCampgroundGeo,
+  parseCampgroundHookups,
   parseCampgroundSort,
   roundCampgroundCoord,
   validateCampgroundGeo,
@@ -37,6 +42,15 @@ type Props = {
 
 const ALL_PROVINCES = "__all__";
 
+const HOOKUP_FILTERS: {
+  key: HookupFilterKey;
+  labelKey: "filterElectricity" | "filterWater" | "filterSewer";
+}[] = [
+  { key: "electricity", labelKey: "filterElectricity" },
+  { key: "water", labelKey: "filterWater" },
+  { key: "sewer", labelKey: "filterSewer" },
+];
+
 type QueryState = {
   q: string;
   sort: CampgroundSort;
@@ -44,6 +58,9 @@ type QueryState = {
   lat?: number;
   lng?: number;
   radiusKm?: CampgroundRadiusKm;
+  electricity: boolean;
+  water: boolean;
+  sewer: boolean;
 };
 
 type LatestParams = Omit<QueryState, "q">;
@@ -71,6 +88,11 @@ export default function CampgroundListControls({
     lng: searchParams.get("lng") ?? undefined,
     radiusKm: searchParams.get("radiusKm") ?? undefined,
   });
+  const hookups = parseCampgroundHookups({
+    electricity: searchParams.get("electricity") ?? undefined,
+    water: searchParams.get("water") ?? undefined,
+    sewer: searchParams.get("sewer") ?? undefined,
+  });
   const sortParam = parseCampgroundSort(
     searchParams.get("sort") ?? undefined,
     { geoActive: Boolean(geo) },
@@ -94,6 +116,9 @@ export default function CampgroundListControls({
     lat: geo?.lat,
     lng: geo?.lng,
     radiusKm: geo?.radiusKm ?? preferredRadius,
+    electricity: hookups.electricity,
+    water: hookups.water,
+    sewer: hookups.sewer,
   });
 
   // Sync input from URL only for external changes (back/forward / Clear).
@@ -123,6 +148,9 @@ export default function CampgroundListControls({
       lat: geo?.lat,
       lng: geo?.lng,
       radiusKm: geo?.radiusKm ?? preferredRadius,
+      electricity: hookups.electricity,
+      water: hookups.water,
+      sewer: hookups.sewer,
     };
   }, [
     search,
@@ -132,6 +160,9 @@ export default function CampgroundListControls({
     geo?.lng,
     geo?.radiusKm,
     preferredRadius,
+    hookups.electricity,
+    hookups.water,
+    hookups.sewer,
   ]);
 
   useEffect(() => {
@@ -164,6 +195,9 @@ export default function CampgroundListControls({
       lat: next.lat,
       lng: next.lng,
       radiusKm: next.radiusKm,
+      electricity: next.electricity,
+      water: next.water,
+      sewer: next.sewer,
     };
 
     const params = new URLSearchParams();
@@ -186,11 +220,31 @@ export default function CampgroundListControls({
       params.set("lng", String(geo.lng));
       params.set("radiusKm", String(geo.radiusKm));
     }
+    if (next.electricity) params.set("electricity", "1");
+    if (next.water) params.set("water", "1");
+    if (next.sewer) params.set("sewer", "1");
 
     const query = params.toString();
     startTransition(() => {
       router.replace(query ? `${pathname}?${query}` : pathname);
     });
+  }
+
+  function withLatestFilters(
+    patch: Partial<QueryState> & Pick<QueryState, "q" | "sort">,
+  ): QueryState {
+    const latest = latestParamsRef.current;
+    return {
+      q: patch.q,
+      sort: patch.sort,
+      province: patch.province ?? latest.province,
+      lat: "lat" in patch ? patch.lat : latest.lat,
+      lng: "lng" in patch ? patch.lng : latest.lng,
+      radiusKm: "radiusKm" in patch ? patch.radiusKm : latest.radiusKm,
+      electricity: patch.electricity ?? latest.electricity,
+      water: patch.water ?? latest.water,
+      sewer: patch.sewer ?? latest.sewer,
+    };
   }
 
   useEffect(() => {
@@ -200,7 +254,8 @@ export default function CampgroundListControls({
     clearDebounce();
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
-      const { sort, province, lat, lng, radiusKm } = latestParamsRef.current;
+      const { sort, province, lat, lng, radiusKm, electricity, water, sewer } =
+        latestParamsRef.current;
       replaceQuery({
         q: search,
         sort,
@@ -208,6 +263,9 @@ export default function CampgroundListControls({
         lat,
         lng,
         radiusKm,
+        electricity,
+        water,
+        sewer,
       });
     }, 300);
 
@@ -232,14 +290,15 @@ export default function CampgroundListControls({
         clearDebounce();
         const radiusKm =
           latestParamsRef.current.radiusKm ?? preferredRadius;
-        replaceQuery({
-          q: latestParamsRef.current.q,
-          sort: "distance",
-          province: latestParamsRef.current.province,
-          lat: roundCampgroundCoord(pos.coords.latitude),
-          lng: roundCampgroundCoord(pos.coords.longitude),
-          radiusKm,
-        });
+        replaceQuery(
+          withLatestFilters({
+            q: latestParamsRef.current.q,
+            sort: "distance",
+            lat: roundCampgroundCoord(pos.coords.latitude),
+            lng: roundCampgroundCoord(pos.coords.longitude),
+            radiusKm,
+          }),
+        );
       },
       (err) => {
         if (cancelledRef.current || requestId !== geoRequestIdRef.current) {
@@ -273,154 +332,191 @@ export default function CampgroundListControls({
       a.label.localeCompare(b.label, locale, { sensitivity: "base" }),
     );
 
-  const hasFilters = Boolean(search || provinceParam || geo);
+  const hasFilters = Boolean(
+    search || provinceParam || geo || anyHookupFilterActive(hookups),
+  );
   const controlsDisabled = geoBusy;
 
   return (
     <div
-      className={`space-y-4 md:space-y-0 md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 ${isPending || geoBusy ? "opacity-80" : ""}`}
+      className={`space-y-4 ${isPending || geoBusy ? "opacity-80" : ""}`}
     >
-      <div className="relative flex-1 min-w-48">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder={t("searchPlaceholder")}
-          className="pl-10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label={t("searchPlaceholder")}
-          disabled={controlsDisabled}
-        />
-      </div>
+      <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t("searchPlaceholder")}
+            className="pl-10"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={t("searchPlaceholder")}
+            disabled={controlsDisabled}
+          />
+        </div>
 
-      <Select
-        value={sortParam}
-        disabled={controlsDisabled}
-        onValueChange={(value) => {
-          clearDebounce();
-          replaceQuery({
-            q: search,
-            sort: parseCampgroundSort(value, { geoActive: Boolean(geo) }),
-            province: latestParamsRef.current.province,
-            lat: latestParamsRef.current.lat,
-            lng: latestParamsRef.current.lng,
-            radiusKm: latestParamsRef.current.radiusKm,
-          });
-        }}
-      >
-        <SelectTrigger className="w-45">
-          <SelectValue placeholder={t("sortLabel")} />
-        </SelectTrigger>
-        <SelectContent>
-          {geo ? (
-            <SelectItem value="distance">{t("sortDistance")}</SelectItem>
-          ) : null}
-          <SelectItem value="name">{t("sortNameAsc")}</SelectItem>
-          <SelectItem value="name-desc">{t("sortNameDesc")}</SelectItem>
-          <SelectItem value="city">{t("sortCity")}</SelectItem>
-          <SelectItem value="province">{t("sortProvince")}</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={provinceParam || ALL_PROVINCES}
-        disabled={controlsDisabled}
-        onValueChange={(value) => {
-          clearDebounce();
-          replaceQuery({
-            q: search,
-            sort: latestParamsRef.current.sort,
-            province: value === ALL_PROVINCES ? "" : value,
-            lat: latestParamsRef.current.lat,
-            lng: latestParamsRef.current.lng,
-            radiusKm: latestParamsRef.current.radiusKm,
-          });
-        }}
-      >
-        <SelectTrigger className="w-56">
-          <SelectValue placeholder={t("provinceLabel")} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_PROVINCES}>{t("provinceAll")}</SelectItem>
-          {provinceOptions.map(({ key, label }) => (
-            <SelectItem key={key} value={key}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {geo ? (
         <Select
-          value={String(geo.radiusKm)}
+          value={sortParam}
           disabled={controlsDisabled}
           onValueChange={(value) => {
             clearDebounce();
-            const nextRadius = (CAMPGROUND_RADIUS_KM_PRESETS as readonly number[]).includes(
-              Number(value),
-            )
-              ? (Number(value) as CampgroundRadiusKm)
-              : DEFAULT_CAMPGROUND_RADIUS_KM;
-            setPreferredRadius(nextRadius);
-            replaceQuery({
-              q: search,
-              sort: latestParamsRef.current.sort,
-              province: latestParamsRef.current.province,
-              lat: latestParamsRef.current.lat,
-              lng: latestParamsRef.current.lng,
-              radiusKm: nextRadius,
-            });
+            replaceQuery(
+              withLatestFilters({
+                q: search,
+                sort: parseCampgroundSort(value, { geoActive: Boolean(geo) }),
+              }),
+            );
           }}
         >
-          <SelectTrigger className="w-40" aria-label={t("radiusLabel")}>
-            <SelectValue placeholder={t("radiusLabel")} />
+          <SelectTrigger className="w-45">
+            <SelectValue placeholder={t("sortLabel")} />
           </SelectTrigger>
           <SelectContent>
-            {CAMPGROUND_RADIUS_KM_PRESETS.map((km) => (
-              <SelectItem key={km} value={String(km)}>
-                {t("radiusKm", { km })}
+            {geo ? (
+              <SelectItem value="distance">{t("sortDistance")}</SelectItem>
+            ) : null}
+            <SelectItem value="name">{t("sortNameAsc")}</SelectItem>
+            <SelectItem value="name-desc">{t("sortNameDesc")}</SelectItem>
+            <SelectItem value="city">{t("sortCity")}</SelectItem>
+            <SelectItem value="province">{t("sortProvince")}</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={provinceParam || ALL_PROVINCES}
+          disabled={controlsDisabled}
+          onValueChange={(value) => {
+            clearDebounce();
+            replaceQuery(
+              withLatestFilters({
+                q: search,
+                sort: latestParamsRef.current.sort,
+                province: value === ALL_PROVINCES ? "" : value,
+              }),
+            );
+          }}
+        >
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder={t("provinceLabel")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_PROVINCES}>{t("provinceAll")}</SelectItem>
+            {provinceOptions.map(({ key, label }) => (
+              <SelectItem key={key} value={key}>
+                {label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      ) : null}
 
-      <Button
-        type="button"
-        variant={geo ? "default" : "outline"}
-        onClick={onNearMe}
-        disabled={geoBusy}
-        aria-label={t("nearMe")}
-      >
-        <LocateFixed className="h-4 w-4" />
-        {geoBusy ? t("nearMeLocating") : t("nearMe")}
-      </Button>
+        {geo ? (
+          <Select
+            value={String(geo.radiusKm)}
+            disabled={controlsDisabled}
+            onValueChange={(value) => {
+              clearDebounce();
+              const nextRadius = (CAMPGROUND_RADIUS_KM_PRESETS as readonly number[]).includes(
+                Number(value),
+              )
+                ? (Number(value) as CampgroundRadiusKm)
+                : DEFAULT_CAMPGROUND_RADIUS_KM;
+              setPreferredRadius(nextRadius);
+              replaceQuery(
+                withLatestFilters({
+                  q: search,
+                  sort: latestParamsRef.current.sort,
+                  radiusKm: nextRadius,
+                }),
+              );
+            }}
+          >
+            <SelectTrigger className="w-40" aria-label={t("radiusLabel")}>
+              <SelectValue placeholder={t("radiusLabel")} />
+            </SelectTrigger>
+            <SelectContent>
+              {CAMPGROUND_RADIUS_KM_PRESETS.map((km) => (
+                <SelectItem key={km} value={String(km)}>
+                  {t("radiusKm", { km })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
 
-      {hasFilters || geoBusy ? (
         <Button
           type="button"
-          variant="outline"
-          onClick={() => {
-            clearDebounce();
-            cancelGeolocation();
-            setSearch("");
-            setGeoError(null);
-            replaceQuery({
-              q: "",
-              sort: "name",
-              province: "",
-            });
-          }}
+          variant={geo ? "default" : "outline"}
+          onClick={onNearMe}
+          disabled={geoBusy}
+          aria-label={t("nearMe")}
         >
-          {t("clearFilters")}
+          <LocateFixed className="h-4 w-4" />
+          {geoBusy ? t("nearMeLocating") : t("nearMe")}
         </Button>
-      ) : null}
 
-      <div className="text-sm text-muted-foreground md:ml-auto">
-        {t("resultCount", { count: resultCount })}
+        {hasFilters || geoBusy ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              clearDebounce();
+              cancelGeolocation();
+              setSearch("");
+              setGeoError(null);
+              replaceQuery({
+                q: "",
+                sort: "name",
+                province: "",
+                electricity: false,
+                water: false,
+                sewer: false,
+              });
+            }}
+          >
+            {t("clearFilters")}
+          </Button>
+        ) : null}
+
+        <div className="text-sm text-muted-foreground md:ml-auto">
+          {t("resultCount", { count: resultCount })}
+        </div>
       </div>
 
+      <fieldset
+        className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
+        disabled={controlsDisabled}
+      >
+        <legend className="text-sm font-medium text-foreground mr-1">
+          {t("hookupsLabel")}
+        </legend>
+        {HOOKUP_FILTERS.map(({ key, labelKey }) => {
+          const id = `hookup-${key}`;
+          return (
+            <div key={key} className="flex items-center gap-2">
+              <Checkbox
+                id={id}
+                checked={hookups[key]}
+                disabled={controlsDisabled}
+                onCheckedChange={(checked) => {
+                  clearDebounce();
+                  replaceQuery(
+                    withLatestFilters({
+                      q: search,
+                      sort: latestParamsRef.current.sort,
+                      [key]: checked === true,
+                    }),
+                  );
+                }}
+              />
+              <Label htmlFor={id} className="font-normal cursor-pointer">
+                {t(labelKey)}
+              </Label>
+            </div>
+          );
+        })}
+      </fieldset>
+
       {geoError ? (
-        <p className="basis-full text-sm text-destructive" role="status">
+        <p className="text-sm text-destructive" role="status">
           {geoError}
         </p>
       ) : null}

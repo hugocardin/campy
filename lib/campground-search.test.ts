@@ -3,12 +3,16 @@ import { describe, it } from "node:test";
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   DEFAULT_CAMPGROUND_RADIUS_KM,
+  HOOKUP_AMENITY_CODES,
+  anyHookupFilterActive,
   campgroundRadiusMeters,
   campgroundSortQueryValue,
   formatDistanceKm,
   parseCampgroundGeo,
+  parseCampgroundHookups,
   parseCampgroundRadiusKm,
   parseCampgroundSort,
+  parseHookupFlag,
   roundCampgroundCoord,
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
@@ -122,5 +126,40 @@ describe("formatDistanceKm", () => {
     assert.equal(formatDistanceKm(1200), "1");
     assert.equal(formatDistanceKm(12500), "13");
     assert.equal(formatDistanceKm(null), null);
+  });
+});
+
+describe("hookup URL filters", () => {
+  it("maps stable amenity codes", () => {
+    assert.equal(HOOKUP_AMENITY_CODES.electricity, "ELECTRICITY");
+    assert.equal(HOOKUP_AMENITY_CODES.water, "WATER");
+    assert.equal(HOOKUP_AMENITY_CODES.sewer, "SEWER");
+  });
+
+  it("only treats 1 as true", () => {
+    assert.equal(parseHookupFlag("1"), true);
+    assert.equal(parseHookupFlag("true"), false);
+    assert.equal(parseHookupFlag("yes"), false);
+    assert.equal(parseHookupFlag("0"), false);
+    assert.equal(parseHookupFlag(undefined), false);
+  });
+
+  it("parses electricity/water/sewer URL params", () => {
+    assert.deepEqual(
+      parseCampgroundHookups({
+        electricity: "1",
+        water: "true",
+        sewer: "1",
+      }),
+      { electricity: true, water: false, sewer: true },
+    );
+    assert.equal(
+      anyHookupFilterActive({ electricity: false, water: false, sewer: false }),
+      false,
+    );
+    assert.equal(
+      anyHookupFilterActive({ electricity: true, water: false, sewer: false }),
+      true,
+    );
   });
 });

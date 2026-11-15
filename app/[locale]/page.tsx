@@ -6,7 +6,11 @@ import {
   getCampgroundProvinces,
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
-import { parseCampgroundGeo, parseCampgroundSort } from "@/lib/campground-search";
+import {
+  parseCampgroundGeo,
+  parseCampgroundHookups,
+  parseCampgroundSort,
+} from "@/lib/campground-search";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
 import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
@@ -37,6 +41,11 @@ export default async function Home({ searchParams }: PageProps) {
     lng: firstParam(params.lng),
     radiusKm: firstParam(params.radiusKm),
   });
+  const hookups = parseCampgroundHookups({
+    electricity: firstParam(params.electricity),
+    water: firstParam(params.water),
+    sewer: firstParam(params.sewer),
+  });
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
   });
@@ -49,6 +58,9 @@ export default async function Home({ searchParams }: PageProps) {
       geo?.lat,
       geo?.lng,
       geo?.radiusKm,
+      hookups.electricity,
+      hookups.water,
+      hookups.sewer,
     ),
     getCampgroundProvinces(),
   ]);
