@@ -5,6 +5,7 @@ Migrations:
 - `20261115032643_search_campgrounds_near.sql` (initial; version matches live `schema_migrations`)
 - `20261115033324_search_campgrounds_near_harden.sql` (explicit `RETURNS TABLE` + `distance_m`, clamp, LIMIT, ILIKE escape)
 - `20261115033824_search_campgrounds_near_reject_nan.sql` (reject NaN/±Inf on radius; cap q before escape)
+- `20261115183618_search_campgrounds_near_province_aliases.sql` (`province` text → `province_aliases text[]` ILIKE match)
 
 ## SQL
 
@@ -24,9 +25,16 @@ SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 'Infinity'::
 -- Literal % is escaped (not "match all")
 SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 100000, '%', NULL);
 
+-- Province aliases (app expands QC → Quebec/Québec/…); BC code matches seed rows
+SELECT name, province
+FROM public.search_campgrounds_near(
+  49.28, -123.12, 100000, NULL,
+  ARRAY['BC', 'British Columbia', 'Colombie-Britannique']
+);
+
 SELECT has_function_privilege(
   'anon',
-  'public.search_campgrounds_near(double precision, double precision, double precision, text, text)',
+  'public.search_campgrounds_near(double precision, double precision, double precision, text, text[])',
   'execute'
 ) AS anon_exec;
 
@@ -41,7 +49,7 @@ WHERE pronamespace = 'public'::regnamespace
 `POST /rest/v1/rpc/search_campgrounds_near` with body:
 
 ```json
-{ "lat": 49.28, "lng": -123.12, "radius_m": 100000, "q": null, "province": null }
+{ "lat": 49.28, "lng": -123.12, "radius_m": 100000, "q": null, "province_aliases": null }
 ```
 
 Expect 200, guest columns + `distance_m` (no commission). `prosecdef` must be false (SECURITY INVOKER).

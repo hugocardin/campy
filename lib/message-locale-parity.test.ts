@@ -27,6 +27,13 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "campgrounds.form.latitudeLabel",
   "campgrounds.form.longitudeLabel",
   "sites.form.descriptionLabel",
+  // Official names identical in en-CA / fr-CA
+  "search.provinces.AB",
+  "search.provinces.MB",
+  "search.provinces.NU",
+  "search.provinces.ON",
+  "search.provinces.SK",
+  "search.provinces.YT",
 ]);
 
 function listLocaleJsonFiles(locale: string): string[] {

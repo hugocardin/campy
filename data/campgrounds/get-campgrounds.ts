@@ -1,5 +1,10 @@
 import { Campground } from "@/entities/campground";
 import {
+  provinceMatchValues,
+  provinceOrFilter,
+  uniqueProvinceFilterKeys,
+} from "@/lib/canadian-provinces";
+import {
   CAMPGROUND_SORT_CONFIG,
   CampgroundSort,
   campgroundRadiusMeters,
@@ -95,8 +100,9 @@ function sortCampgrounds(
 }
 
 /**
- * Follow-up (parked): distinct view/RPC, `unstable_cache` / revalidate, and
- * Quebec/Québec/QC + fr-CA label normalization. Fine at demo scale.
+ * Distinct province filter keys (canonical codes when known). Labels are
+ * locale-aware in the UI; matching expands aliases — see canadian-provinces.
+ * Follow-up: distinct view/RPC + `unstable_cache` / revalidate at scale.
  */
 export const getCampgroundProvinces = cache(
   async (): Promise<ActionResult<string[]>> => {
@@ -111,15 +117,9 @@ export const getCampgroundProvinces = cache(
         return result;
       }
 
-      const provinces = [
-        ...new Set(
-          result.data
-            .map((row) => row.province?.trim())
-            .filter((p): p is string => Boolean(p)),
-        ),
-      ].sort((a, b) => a.localeCompare(b));
-
-      return resultSuccess(provinces);
+      return resultSuccess(
+        uniqueProvinceFilterKeys(result.data.map((row) => row.province)),
+      );
     } catch (err) {
       return handleUnexpectedError(err);
     }
@@ -144,6 +144,9 @@ export const getCampgrounds = cache(
       });
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       const provinceFilter = province?.trim().slice(0, 100) || "";
+      const provinceAliases = provinceFilter
+        ? provinceMatchValues(provinceFilter)
+        : [];
 
       if (geo) {
         const result = await handleDbResponse(
@@ -152,7 +155,8 @@ export const getCampgrounds = cache(
             lng: geo.lng,
             radius_m: campgroundRadiusMeters(geo.radiusKm),
             q: term || null,
-            province: provinceFilter || null,
+            province_aliases:
+              provinceAliases.length > 0 ? provinceAliases : null,
           }),
         );
 
@@ -187,7 +191,10 @@ export const getCampgrounds = cache(
       }
 
       if (provinceFilter) {
-        query = query.eq("province", provinceFilter);
+        const orFilter = provinceOrFilter(provinceFilter);
+        if (orFilter) {
+          query = query.or(orFilter);
+        }
       }
 
       query = query.order(column, { ascending });
