@@ -14,7 +14,10 @@
     "FIRE_PIT": "Feu de camp",
     "PET_FRIENDLY": "Animaux acceptés",
     "POOL": "Piscine",
-    "SOCCER": "Soccer / football"
+    "SOCCER": "Soccer / football",
+    "ELECTRICITY": "Électricité",
+    "WATER": "Eau",
+    "SEWER": "Égouts"
   },
 
   "form": {
@@ -25,7 +28,8 @@
   "errors": {
     "codeRequired": "Le nom de la commodité est requis, mais n'a pas été fourni.",
     "categoryRequired": "La catégorie est requise, mais n'a pas été fournie.",
-    "codeTooLong": "Le nom de la commodité doit compter au plus {max} caractères."
+    "codeTooLong": "Le nom de la commodité doit compter au plus {max} caractères.",
+    "hookupCodeProtected": "Les commodités électricité, eau et égouts servent à la recherche et ne peuvent pas être supprimées ni renommées."
   },
 
   "actions": {

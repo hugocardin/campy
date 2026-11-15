@@ -1,3 +1,8 @@
+import {
+  PROTECTED_HOOKUP_AMENITY_CODES,
+  type ProtectedHookupAmenityCode,
+} from "@/lib/amenities/hookup-codes";
+
 export type CampgroundSort =
   | "name"
   | "name-desc"
@@ -15,10 +20,10 @@ export const CAMPGROUND_GEO_COORD_DECIMALS = 2;
 
 /** Stable amenity `code` values mapped to guest hookup filters. */
 export const HOOKUP_AMENITY_CODES = {
-  electricity: "ELECTRICITY",
-  water: "WATER",
-  sewer: "SEWER",
-} as const;
+  electricity: PROTECTED_HOOKUP_AMENITY_CODES[0],
+  water: PROTECTED_HOOKUP_AMENITY_CODES[1],
+  sewer: PROTECTED_HOOKUP_AMENITY_CODES[2],
+} as const satisfies Record<string, ProtectedHookupAmenityCode>;
 
 export type HookupFilterKey = keyof typeof HOOKUP_AMENITY_CODES;
 

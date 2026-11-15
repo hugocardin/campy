@@ -22,13 +22,18 @@ import {
   DEFAULT_CAMPGROUND_RADIUS_KM,
   HookupFilterKey,
   anyHookupFilterActive,
-  campgroundSortQueryValue,
   parseCampgroundGeo,
   parseCampgroundHookups,
   parseCampgroundSort,
   roundCampgroundCoord,
-  validateCampgroundGeo,
 } from "@/lib/campground-search";
+import {
+  CampgroundQueryState,
+  buildCampgroundSearchParams,
+  clearedCampgroundQueryState,
+  hookupsKey,
+  withLatestCampgroundFilters,
+} from "@/lib/campground-search-query";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -50,20 +55,6 @@ const HOOKUP_FILTERS: {
   { key: "water", labelKey: "filterWater" },
   { key: "sewer", labelKey: "filterSewer" },
 ];
-
-type QueryState = {
-  q: string;
-  sort: CampgroundSort;
-  province: string;
-  lat?: number;
-  lng?: number;
-  radiusKm?: CampgroundRadiusKm;
-  electricity: boolean;
-  water: boolean;
-  sewer: boolean;
-};
-
-type LatestParams = Omit<QueryState, "q">;
 
 export default function CampgroundListControls({
   resultCount,
@@ -88,11 +79,12 @@ export default function CampgroundListControls({
     lng: searchParams.get("lng") ?? undefined,
     radiusKm: searchParams.get("radiusKm") ?? undefined,
   });
-  const hookups = parseCampgroundHookups({
+  const urlHookups = parseCampgroundHookups({
     electricity: searchParams.get("electricity") ?? undefined,
     water: searchParams.get("water") ?? undefined,
     sewer: searchParams.get("sewer") ?? undefined,
   });
+  const urlHookupsKey = hookupsKey(urlHookups);
   const sortParam = parseCampgroundSort(
     searchParams.get("sort") ?? undefined,
     { geoActive: Boolean(geo) },
@@ -105,20 +97,24 @@ export default function CampgroundListControls({
   const [search, setSearch] = useState(qParam);
   const [prevQParam, setPrevQParam] = useState(qParam);
   const [lastPushedQ, setLastPushedQ] = useState(qParam);
+  const [localHookups, setLocalHookups] = useState(urlHookups);
+  const [prevUrlHookupsKey, setPrevUrlHookupsKey] = useState(urlHookupsKey);
+  const [lastPushedHookupsKey, setLastPushedHookupsKey] =
+    useState(urlHookupsKey);
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
-  const latestParamsRef = useRef<LatestParams & { q: string }>({
+  const latestParamsRef = useRef<CampgroundQueryState>({
     q: search,
     sort: sortParam,
     province: provinceParam,
     lat: geo?.lat,
     lng: geo?.lng,
     radiusKm: geo?.radiusKm ?? preferredRadius,
-    electricity: hookups.electricity,
-    water: hookups.water,
-    sewer: hookups.sewer,
+    electricity: localHookups.electricity,
+    water: localHookups.water,
+    sewer: localHookups.sewer,
   });
 
   // Sync input from URL only for external changes (back/forward / Clear).
@@ -132,6 +128,21 @@ export default function CampgroundListControls({
     }
   }
 
+  // Sync hookups from URL only for external changes (not our own pending push).
+  if (urlHookupsKey !== prevUrlHookupsKey) {
+    setPrevUrlHookupsKey(urlHookupsKey);
+    if (urlHookupsKey !== lastPushedHookupsKey) {
+      setLastPushedHookupsKey(urlHookupsKey);
+      setLocalHookups(urlHookups);
+      latestParamsRef.current = {
+        ...latestParamsRef.current,
+        ...urlHookups,
+      };
+    } else {
+      setLocalHookups(urlHookups);
+    }
+  }
+
   // Keep preferred radius in sync when geo URL changes (e.g. back/forward).
   if (geo?.radiusKm != null && geo.radiusKm !== prevGeoRadius) {
     setPrevGeoRadius(geo.radiusKm);
@@ -140,17 +151,18 @@ export default function CampgroundListControls({
     setPrevGeoRadius(undefined);
   }
 
+  // Sync non-hookup fields from URL/search. Hookups stay on the ref until
+  // replaceQuery or an external URL change updates them (avoids clobbering
+  // pending checkbox toggles while search debounce runs).
   useEffect(() => {
     latestParamsRef.current = {
+      ...latestParamsRef.current,
       q: search,
       sort: sortParam,
       province: provinceParam,
       lat: geo?.lat,
       lng: geo?.lng,
       radiusKm: geo?.radiusKm ?? preferredRadius,
-      electricity: hookups.electricity,
-      water: hookups.water,
-      sewer: hookups.sewer,
     };
   }, [
     search,
@@ -160,9 +172,6 @@ export default function CampgroundListControls({
     geo?.lng,
     geo?.radiusKm,
     preferredRadius,
-    hookups.electricity,
-    hookups.water,
-    hookups.sewer,
   ]);
 
   useEffect(() => {
@@ -185,66 +194,23 @@ export default function CampgroundListControls({
     setGeoBusy(false);
   }
 
-  function replaceQuery(next: QueryState) {
+  function replaceQuery(next: CampgroundQueryState) {
     const trimmedQ = next.q.trim();
     setLastPushedQ(trimmedQ);
-    latestParamsRef.current = {
-      q: next.q,
-      sort: next.sort,
-      province: next.province,
-      lat: next.lat,
-      lng: next.lng,
-      radiusKm: next.radiusKm,
+    const nextHookupsKey = hookupsKey(next);
+    setLastPushedHookupsKey(nextHookupsKey);
+    setLocalHookups({
       electricity: next.electricity,
       water: next.water,
       sewer: next.sewer,
-    };
+    });
+    latestParamsRef.current = next;
 
-    const params = new URLSearchParams();
-    if (trimmedQ) {
-      params.set("q", trimmedQ);
-    }
-    const geo = validateCampgroundGeo(next.lat, next.lng, next.radiusKm);
-    const sortQuery = campgroundSortQueryValue(next.sort, Boolean(geo));
-    if (sortQuery) {
-      params.set("sort", sortQuery);
-    }
-    if (next.province) {
-      params.set(
-        "province",
-        provinceFilterKey(next.province) ?? next.province,
-      );
-    }
-    if (geo) {
-      params.set("lat", String(geo.lat));
-      params.set("lng", String(geo.lng));
-      params.set("radiusKm", String(geo.radiusKm));
-    }
-    if (next.electricity) params.set("electricity", "1");
-    if (next.water) params.set("water", "1");
-    if (next.sewer) params.set("sewer", "1");
-
+    const params = buildCampgroundSearchParams(next);
     const query = params.toString();
     startTransition(() => {
       router.replace(query ? `${pathname}?${query}` : pathname);
     });
-  }
-
-  function withLatestFilters(
-    patch: Partial<QueryState> & Pick<QueryState, "q" | "sort">,
-  ): QueryState {
-    const latest = latestParamsRef.current;
-    return {
-      q: patch.q,
-      sort: patch.sort,
-      province: patch.province ?? latest.province,
-      lat: "lat" in patch ? patch.lat : latest.lat,
-      lng: "lng" in patch ? patch.lng : latest.lng,
-      radiusKm: "radiusKm" in patch ? patch.radiusKm : latest.radiusKm,
-      electricity: patch.electricity ?? latest.electricity,
-      water: patch.water ?? latest.water,
-      sewer: patch.sewer ?? latest.sewer,
-    };
   }
 
   useEffect(() => {
@@ -254,18 +220,10 @@ export default function CampgroundListControls({
     clearDebounce();
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
-      const { sort, province, lat, lng, radiusKm, electricity, water, sewer } =
-        latestParamsRef.current;
+      const latest = latestParamsRef.current;
       replaceQuery({
+        ...latest,
         q: search,
-        sort,
-        province,
-        lat,
-        lng,
-        radiusKm,
-        electricity,
-        water,
-        sewer,
       });
     }, 300);
 
@@ -291,7 +249,7 @@ export default function CampgroundListControls({
         const radiusKm =
           latestParamsRef.current.radiusKm ?? preferredRadius;
         replaceQuery(
-          withLatestFilters({
+          withLatestCampgroundFilters(latestParamsRef.current, {
             q: latestParamsRef.current.q,
             sort: "distance",
             lat: roundCampgroundCoord(pos.coords.latitude),
@@ -333,9 +291,12 @@ export default function CampgroundListControls({
     );
 
   const hasFilters = Boolean(
-    search || provinceParam || geo || anyHookupFilterActive(hookups),
+    search ||
+      provinceParam ||
+      geo ||
+      anyHookupFilterActive(localHookups),
   );
-  const controlsDisabled = geoBusy;
+  const controlsDisabled = geoBusy || isPending;
 
   return (
     <div
@@ -360,7 +321,7 @@ export default function CampgroundListControls({
           onValueChange={(value) => {
             clearDebounce();
             replaceQuery(
-              withLatestFilters({
+              withLatestCampgroundFilters(latestParamsRef.current, {
                 q: search,
                 sort: parseCampgroundSort(value, { geoActive: Boolean(geo) }),
               }),
@@ -387,7 +348,7 @@ export default function CampgroundListControls({
           onValueChange={(value) => {
             clearDebounce();
             replaceQuery(
-              withLatestFilters({
+              withLatestCampgroundFilters(latestParamsRef.current, {
                 q: search,
                 sort: latestParamsRef.current.sort,
                 province: value === ALL_PROVINCES ? "" : value,
@@ -421,7 +382,7 @@ export default function CampgroundListControls({
                 : DEFAULT_CAMPGROUND_RADIUS_KM;
               setPreferredRadius(nextRadius);
               replaceQuery(
-                withLatestFilters({
+                withLatestCampgroundFilters(latestParamsRef.current, {
                   q: search,
                   sort: latestParamsRef.current.sort,
                   radiusKm: nextRadius,
@@ -446,7 +407,7 @@ export default function CampgroundListControls({
           type="button"
           variant={geo ? "default" : "outline"}
           onClick={onNearMe}
-          disabled={geoBusy}
+          disabled={geoBusy || isPending}
           aria-label={t("nearMe")}
         >
           <LocateFixed className="h-4 w-4" />
@@ -457,19 +418,13 @@ export default function CampgroundListControls({
           <Button
             type="button"
             variant="outline"
+            disabled={controlsDisabled}
             onClick={() => {
               clearDebounce();
               cancelGeolocation();
               setSearch("");
               setGeoError(null);
-              replaceQuery({
-                q: "",
-                sort: "name",
-                province: "",
-                electricity: false,
-                water: false,
-                sewer: false,
-              });
+              replaceQuery(clearedCampgroundQueryState());
             }}
           >
             {t("clearFilters")}
@@ -485,7 +440,7 @@ export default function CampgroundListControls({
         className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
         disabled={controlsDisabled}
       >
-        <legend className="text-sm font-medium text-foreground mr-1">
+        <legend className="text-sm font-medium text-foreground mr-1 float-left">
           {t("hookupsLabel")}
         </legend>
         {HOOKUP_FILTERS.map(({ key, labelKey }) => {
@@ -494,12 +449,12 @@ export default function CampgroundListControls({
             <div key={key} className="flex items-center gap-2">
               <Checkbox
                 id={id}
-                checked={hookups[key]}
+                checked={localHookups[key]}
                 disabled={controlsDisabled}
                 onCheckedChange={(checked) => {
                   clearDebounce();
                   replaceQuery(
-                    withLatestFilters({
+                    withLatestCampgroundFilters(latestParamsRef.current, {
                       q: search,
                       sort: latestParamsRef.current.sort,
                       [key]: checked === true,
@@ -514,6 +469,7 @@ export default function CampgroundListControls({
           );
         })}
       </fieldset>
+      <p className="text-xs text-muted-foreground">{t("hookupsHint")}</p>
 
       {geoError ? (
         <p className="text-sm text-destructive" role="status">

@@ -14,7 +14,10 @@
     "FIRE_PIT": "Fire pit",
     "PET_FRIENDLY": "Pet friendly",
     "POOL": "Pool",
-    "SOCCER": "Soccer"
+    "SOCCER": "Soccer",
+    "ELECTRICITY": "Electricity",
+    "WATER": "Water",
+    "SEWER": "Sewer"
   },
 
   "form": {
@@ -25,7 +28,8 @@
   "errors": {
     "codeRequired": "Amenity Name is required but was not provided.",
     "categoryRequired": "Category is required but was not provided.",
-    "codeTooLong": "Amenity Name must be {max} characters or fewer."
+    "codeTooLong": "Amenity Name must be {max} characters or fewer.",
+    "hookupCodeProtected": "Electricity, water, and sewer amenities are used by guest search and cannot be deleted or renamed."
   },
 
   "actions": {
