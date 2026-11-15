@@ -12,7 +12,7 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # Keep @types/node aligned with engines.node / .nvmrc (currently 22.x).
+      # Keep @types/node aligned with engines.node / .nvmrc (currently 24.x).
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
       # Straight typescript majors drop the JS compiler API. Use the side-by-side
