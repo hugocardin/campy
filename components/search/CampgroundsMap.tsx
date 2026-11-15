@@ -8,10 +8,20 @@ import L, { type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import {
+  Circle,
+  CircleMarker,
+  MapContainer,
+  Marker,
+  Popup,
+  TileLayer,
+  useMap,
+} from "react-leaflet";
 
 type Props = {
   campgrounds: Campground[];
+  searchCenter?: { lat: number; lng: number };
+  radiusKm?: number;
   className?: string;
 };
 
@@ -34,20 +44,45 @@ function hasValidCoords(
   return Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 }
 
-function FitMarkers({ positions }: { positions: LatLngTuple[] }) {
+function FitMarkers({
+  positions,
+  searchCenter,
+  radiusKm,
+}: {
+  positions: LatLngTuple[];
+  searchCenter?: LatLngTuple;
+  radiusKm?: number;
+}) {
   const map = useMap();
 
   useEffect(() => {
-    if (positions.length === 0) {
+    if (
+      searchCenter &&
+      radiusKm != null &&
+      Number.isFinite(radiusKm) &&
+      radiusKm > 0
+    ) {
+      // toBounds(sizeInMeters) spans size/2 each side — pass diameter so the
+      // full search circle fits, then extend with any result markers.
+      const bounds = L.latLng(searchCenter).toBounds(radiusKm * 2000);
+      for (const position of positions) {
+        bounds.extend(position);
+      }
+      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 10 });
+      return;
+    }
+
+    const all = searchCenter ? [...positions, searchCenter] : positions;
+    if (all.length === 0) {
       map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       return;
     }
-    if (positions.length === 1) {
-      map.setView(positions[0], 9);
+    if (all.length === 1) {
+      map.setView(all[0], 9);
       return;
     }
-    map.fitBounds(positions, { padding: [48, 48], maxZoom: 10 });
-  }, [map, positions]);
+    map.fitBounds(all, { padding: [48, 48], maxZoom: 10 });
+  }, [map, positions, searchCenter, radiusKm]);
 
   return null;
 }
@@ -64,7 +99,12 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-export default function CampgroundsMap({ campgrounds, className }: Props) {
+export default function CampgroundsMap({
+  campgrounds,
+  searchCenter,
+  radiusKm,
+  className,
+}: Props) {
   const t = useTranslations("search.controls");
 
   const withCoords = useMemo(
@@ -77,7 +117,22 @@ export default function CampgroundsMap({ campgrounds, className }: Props) {
     [withCoords],
   );
 
-  if (withCoords.length === 0) {
+  const centerLat = searchCenter?.lat;
+  const centerLng = searchCenter?.lng;
+  const centerTuple = useMemo<LatLngTuple | undefined>(
+    () =>
+      centerLat != null && centerLng != null
+        ? [centerLat, centerLng]
+        : undefined,
+    [centerLat, centerLng],
+  );
+
+  const radiusMeters =
+    radiusKm != null && Number.isFinite(radiusKm) && radiusKm > 0
+      ? radiusKm * 1000
+      : undefined;
+
+  if (withCoords.length === 0 && !centerTuple) {
     return (
       <div
         className={
@@ -93,8 +148,8 @@ export default function CampgroundsMap({ campgrounds, className }: Props) {
   return (
     <div className={className ?? "absolute inset-0 h-full w-full"}>
       <MapContainer
-        center={positions[0] ?? DEFAULT_CENTER}
-        zoom={positions.length === 1 ? 9 : DEFAULT_ZOOM}
+        center={centerTuple ?? positions[0] ?? DEFAULT_CENTER}
+        zoom={positions.length === 1 && !centerTuple ? 9 : DEFAULT_ZOOM}
         className="h-full w-full z-0 rounded-xl"
         scrollWheelZoom
       >
@@ -106,7 +161,39 @@ export default function CampgroundsMap({ campgrounds, className }: Props) {
           // non-{s} URL; the subdomain pattern is deprecated by OSM.
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <FitMarkers positions={positions} />
+        <FitMarkers
+          positions={positions}
+          searchCenter={centerTuple}
+          radiusKm={radiusKm}
+        />
+        {centerTuple && radiusMeters != null ? (
+          <Circle
+            center={centerTuple}
+            radius={radiusMeters}
+            pathOptions={{
+              color: "#0f766e",
+              fillColor: "#14b8a6",
+              fillOpacity: 0.08,
+              weight: 1.5,
+            }}
+          />
+        ) : null}
+        {centerTuple ? (
+          <CircleMarker
+            center={centerTuple}
+            radius={8}
+            pathOptions={{
+              color: "#0f766e",
+              fillColor: "#14b8a6",
+              fillOpacity: 0.85,
+              weight: 2,
+            }}
+          >
+            <Popup>
+              <p className="text-sm font-medium">{t("searchCenter")}</p>
+            </Popup>
+          </CircleMarker>
+        ) : null}
         {withCoords.map((campground) => (
           <Marker
             key={campground.id}

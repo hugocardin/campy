@@ -11,6 +11,8 @@ export interface Campground {
     lat: number;
     lng: number;
   } | null;
+  /** Metres from search center when geo search is active; otherwise omitted. */
+  distanceMeters?: number | null;
   website: string;
   phone: string;
 }
