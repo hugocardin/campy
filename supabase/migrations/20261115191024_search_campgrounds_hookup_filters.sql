@@ -3,8 +3,6 @@
 -- require_* boolean defaults so named-arg callers (q, province_aliases) keep working.
 -- Compat near-me `province text` overload retained (calls expanded aliases fn).
 
-BEGIN;
-
 -- Stable catalog codes for hookup filters (existing amenities table — not new lookups).
 INSERT INTO public.amenities (code, category_id)
 SELECT v.code, ac.id
@@ -18,11 +16,24 @@ CROSS JOIN public.amenity_categories AS ac
 WHERE ac.code = 'SERVICES'
 ON CONFLICT (code) DO NOTHING;
 
--- Demo site_amenities live in supabase/seed.sql only (not schema migrations).
+-- Demo site links so filters are exercisable on active parks (idempotent).
+INSERT INTO public.site_amenities (site_id, amenity_id)
+SELECT s.id, a.id
+FROM public.sites AS s
+JOIN public.campgrounds AS c ON c.id = s.campground_id
+JOIN public.amenities AS a ON a.code IN ('ELECTRICITY', 'WATER', 'SEWER')
+WHERE (c.name, s.name, a.code) IN (
+  ('Alice Lake Provincial Park', 'AL-1', 'ELECTRICITY'),
+  ('Alice Lake Provincial Park', 'AL-1', 'WATER'),
+  ('Alice Lake Provincial Park', 'AL-1', 'SEWER'),
+  ('Alice Lake Provincial Park', 'AL-12', 'ELECTRICITY'),
+  ('Green Point Campground – Pacific Rim', 'GP-21', 'ELECTRICITY'),
+  ('Green Point Campground – Pacific Rim', 'GP-21', 'WATER'),
+  ('Emerald Lake Campground', 'E-2', 'WATER'),
+  ('Gold Creek Campground – Golden Ears', 'A2', 'SEWER')
+)
+ON CONFLICT (site_id, amenity_id) DO NOTHING;
 
--- ---------------------------------------------------------------------------
--- search_campgrounds (non-geo): expand with require_* booleans
--- ---------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.search_campgrounds(text, text[]);
 
 CREATE FUNCTION public.search_campgrounds(
@@ -165,9 +176,6 @@ COMMENT ON FUNCTION public.search_campgrounds(
 ) IS
   'Guest non-geo search: q ILIKE + province_aliases (lower(btrim), max 32×100 fail closed) + site-level ELECTRICITY/WATER/SEWER amenity AND filters; no LIMIT (app sorts); SECURITY INVOKER.';
 
--- ---------------------------------------------------------------------------
--- search_campgrounds_near (aliases overload): expand with require_* booleans
--- ---------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.search_campgrounds_near(
   double precision, double precision, double precision, text, text[]
 );
@@ -344,8 +352,6 @@ COMMENT ON FUNCTION public.search_campgrounds_near(
 ) IS
   'Guest near-me search: province_aliases + site-level ELECTRICITY/WATER/SEWER amenity AND filters; >32 aliases fail closed; SECURITY INVOKER.';
 
--- Re-bind province text compat wrapper onto the expanded aliases signature
--- (positional 5-arg call uses require_* defaults = false).
 CREATE OR REPLACE FUNCTION public.search_campgrounds_near(
   lat double precision,
   lng double precision,
@@ -387,5 +393,3 @@ AS $$
     false
   );
 $$;
-
-COMMIT;

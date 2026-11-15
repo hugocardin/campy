@@ -4,33 +4,11 @@
 -- 3) Drop ambiguous search_campgrounds_near(province text) overload.
 -- 4) Protect ELECTRICITY/WATER/SEWER amenity codes from rename/delete.
 
-BEGIN;
-
--- ---------------------------------------------------------------------------
--- 1) Undo demo site_amenities only (exact tuples from the pre-fix INSERT;
---    codes remain; demo links for local → supabase/seed.sql)
--- ---------------------------------------------------------------------------
 DELETE FROM public.site_amenities AS sa
-USING public.sites AS s,
-      public.campgrounds AS c,
-      public.amenities AS a
-WHERE sa.site_id = s.id
-  AND c.id = s.campground_id
-  AND a.id = sa.amenity_id
-  AND (c.name, s.name, a.code) IN (
-    ('Alice Lake Provincial Park', 'AL-1', 'ELECTRICITY'),
-    ('Alice Lake Provincial Park', 'AL-1', 'WATER'),
-    ('Alice Lake Provincial Park', 'AL-1', 'SEWER'),
-    ('Alice Lake Provincial Park', 'AL-12', 'ELECTRICITY'),
-    ('Green Point Campground – Pacific Rim', 'GP-21', 'ELECTRICITY'),
-    ('Green Point Campground – Pacific Rim', 'GP-21', 'WATER'),
-    ('Emerald Lake Campground', 'E-2', 'WATER'),
-    ('Gold Creek Campground – Golden Ears', 'A2', 'SEWER')
-  );
+USING public.amenities AS a
+WHERE sa.amenity_id = a.id
+  AND a.code IN ('ELECTRICITY', 'WATER', 'SEWER');
 
--- ---------------------------------------------------------------------------
--- 2) Protect hookup amenity codes (defense in depth with admin action guard)
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.protect_hookup_amenity_codes()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -74,16 +52,10 @@ CREATE TRIGGER protect_hookup_amenity_codes
 COMMENT ON FUNCTION public.protect_hookup_amenity_codes() IS
   'Refuse rename/delete of ELECTRICITY/WATER/SEWER (guest search hookup filters).';
 
--- ---------------------------------------------------------------------------
--- 3) Drop province text overload (app uses province_aliases only)
--- ---------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.search_campgrounds_near(
   double precision, double precision, double precision, text, text
 );
 
--- ---------------------------------------------------------------------------
--- 4) Replace list + near RPCs: single-site AND over required codes
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.search_campgrounds(
   q text DEFAULT NULL,
   province_aliases text[] DEFAULT NULL,
@@ -352,7 +324,6 @@ COMMENT ON FUNCTION public.search_campgrounds_near(
 ) IS
   'Guest near-me search: province_aliases + per-site ELECTRICITY/WATER/SEWER AND; no province text overload; SECURITY INVOKER.';
 
--- Ensure grants remain after CREATE OR REPLACE (same signature)
 REVOKE ALL ON FUNCTION public.search_campgrounds(
   text, text[], boolean, boolean, boolean
 ) FROM PUBLIC;
@@ -368,5 +339,3 @@ GRANT EXECUTE ON FUNCTION public.search_campgrounds_near(
   double precision, double precision, double precision, text, text[],
   boolean, boolean, boolean
 ) TO anon, authenticated;
-
-COMMIT;
