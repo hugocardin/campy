@@ -47,13 +47,31 @@ function hasValidCoords(
 function FitMarkers({
   positions,
   searchCenter,
+  radiusKm,
 }: {
   positions: LatLngTuple[];
   searchCenter?: LatLngTuple;
+  radiusKm?: number;
 }) {
   const map = useMap();
 
   useEffect(() => {
+    if (
+      searchCenter &&
+      radiusKm != null &&
+      Number.isFinite(radiusKm) &&
+      radiusKm > 0
+    ) {
+      // toBounds(sizeInMeters) spans size/2 each side — pass diameter so the
+      // full search circle fits, then extend with any result markers.
+      const bounds = L.latLng(searchCenter).toBounds(radiusKm * 2000);
+      for (const position of positions) {
+        bounds.extend(position);
+      }
+      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 10 });
+      return;
+    }
+
     const all = searchCenter ? [...positions, searchCenter] : positions;
     if (all.length === 0) {
       map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
@@ -64,7 +82,7 @@ function FitMarkers({
       return;
     }
     map.fitBounds(all, { padding: [48, 48], maxZoom: 10 });
-  }, [map, positions, searchCenter]);
+  }, [map, positions, searchCenter, radiusKm]);
 
   return null;
 }
@@ -143,7 +161,11 @@ export default function CampgroundsMap({
           // non-{s} URL; the subdomain pattern is deprecated by OSM.
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <FitMarkers positions={positions} searchCenter={centerTuple} />
+        <FitMarkers
+          positions={positions}
+          searchCenter={centerTuple}
+          radiusKm={radiusKm}
+        />
         {centerTuple && radiusMeters != null ? (
           <Circle
             center={centerTuple}

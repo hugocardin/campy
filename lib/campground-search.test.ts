@@ -4,6 +4,7 @@ import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   campgroundRadiusMeters,
+  campgroundSortQueryValue,
   formatDistanceKm,
   parseCampgroundGeo,
   parseCampgroundRadiusKm,
@@ -26,6 +27,29 @@ describe("parseCampgroundSort", () => {
     assert.equal(parseCampgroundSort("distance", { geoActive: true }), "distance");
     assert.equal(parseCampgroundSort("distance", { geoActive: false }), "name");
     assert.equal(parseCampgroundSort("name", { geoActive: true }), "name");
+  });
+});
+
+describe("campgroundSortQueryValue", () => {
+  it("omits only the mode default so geo+name round-trips", () => {
+    assert.equal(campgroundSortQueryValue("distance", true), undefined);
+    assert.equal(campgroundSortQueryValue("name", true), "name");
+    assert.equal(campgroundSortQueryValue("name", false), undefined);
+    assert.equal(campgroundSortQueryValue("distance", false), "distance");
+    assert.equal(campgroundSortQueryValue("city", true), "city");
+
+    assert.equal(
+      parseCampgroundSort(campgroundSortQueryValue("name", true), {
+        geoActive: true,
+      }),
+      "name",
+    );
+    assert.equal(
+      parseCampgroundSort(campgroundSortQueryValue("distance", true), {
+        geoActive: true,
+      }),
+      "distance",
+    );
   });
 });
 

@@ -52,6 +52,23 @@ export function parseCampgroundSort(
   return options?.geoActive ? "distance" : "name";
 }
 
+/** Default sort for the current mode — omit from the URL when active. */
+export function defaultCampgroundSort(geoActive: boolean): CampgroundSort {
+  return geoActive ? "distance" : "name";
+}
+
+/**
+ * Sort value to put in the URL, or `undefined` to omit (mode default).
+ * Geo default is distance; non-geo default is name — so geo + name must
+ * keep `sort=name` so it round-trips.
+ */
+export function campgroundSortQueryValue(
+  sort: CampgroundSort,
+  geoActive: boolean,
+): string | undefined {
+  return sort !== defaultCampgroundSort(geoActive) ? sort : undefined;
+}
+
 /**
  * Sanitize a free-text search term for PostgREST `.or(...ilike...)`.
  * Strips filter-grammar breakers and PostgREST/ilike wildcards (`*`, `%`, `_`).

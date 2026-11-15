@@ -14,6 +14,7 @@ import {
   CampgroundRadiusKm,
   CampgroundSort,
   DEFAULT_CAMPGROUND_RADIUS_KM,
+  campgroundSortQueryValue,
   parseCampgroundGeo,
   parseCampgroundSort,
   roundCampgroundCoord,
@@ -161,11 +162,9 @@ export default function CampgroundListControls({
       params.set("q", trimmedQ);
     }
     const geoActive = next.lat != null && next.lng != null;
-    if (next.sort && next.sort !== "name") {
-      // Default when geo: distance (omit from URL). Otherwise omit name.
-      if (!(geoActive && next.sort === "distance")) {
-        params.set("sort", next.sort);
-      }
+    const sortQuery = campgroundSortQueryValue(next.sort, geoActive);
+    if (sortQuery) {
+      params.set("sort", sortQuery);
     }
     if (next.province) {
       params.set("province", next.province);

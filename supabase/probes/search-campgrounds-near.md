@@ -4,6 +4,7 @@ Migrations:
 
 - `20261115032643_search_campgrounds_near.sql` (initial; version matches live `schema_migrations`)
 - `20261115033324_search_campgrounds_near_harden.sql` (explicit `RETURNS TABLE` + `distance_m`, clamp, LIMIT, ILIKE escape)
+- `20261115033824_search_campgrounds_near_reject_nan.sql` (reject NaN/±Inf on radius; cap q before escape)
 
 ## SQL
 
@@ -15,8 +16,10 @@ FROM public.search_campgrounds_near(49.28, -123.12, 100000, NULL, NULL);
 -- Huge radius_m is clamped to 200 km
 SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 1e12, NULL, NULL);
 
--- NaN rejected
+-- NaN / Infinity rejected (lat and radius_m — NaN radius must NOT become 200km)
 SELECT count(*) FROM public.search_campgrounds_near('NaN'::float8, -123.12, 50000, NULL, NULL);
+SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 'NaN'::float8, NULL, NULL);
+SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 'Infinity'::float8, NULL, NULL);
 
 -- Literal % is escaped (not "match all")
 SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 100000, '%', NULL);
