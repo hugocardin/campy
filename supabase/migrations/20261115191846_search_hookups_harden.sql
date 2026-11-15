@@ -7,12 +7,26 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- 1) Undo demo site_amenities (codes remain; demo links → supabase/seed.sql)
+-- 1) Undo demo site_amenities only (exact tuples from the pre-fix INSERT;
+--    codes remain; demo links for local → supabase/seed.sql)
 -- ---------------------------------------------------------------------------
 DELETE FROM public.site_amenities AS sa
-USING public.amenities AS a
-WHERE sa.amenity_id = a.id
-  AND a.code IN ('ELECTRICITY', 'WATER', 'SEWER');
+USING public.sites AS s,
+      public.campgrounds AS c,
+      public.amenities AS a
+WHERE sa.site_id = s.id
+  AND c.id = s.campground_id
+  AND a.id = sa.amenity_id
+  AND (c.name, s.name, a.code) IN (
+    ('Alice Lake Provincial Park', 'AL-1', 'ELECTRICITY'),
+    ('Alice Lake Provincial Park', 'AL-1', 'WATER'),
+    ('Alice Lake Provincial Park', 'AL-1', 'SEWER'),
+    ('Alice Lake Provincial Park', 'AL-12', 'ELECTRICITY'),
+    ('Green Point Campground – Pacific Rim', 'GP-21', 'ELECTRICITY'),
+    ('Green Point Campground – Pacific Rim', 'GP-21', 'WATER'),
+    ('Emerald Lake Campground', 'E-2', 'WATER'),
+    ('Gold Creek Campground – Golden Ears', 'A2', 'SEWER')
+  );
 
 -- ---------------------------------------------------------------------------
 -- 2) Protect hookup amenity codes (defense in depth with admin action guard)

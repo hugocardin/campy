@@ -18,23 +18,7 @@ CROSS JOIN public.amenity_categories AS ac
 WHERE ac.code = 'SERVICES'
 ON CONFLICT (code) DO NOTHING;
 
--- Demo site links so filters are exercisable on active parks (idempotent).
-INSERT INTO public.site_amenities (site_id, amenity_id)
-SELECT s.id, a.id
-FROM public.sites AS s
-JOIN public.campgrounds AS c ON c.id = s.campground_id
-JOIN public.amenities AS a ON a.code IN ('ELECTRICITY', 'WATER', 'SEWER')
-WHERE (c.name, s.name, a.code) IN (
-  ('Alice Lake Provincial Park', 'AL-1', 'ELECTRICITY'),
-  ('Alice Lake Provincial Park', 'AL-1', 'WATER'),
-  ('Alice Lake Provincial Park', 'AL-1', 'SEWER'),
-  ('Alice Lake Provincial Park', 'AL-12', 'ELECTRICITY'),
-  ('Green Point Campground – Pacific Rim', 'GP-21', 'ELECTRICITY'),
-  ('Green Point Campground – Pacific Rim', 'GP-21', 'WATER'),
-  ('Emerald Lake Campground', 'E-2', 'WATER'),
-  ('Gold Creek Campground – Golden Ears', 'A2', 'SEWER')
-)
-ON CONFLICT (site_id, amenity_id) DO NOTHING;
+-- Demo site_amenities live in supabase/seed.sql only (not schema migrations).
 
 -- ---------------------------------------------------------------------------
 -- search_campgrounds (non-geo): expand with require_* booleans

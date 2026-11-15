@@ -297,7 +297,9 @@ export default function CampgroundListControls({
       geo ||
       anyHookupFilterActive(localHookups),
   );
-  const controlsDisabled = geoBusy || isPending;
+  // Discrete controls only — keep the search input enabled during isPending so
+  // typing is not blurred/lost while router.replace transitions.
+  const discreteControlsDisabled = geoBusy || isPending;
 
   return (
     <div
@@ -312,13 +314,13 @@ export default function CampgroundListControls({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label={t("searchPlaceholder")}
-            disabled={controlsDisabled}
+            disabled={geoBusy}
           />
         </div>
 
         <Select
           value={sortParam}
-          disabled={controlsDisabled}
+          disabled={discreteControlsDisabled}
           onValueChange={(value) => {
             clearDebounce();
             replaceQuery(
@@ -345,7 +347,7 @@ export default function CampgroundListControls({
 
         <Select
           value={provinceParam || ALL_PROVINCES}
-          disabled={controlsDisabled}
+          disabled={discreteControlsDisabled}
           onValueChange={(value) => {
             clearDebounce();
             replaceQuery(
@@ -373,7 +375,7 @@ export default function CampgroundListControls({
         {geo ? (
           <Select
             value={String(geo.radiusKm)}
-            disabled={controlsDisabled}
+            disabled={discreteControlsDisabled}
             onValueChange={(value) => {
               clearDebounce();
               const nextRadius = (CAMPGROUND_RADIUS_KM_PRESETS as readonly number[]).includes(
@@ -408,7 +410,7 @@ export default function CampgroundListControls({
           type="button"
           variant={geo ? "default" : "outline"}
           onClick={onNearMe}
-          disabled={geoBusy || isPending}
+          disabled={discreteControlsDisabled}
           aria-label={t("nearMe")}
         >
           <LocateFixed className="h-4 w-4" />
@@ -419,7 +421,7 @@ export default function CampgroundListControls({
           <Button
             type="button"
             variant="outline"
-            disabled={controlsDisabled}
+            disabled={discreteControlsDisabled}
             onClick={() => {
               clearDebounce();
               cancelGeolocation();
@@ -439,7 +441,7 @@ export default function CampgroundListControls({
 
       <fieldset
         className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
-        disabled={controlsDisabled}
+        disabled={discreteControlsDisabled}
       >
         <legend className="text-sm font-medium text-foreground mr-1 float-left">
           {t("hookupsLabel")}
@@ -451,7 +453,7 @@ export default function CampgroundListControls({
               <Checkbox
                 id={id}
                 checked={localHookups[key]}
-                disabled={controlsDisabled}
+                disabled={discreteControlsDisabled}
                 onCheckedChange={(checked) => {
                   clearDebounce();
                   replaceQuery(
