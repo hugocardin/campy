@@ -199,6 +199,7 @@ export const getCampgrounds = cache(
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
 
       // Province filter uses search_campgrounds RPC (same lower(btrim) as near-me).
+      // RPC has no LIMIT / ORDER BY — sort here like the unfiltered v_campgrounds path.
       if (provinceAliases.length > 0) {
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds", {
