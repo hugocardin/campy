@@ -30,6 +30,11 @@ SELECT public.normalize_guest_amenity_ids(ARRAY['wifi', 'PET FRIENDLY']);
 SELECT public.normalize_guest_amenity_ids(ARRAY['POOL']);
 -- NULL (unknown → fail closed)
 
+SELECT public.normalize_guest_amenity_ids(
+  ARRAY(SELECT 'WIFI'::text FROM generate_series(1, 17))
+);
+-- NULL (oversized after DISTINCT still fails closed; raw >64 also NULL)
+
 SELECT name
 FROM search_campgrounds(
   require_amenity_codes := ARRAY['WIFI'],
