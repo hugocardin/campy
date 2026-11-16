@@ -15,47 +15,61 @@ export function defaultRigUnitForLocale(locale: string): RigLengthUnit {
   return locale.toLowerCase().startsWith("fr") ? "m" : "ft";
 }
 
-type Options = {
-  /** Canonical feet already stored; null/undefined → empty draft (uncontrolled). */
-  initialFeet?: number | null;
+type UncontrolledOptions = {
   /**
    * Starting display unit. When omitted, defaults from locale (`fr*` → m).
-   * Site admin passes `"ft"` to keep feet-first editing.
    */
   initialUnit?: RigLengthUnit;
-  /**
-   * Controlled draft (e.g. `form.max_rig_length` on site admin). When set with
-   * `onDraftChange`, the hook does not own draft state.
-   */
-  draft?: string;
-  onDraftChange?: (draft: string) => void;
+  /** Canonical feet already stored; null/undefined → empty draft. */
+  initialFeet?: number | null;
+  draft?: never;
+  onDraftChange?: never;
 };
+
+type ControlledOptions = {
+  /**
+   * Starting display unit. Site admin passes `"ft"` to keep feet-first editing.
+   * When omitted, defaults from locale (`fr*` → m).
+   */
+  initialUnit?: RigLengthUnit;
+  /** Not used in controlled mode — draft comes from the caller. */
+  initialFeet?: never;
+  /** Controlled draft (e.g. `form.max_rig_length` on site admin). */
+  draft: string;
+  onDraftChange: (draft: string) => void;
+};
+
+export type UseRigLengthInputOptions = UncontrolledOptions | ControlledOptions;
 
 /**
  * Shared draft + unit state for profile / site / search rig-length inputs
  * (issue #42). Canonical parse stays in feet via {@link parseRigLengthToFeet}.
+ *
+ * Pass either uncontrolled (`initialFeet`) or controlled (`draft` +
+ * `onDraftChange`) — the discriminated union rejects mixing them.
  */
-export function useRigLengthInput({
-  initialFeet,
-  initialUnit,
-  draft: controlledDraft,
-  onDraftChange,
-}: Options = {}) {
+export function useRigLengthInput(
+  options: UseRigLengthInputOptions = {},
+) {
+  const { initialUnit } = options;
   const locale = useLocale();
   const tUnits = useTranslations("common.units");
   const startingUnit = initialUnit ?? defaultRigUnitForLocale(locale);
-  const isControlled =
-    controlledDraft !== undefined && typeof onDraftChange === "function";
+  const isControlled = options.onDraftChange !== undefined;
 
   const [unit, setUnit] = useState<RigLengthUnit>(startingUnit);
   const [internalDraft, setInternalDraft] = useState(() =>
     isControlled
       ? ""
-      : formatRigLengthForDisplay(initialFeet, startingUnit, locale),
+      : formatRigLengthForDisplay(
+          options.initialFeet,
+          startingUnit,
+          locale,
+        ),
   );
 
-  const draft = isControlled ? controlledDraft : internalDraft;
-  const setDraft = isControlled ? onDraftChange : setInternalDraft;
+  const draft = isControlled ? options.draft : internalDraft;
+  const setDraft = isControlled ? options.onDraftChange : setInternalDraft;
 
   const unitLabel = unit === "m" ? tUnits("m") : tUnits("ft");
   const max = maxRigLengthInUnit(unit);
