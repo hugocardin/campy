@@ -4,8 +4,15 @@ import {
   resolveSearchHover,
   scrollChildIntoContainer,
   shouldScrollListOnMapHover,
+  SIDE_BY_SIDE_MEDIA_QUERY,
   type SearchHoverState,
 } from "./search-hover-sync";
+
+describe("SIDE_BY_SIDE_MEDIA_QUERY", () => {
+  it("matches Tailwind lg (1024px) used by SearchResultsPanel", () => {
+    assert.equal(SIDE_BY_SIDE_MEDIA_QUERY, "(min-width: 1024px)");
+  });
+});
 
 describe("resolveSearchHover", () => {
   it("returns hover when keys match", () => {

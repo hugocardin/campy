@@ -34,7 +34,11 @@ import {
   useMapEvents,
 } from "react-leaflet";
 
-/** Search-center / accent colours (circle + marker highlight). */
+/**
+ * Search-center / accent colours (circle + marker highlight).
+ * Keep the CSS drop-shadow in globals.css (`.campground-marker--highlighted`)
+ * aligned with MAP_ACCENT_STROKE.
+ */
 const MAP_ACCENT_STROKE = "#0f766e";
 const MAP_ACCENT_FILL = "#14b8a6";
 

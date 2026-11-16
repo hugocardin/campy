@@ -5,6 +5,7 @@ import type { CampgroundDetailQuery } from "@/lib/routes";
 import {
   resolveSearchHover,
   shouldScrollListOnMapHover,
+  SIDE_BY_SIDE_MEDIA_QUERY,
   type SearchHoverState,
 } from "@/lib/search-hover-sync";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -43,7 +44,7 @@ export default function SearchResultsPanel({
   const listScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
+    const mq = window.matchMedia(SIDE_BY_SIDE_MEDIA_QUERY);
     const sync = () => setSideBySide(mq.matches);
     sync();
     mq.addEventListener("change", sync);

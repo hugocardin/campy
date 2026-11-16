@@ -2,6 +2,12 @@
  * Pure helpers for guest search list ↔ map hover sync (#24 §4).
  */
 
+/**
+ * Mirrors Tailwind `lg:` on SearchResultsPanel (`lg:grid-cols-2`).
+ * Keep in sync if that layout breakpoint changes.
+ */
+export const SIDE_BY_SIDE_MEDIA_QUERY = "(min-width: 1024px)";
+
 export type SearchHoverSource = "list" | "map";
 
 export type SearchHoverState = {
