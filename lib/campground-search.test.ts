@@ -61,6 +61,23 @@ describe("parseCampgroundSort", () => {
     assert.equal(parseCampgroundSort("distance", { geoActive: false }), "name");
     assert.equal(parseCampgroundSort("name", { geoActive: true }), "name");
   });
+
+  it("keeps price sorts with or without geo (near RPC sort_key)", () => {
+    assert.equal(parseCampgroundSort("price", { geoActive: true }), "price");
+    assert.equal(
+      parseCampgroundSort("price-desc", { geoActive: true }),
+      "price-desc",
+    );
+    assert.equal(parseCampgroundSort("price", { geoActive: false }), "price");
+    assert.equal(
+      campgroundSortQueryValue("price", true),
+      "price",
+    );
+    assert.equal(
+      campgroundSortQueryValue("price-desc", false),
+      "price-desc",
+    );
+  });
 });
 
 describe("campgroundSortQueryValue", () => {

@@ -6,13 +6,11 @@ import {
   uniqueProvinceFilterKeys,
 } from "@/lib/canadian-provinces";
 import {
-  CAMPGROUND_COLUMN_SORT_CONFIG,
   CampgroundSiteFilters,
   CampgroundSort,
   SEARCH_CAMPGROUNDS_LIMIT,
   campgroundRadiusMeters,
   formatCampgroundAmpsParam,
-  isCampgroundPriceSort,
   parseCampgroundSiteFilters,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
@@ -102,64 +100,6 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
     website: row.website ?? "",
     phone: row.phone ?? "",
   };
-}
-
-/**
- * Stable name then id tie-break for JS re-sorts (near-me / price).
- * Locale accent-insensitive; may differ from SQL `lower(name)` collation.
- */
-function compareCampgroundNameId(a: Campground, b: Campground): number {
-  const byName = a.name.localeCompare(b.name, "en", { sensitivity: "base" });
-  if (byName !== 0) return byName;
-  return a.id.localeCompare(b.id);
-}
-
-function sortCampgrounds(
-  campgrounds: Campground[],
-  sort: CampgroundSort,
-): Campground[] {
-  if (sort === "distance") {
-    return [...campgrounds].sort((a, b) => {
-      const ad = a.distanceMeters;
-      const bd = b.distanceMeters;
-      if (ad == null && bd == null) return compareCampgroundNameId(a, b);
-      if (ad == null) return 1;
-      if (bd == null) return -1;
-      if (ad !== bd) return ad - bd;
-      return compareCampgroundNameId(a, b);
-    });
-  }
-
-  if (isCampgroundPriceSort(sort)) {
-    const dir = sort === "price" ? 1 : -1;
-    return [...campgrounds].sort((a, b) => {
-      const ap = a.minPricePerNight;
-      const bp = b.minPricePerNight;
-      if (ap == null && bp == null) return compareCampgroundNameId(a, b);
-      if (ap == null) return 1;
-      if (bp == null) return -1;
-      if (ap !== bp) return (ap - bp) * dir;
-      return compareCampgroundNameId(a, b);
-    });
-  }
-
-  const columnSort =
-    sort === "name" ||
-    sort === "name-desc" ||
-    sort === "city" ||
-    sort === "province"
-      ? sort
-      : ("name" as const);
-  const { column, ascending } = CAMPGROUND_COLUMN_SORT_CONFIG[columnSort];
-  const dir = ascending ? 1 : -1;
-  return [...campgrounds].sort((a, b) => {
-    const av = (a[column] ?? "").toString();
-    const bv = (b[column] ?? "").toString();
-    const primary =
-      av.localeCompare(bv, "en", { sensitivity: "base" }) * dir;
-    if (primary !== 0) return primary;
-    return compareCampgroundNameId(a, b);
-  });
 }
 
 /**
@@ -333,6 +273,9 @@ export const getCampgrounds = cache(
       }
 
       if (geo) {
+        // Near RPC ORDER BY + LIMIT via sort_key (#24 §4). Truncation means
+        // more matches within the radius under the active sort (not only
+        // "more nearest"). Trust SQL order — no JS re-sort.
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds_near", {
             lat: geo.lat,
@@ -342,9 +285,7 @@ export const getCampgrounds = cache(
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
             ...siteFilterRpcArgs(siteFilters),
-            // Always distance-ordered in SQL (cap after that). App may
-            // re-sort the capped set for other keys — truncation still means
-            // "more within radius", not "more in name/price order".
+            sort_key: resolvedSort,
             result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
         );
@@ -357,11 +298,6 @@ export const getCampgrounds = cache(
         const truncated = rows.length > SEARCH_CAMPGROUNDS_LIMIT;
         if (truncated) {
           rows = rows.slice(0, SEARCH_CAMPGROUNDS_LIMIT);
-        }
-        // Near RPC is SQL-ordered by distance; only re-sort for other keys
-        // (on the already-capped nearest set).
-        if (resolvedSort !== "distance") {
-          rows = sortCampgrounds(rows, resolvedSort);
         }
         return resultSuccess({ campgrounds: rows, truncated });
       }
