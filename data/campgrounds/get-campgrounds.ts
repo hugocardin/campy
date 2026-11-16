@@ -7,17 +7,21 @@ import {
 } from "@/lib/canadian-provinces";
 import {
   CAMPGROUND_SORT_CONFIG,
-  CampgroundHookupFilters,
+  CampgroundSiteFilters,
   CampgroundSort,
-  anyHookupFilterActive,
+  anySiteFilterActive,
   campgroundRadiusMeters,
-  parseCampgroundAmps,
+  formatCampgroundAmpsParam,
+  parseCampgroundSiteFilters,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
+import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
+import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
+import { formatStayKindParam } from "@/lib/stay-kind";
 import {
   handleDbResponse,
   handleUnexpectedError,
@@ -146,17 +150,57 @@ export const getCampgroundProvinces = cache(
   },
 );
 
-function hookupRpcArgs(hookups: CampgroundHookupFilters) {
+function siteFilterRpcArgs(filters: CampgroundSiteFilters) {
   return {
-    require_amps: electricityAmpsToRpcArg(hookups.amps),
-    require_water: hookups.water,
-    require_sewer: hookups.sewer,
+    require_amps: electricityAmpsToRpcArg(filters.amps),
+    require_water: filters.water,
+    require_sewer: filters.sewer,
+    require_dump_station: filters.dumpStation,
+    require_driveway_type: filters.drivewayType ?? null,
+    min_rig_length: filters.rigLength ?? null,
+    stay_kind: filters.stayKind ?? null,
   };
 }
 
 /**
+ * Canonical primitive for React `cache` — URL-shaped site/park filter string.
+ * Built by {@link buildCampgroundSiteFiltersCacheKey}.
+ */
+export function buildCampgroundSiteFiltersCacheKey(
+  filters: CampgroundSiteFilters,
+): string {
+  const params = new URLSearchParams();
+  const amps = formatCampgroundAmpsParam(filters.amps);
+  if (amps) params.set("amps", amps);
+  if (filters.water) params.set("water", "1");
+  if (filters.sewer) params.set("sewer", "1");
+  if (filters.dumpStation) params.set("dump", "1");
+  const driveway = formatDrivewayUrlParam(filters.drivewayType);
+  if (driveway) params.set("driveway", driveway);
+  const stay = formatStayKindParam(filters.stayKind);
+  if (stay) params.set("stay", stay);
+  const rig = formatGuestRigLengthParam(filters.rigLength);
+  if (rig) params.set("rigLength", rig);
+  return params.toString();
+}
+
+function parseSiteFiltersCacheKey(key: string): CampgroundSiteFilters {
+  const params = new URLSearchParams(key);
+  return parseCampgroundSiteFilters({
+    amps: params.get("amps") ?? undefined,
+    water: params.get("water") ?? undefined,
+    sewer: params.get("sewer") ?? undefined,
+    dump: params.get("dump") ?? undefined,
+    driveway: params.get("driveway") ?? undefined,
+    rigLength: params.get("rigLength") ?? undefined,
+    stay: params.get("stay") ?? undefined,
+  });
+}
+
+/**
  * Primitives (not an object) so React `cache` can dedupe by argument identity.
- * `ampsKey` is a stable serialized filter (`none,15,30` or "").
+ * `siteFiltersKey` is one canonical URL-shaped filter string (avoids a growing
+ * list of adjacent booleans/strings that can be swapped at call sites).
  */
 export const getCampgrounds = cache(
   async (
@@ -166,9 +210,7 @@ export const getCampgrounds = cache(
     lat?: number,
     lng?: number,
     radiusKm?: number,
-    ampsKey = "",
-    water = false,
-    sewer = false,
+    siteFiltersKey = "",
   ): Promise<ActionResult<Campground[]>> => {
     try {
       const supabase = await createClient();
@@ -179,12 +221,8 @@ export const getCampgrounds = cache(
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       // Unknown / malicious ?province= is ignored (All provinces).
       const provinceCode = resolveProvinceCode(province);
-      const hookups: CampgroundHookupFilters = {
-        amps: parseCampgroundAmps({ amps: ampsKey || undefined }),
-        water: Boolean(water),
-        sewer: Boolean(sewer),
-      };
-      const hookupsActive = anyHookupFilterActive(hookups);
+      const siteFilters = parseSiteFiltersCacheKey(siteFiltersKey);
+      const siteFiltersActive = anySiteFilterActive(siteFilters);
 
       let provinceAliases: string[] = [];
       if (provinceCode) {
@@ -204,7 +242,7 @@ export const getCampgrounds = cache(
             q: term || null,
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
-            ...hookupRpcArgs(hookups),
+            ...siteFilterRpcArgs(siteFilters),
           }),
         );
 
@@ -223,15 +261,15 @@ export const getCampgrounds = cache(
       const nonGeoSort =
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
 
-      // Province and/or hookups use search_campgrounds RPC (guest-safe; no PostgREST
-      // amenity filter injection). RPC has no LIMIT / ORDER BY — sort in JS.
-      if (provinceAliases.length > 0 || hookupsActive) {
+      // Province and/or site filters use search_campgrounds RPC (guest-safe; no
+      // PostgREST amenity filter injection). RPC has no LIMIT / ORDER BY — sort in JS.
+      if (provinceAliases.length > 0 || siteFiltersActive) {
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds", {
             q: term || null,
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
-            ...hookupRpcArgs(hookups),
+            ...siteFilterRpcArgs(siteFilters),
           }),
         );
 

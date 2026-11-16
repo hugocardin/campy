@@ -1,4 +1,5 @@
 import { Site } from "@/entities/sites";
+import { parseDrivewayType } from "@/lib/driveway-type";
 import { normalizeElectricityAmps } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import {
@@ -18,10 +19,12 @@ type SiteWithSiteTypeRow = {
   price_per_night_base: number;
   min_stay_nights: number;
   electricity_amps: number[] | null;
+  driveway_type: string | null;
   site_types: { code: string };
 };
 
 function toDomain(row: SiteWithSiteTypeRow): Site {
+  const driveway = parseDrivewayType(row.driveway_type);
   return {
     id: row.id,
     name: row.name,
@@ -32,6 +35,7 @@ function toDomain(row: SiteWithSiteTypeRow): Site {
     price_per_night: row.price_per_night_base,
     min_stay_nights: row.min_stay_nights,
     electricity_amps: normalizeElectricityAmps(row.electricity_amps ?? []),
+    driveway_type: driveway === undefined ? null : driveway,
   };
 }
 
@@ -51,6 +55,7 @@ export const getSitesOfCampground = cache(
             price_per_night_base,
             min_stay_nights,
             electricity_amps,
+            driveway_type,
             description,
             site_types!inner (code)
           `,
@@ -89,6 +94,7 @@ export const getSiteOfCampground = cache(
             price_per_night_base,
             min_stay_nights,
             electricity_amps,
+            driveway_type,
             description,
             site_types!inner (code)
           `,

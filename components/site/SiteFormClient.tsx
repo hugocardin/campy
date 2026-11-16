@@ -1,7 +1,7 @@
 "use client";
 
 import { Save } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
 import { SiteFormData } from "@/components/site/site-form-utils";
@@ -19,11 +19,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { SiteType } from "@/entities/site-type";
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
+import type { DrivewayType } from "@/lib/driveway-type";
+import { DRIVEWAY_TYPES } from "@/lib/driveway-type";
 import {
   ELECTRICITY_AMP_VALUES,
   type ElectricityAmp,
   normalizeElectricityAmps,
 } from "@/lib/electricity-amps";
+import {
+  isLodgingSiteType,
+  siteTypeRequiresMaxRigLength,
+} from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import {
@@ -38,6 +44,8 @@ const AMP_LABEL_KEYS = {
   30: "amp30",
   50: "amp50",
 } as const satisfies Record<ElectricityAmp, string>;
+
+const DRIVEWAY_NONE = "__none__";
 
 type SiteFormProps = {
   campgroundId: string;
@@ -72,14 +80,26 @@ export default function SiteFormClient({
     electricity_amps: normalizeElectricityAmps(
       initialData?.electricity_amps ?? [],
     ),
+    driveway_type: initialData?.driveway_type ?? "",
   }));
+
+  const selectedTypeCode = useMemo(() => {
+    if (!form.site_type_id) return undefined;
+    return siteTypes.find((t) => String(t.id) === form.site_type_id)?.code;
+  }, [form.site_type_id, siteTypes]);
+
+  const isLodging = isLodgingSiteType(selectedTypeCode);
+  const requiresMaxRig = siteTypeRequiresMaxRigLength(selectedTypeCode);
 
   const isFormValid = Boolean(
     form.name.trim() &&
     form.site_type_id &&
     form.price_per_night &&
     !isNaN(parseFloat(form.price_per_night)) &&
-    !isNaN(parseFloat(form.min_stay_nights || "0")),
+    !isNaN(parseFloat(form.min_stay_nights || "0")) &&
+    (!requiresMaxRig ||
+      (!isNaN(parseFloat(form.max_rig_length)) &&
+        parseFloat(form.max_rig_length) > 0)),
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -94,7 +114,13 @@ export default function SiteFormClient({
     if (!form.name.trim()) return setError(t_sites("errors.nameRequired"));
     if (!form.site_type_id) return setError(t_sites("errors.typeRequired"));
     if (!form.price_per_night) return setError(t_sites("errors.priceRequired"));
-    if (!isNaN(maxRigLengthNum) && maxRigLengthNum < 0) {
+    if (isLodging) {
+      // Lodging: force null max_rig_length (issue #27).
+    } else if (requiresMaxRig) {
+      if (isNaN(maxRigLengthNum) || maxRigLengthNum <= 0) {
+        return setError(t_sites("errors.maxRigLengthRequired"));
+      }
+    } else if (!isNaN(maxRigLengthNum) && maxRigLengthNum <= 0) {
       return setError(t_sites("errors.invalidMaxLength"));
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
@@ -107,15 +133,26 @@ export default function SiteFormClient({
       return setError(t_sites("errors.typeRequired"));
     }
 
+    const driveway: DrivewayType | null = isLodging
+      ? null
+      : form.driveway_type === ""
+        ? null
+        : form.driveway_type;
+
     const payload: SiteCreateUpdateInput = {
       id: initialData?.id,
       name: form.name,
       description: form.description,
       site_type_id: siteTypeIdNum,
-      max_rig_length: isNaN(maxRigLengthNum) ? undefined : maxRigLengthNum,
+      max_rig_length: isLodging
+        ? undefined
+        : isNaN(maxRigLengthNum)
+          ? undefined
+          : maxRigLengthNum,
       price_per_night: pricePerNightNum,
       min_stay_nights: isNaN(minStayNightsNum) ? undefined : minStayNightsNum,
       electricity_amps: normalizeElectricityAmps(form.electricity_amps),
+      driveway_type: driveway,
     };
 
     startTransition(async () => {
@@ -132,6 +169,8 @@ export default function SiteFormClient({
               {
                 fieldMessages: {
                   electricity_amps: t_sites("errors.invalidElectricityAmps"),
+                  driveway_type: t_sites("errors.invalidDrivewayType"),
+                  max_rig_length: t_sites("errors.maxRigLengthRequired"),
                 },
               },
             ),
@@ -152,7 +191,14 @@ export default function SiteFormClient({
   };
 
   const handleSiteTypeChange = (value: string) => {
-    setForm((prev) => ({ ...prev, site_type_id: value }));
+    const nextCode = siteTypes.find((t) => String(t.id) === value)?.code;
+    setForm((prev) => ({
+      ...prev,
+      site_type_id: value,
+      // Clear rig length + driveway when switching to lodging.
+      max_rig_length: isLodgingSiteType(nextCode) ? "" : prev.max_rig_length,
+      driveway_type: isLodgingSiteType(nextCode) ? "" : prev.driveway_type,
+    }));
     setError(null);
   };
 
@@ -213,20 +259,32 @@ export default function SiteFormClient({
               />
             </div>
 
-            <div>
-              <Label htmlFor="max_rig_length">
-                {t_sites("form.maxRigLengthLabel")}
-              </Label>
-              <Input
-                id="max_rig_length"
-                name="max_rig_length"
-                type="number"
-                value={form.max_rig_length}
-                onChange={handleChange}
-                className="mt-1.5"
-                placeholder={t_sites("form.maxRigLengthPlaceholder")}
-              />
-            </div>
+            {!isLodging ? (
+              <div>
+                <Label htmlFor="max_rig_length">
+                  {t_sites("form.maxRigLengthLabel")}
+                  {requiresMaxRig ? (
+                    <span className="text-red-500"> *</span>
+                  ) : null}
+                </Label>
+                <Input
+                  id="max_rig_length"
+                  name="max_rig_length"
+                  type="number"
+                  min={1}
+                  value={form.max_rig_length}
+                  onChange={handleChange}
+                  className="mt-1.5"
+                  placeholder={t_sites("form.maxRigLengthPlaceholder")}
+                  required={requiresMaxRig}
+                />
+                {requiresMaxRig ? (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t_sites("form.maxRigLengthRequiredHint")}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {/* Right column */}
@@ -288,6 +346,48 @@ export default function SiteFormClient({
                 placeholder={t_sites("form.minStayNightPlaceholder")}
               />
             </div>
+
+            {!isLodging ? (
+              <div>
+                <Label htmlFor="driveway_type">
+                  {t_sites("form.drivewayLabel")}
+                </Label>
+                <Select
+                  value={form.driveway_type || DRIVEWAY_NONE}
+                  onValueChange={(value) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      driveway_type:
+                        value === DRIVEWAY_NONE
+                          ? ""
+                          : (value as DrivewayType),
+                    }));
+                    setError(null);
+                  }}
+                >
+                  <SelectTrigger id="driveway_type" className="mt-1.5">
+                    <SelectValue
+                      placeholder={t_sites("form.drivewayPlaceholder")}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DRIVEWAY_NONE}>
+                      {t_sites("form.drivewayPlaceholder")}
+                    </SelectItem>
+                    {DRIVEWAY_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type === "PULL_THROUGH"
+                          ? t_sites("form.drivewayPullThrough")
+                          : t_sites("form.drivewayBackIn")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t_sites("form.drivewayHint")}
+                </p>
+              </div>
+            ) : null}
 
             <fieldset className="space-y-2 border-0 p-0 m-0">
               <legend className="text-sm font-medium leading-none">

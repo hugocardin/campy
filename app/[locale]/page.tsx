@@ -3,13 +3,13 @@ import CampgroundList from "@/components/search/CampgroundList";
 import CampgroundsMapDynamic from "@/components/search/CampgroundsMapDynamic";
 import CampgroundListControls from "@/components/search/list/CampgroundListControls";
 import {
+  buildCampgroundSiteFiltersCacheKey,
   getCampgroundProvinces,
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
 import {
-  formatCampgroundAmpsParam,
   parseCampgroundGeo,
-  parseCampgroundHookups,
+  parseCampgroundSiteFilters,
   parseCampgroundSort,
 } from "@/lib/campground-search";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
@@ -42,16 +42,20 @@ export default async function Home({ searchParams }: PageProps) {
     lng: firstParam(params.lng),
     radiusKm: firstParam(params.radiusKm),
   });
-  const hookups = parseCampgroundHookups({
+  const siteFilters = parseCampgroundSiteFilters({
     amps: firstParam(params.amps),
     electricity: firstParam(params.electricity),
     water: firstParam(params.water),
     sewer: firstParam(params.sewer),
+    dump: firstParam(params.dump),
+    driveway: firstParam(params.driveway),
+    rigLength: firstParam(params.rigLength),
+    stay: firstParam(params.stay),
   });
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
   });
-  const ampsKey = formatCampgroundAmpsParam(hookups.amps) ?? "";
+  const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
 
   const [campgroundsResult, provincesResult] = await Promise.all([
     getCampgrounds(
@@ -61,9 +65,7 @@ export default async function Home({ searchParams }: PageProps) {
       geo?.lat,
       geo?.lng,
       geo?.radiusKm,
-      ampsKey,
-      hookups.water,
-      hookups.sewer,
+      siteFiltersKey,
     ),
     getCampgroundProvinces(),
   ]);
@@ -104,9 +106,7 @@ export default async function Home({ searchParams }: PageProps) {
     q ?? "",
     province ?? "",
     geo ? `${geo.lat},${geo.lng},${geo.radiusKm}` : "",
-    ampsKey,
-    hookups.water ? "w" : "",
-    hookups.sewer ? "s" : "",
+    siteFiltersKey,
   ].join("|");
 
   return (

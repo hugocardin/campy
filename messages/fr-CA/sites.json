@@ -18,6 +18,7 @@
     "descriptionPlaceholder": "Décrivez l'emplacement...",
     "maxRigLengthLabel": "Longueur max. du véhicule (pieds)",
     "maxRigLengthPlaceholder": "ex. 35",
+    "maxRigLengthRequiredHint": "Obligatoire pour les emplacements VR et VR-et-tente.",
     "siteTypeLabel": "Type d'emplacement",
     "siteTypePlaceholder": "Sélectionnez un type",
     "pricePerNightLabel": "Prix par nuit",
@@ -25,7 +26,12 @@
     "minStayNightLabel": "Nombre minimal de nuits",
     "minStayNightPlaceholder": "ex. 2",
     "electricityAmpsLabel": "Ampères d’électricité",
-    "electricityAmpsHint": "Cochez chaque prise disponible sur le piédestal. Laissez tout décoché s’il n’y a pas d’électricité."
+    "electricityAmpsHint": "Cochez chaque prise disponible sur le piédestal. Laissez tout décoché s’il n’y a pas d’électricité.",
+    "drivewayLabel": "Type d’allée",
+    "drivewayPlaceholder": "Inconnu / non défini",
+    "drivewayPullThrough": "Traversante",
+    "drivewayBackIn": "En marche arrière",
+    "drivewayHint": "Facultatif. Utilisé dans la recherche lorsque les visiteurs filtrent par allée."
   },
 
   "electricityAmps": {
@@ -43,9 +49,11 @@
     "typeRequired": "Le type est requis",
     "priceRequired": "Le prix est requis",
     "invalidMaxLength": "Longueur max. du véhicule invalide",
+    "maxRigLengthRequired": "La longueur max. du véhicule est obligatoire pour les emplacements VR",
     "invalidPricePerNight": "Prix par nuit invalide",
     "invalidMinStayNights": "Nombre minimal de nuits invalide",
-    "invalidElectricityAmps": "Choisissez uniquement parmi 15, 20, 30 ou 50 ampères"
+    "invalidElectricityAmps": "Choisissez uniquement parmi 15, 20, 30 ou 50 ampères",
+    "invalidDrivewayType": "Choisissez traversante, marche arrière, ou laissez vide"
   },
 
   "actions": {

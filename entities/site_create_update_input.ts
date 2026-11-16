@@ -1,3 +1,4 @@
+import type { DrivewayType } from "@/lib/driveway-type";
 import type { ElectricityAmp } from "@/lib/electricity-amps";
 
 export interface SiteCreateUpdateInput {
@@ -9,4 +10,5 @@ export interface SiteCreateUpdateInput {
   price_per_night: number;
   min_stay_nights: number | undefined;
   electricity_amps: ElectricityAmp[];
+  driveway_type: DrivewayType | null;
 }

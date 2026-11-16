@@ -18,6 +18,7 @@
     "descriptionPlaceholder": "Describe the site...",
     "maxRigLengthLabel": "Max rig length (feet)",
     "maxRigLengthPlaceholder": "e.g. 35",
+    "maxRigLengthRequiredHint": "Required for RV and RV-and-tent sites.",
     "siteTypeLabel": "Site type",
     "siteTypePlaceholder": "Select a type",
     "pricePerNightLabel": "Price per night",
@@ -25,7 +26,12 @@
     "minStayNightLabel": "Minimal stay nights",
     "minStayNightPlaceholder": "e.g. 2",
     "electricityAmpsLabel": "Electricity amps",
-    "electricityAmpsHint": "Select every plug available on this site’s pedestal. Leave all unchecked for no electricity."
+    "electricityAmpsHint": "Select every plug available on this site’s pedestal. Leave all unchecked for no electricity.",
+    "drivewayLabel": "Driveway type",
+    "drivewayPlaceholder": "Unknown / not set",
+    "drivewayPullThrough": "Pull-through",
+    "drivewayBackIn": "Back-in",
+    "drivewayHint": "Optional. Used by guest search when guests filter by driveway."
   },
 
   "electricityAmps": {
@@ -43,9 +49,11 @@
     "typeRequired": "Type is required",
     "priceRequired": "Price is required",
     "invalidMaxLength": "Invalid max rig length",
+    "maxRigLengthRequired": "Max rig length is required for RV sites",
     "invalidPricePerNight": "Invalid price per night",
     "invalidMinStayNights": "Invalid min stay nights",
-    "invalidElectricityAmps": "Choose only from 15, 20, 30, or 50 amps"
+    "invalidElectricityAmps": "Choose only from 15, 20, 30, or 50 amps",
+    "invalidDrivewayType": "Choose pull-through, back-in, or leave unset"
   },
 
   "actions": {

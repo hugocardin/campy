@@ -1,3 +1,4 @@
+import type { DrivewayType } from "@/lib/driveway-type";
 import type { ElectricityAmp } from "@/lib/electricity-amps";
 
 export interface Site {
@@ -12,4 +13,6 @@ export interface Site {
   min_stay_nights: number;
   /** Available pedestal amps; empty = no electricity. */
   electricity_amps: ElectricityAmp[];
+  /** Pull-through / back-in; null = unknown. */
+  driveway_type: DrivewayType | null;
 }

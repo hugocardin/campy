@@ -17,7 +17,8 @@
     "SOCCER": "Soccer",
     "ELECTRICITY": "Electricity",
     "WATER": "Water",
-    "SEWER": "Sewer"
+    "SEWER": "Sewer",
+    "DUMP_STATION": "Dump station"
   },
 
   "form": {
@@ -29,11 +30,12 @@
     "codeRequired": "Amenity Name is required but was not provided.",
     "categoryRequired": "Category is required but was not provided.",
     "codeTooLong": "Amenity Name must be {max} characters or fewer.",
-    "hookupCodeProtected": "Water and sewer amenities are used by guest search and cannot be deleted or renamed."
+    "hookupCodeProtected": "Water, sewer, and dump station amenities are used by guest search and cannot be deleted or renamed."
   },
 
   "hints": {
-    "electricityAmpsOnSiteForm": "Electricity amps are set on the site form, not as an amenity."
+    "electricityAmpsOnSiteForm": "Electricity amps are set on the site form, not as an amenity.",
+    "drivewayOnSiteForm": "Driveway type (pull-through / back-in) is set on the site form, not as an amenity."
   },
 
   "actions": {

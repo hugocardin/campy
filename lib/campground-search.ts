@@ -1,12 +1,21 @@
 import {
-  PROTECTED_HOOKUP_AMENITY_CODES,
-  type ProtectedHookupAmenityCode,
+  type SiteHookupAmenityCode,
 } from "@/lib/amenities/hookup-codes";
+import {
+  type DrivewayType,
+  parseDrivewayUrlParam,
+} from "@/lib/driveway-type";
 import {
   ELECTRICITY_AMP_VALUES,
   type ElectricityAmpFilterOption,
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
+import { parseGuestRigLength } from "@/lib/site-rig-length";
+import {
+  type StayKind,
+  parseStayKind,
+  stayKindAllowsRigLength,
+} from "@/lib/stay-kind";
 
 export type CampgroundSort =
   | "name"
@@ -25,9 +34,9 @@ export const CAMPGROUND_GEO_COORD_DECIMALS = 2;
 
 /** Stable amenity `code` values mapped to guest water/sewer filters. */
 export const HOOKUP_AMENITY_CODES = {
-  water: PROTECTED_HOOKUP_AMENITY_CODES[0],
-  sewer: PROTECTED_HOOKUP_AMENITY_CODES[1],
-} as const satisfies Record<string, ProtectedHookupAmenityCode>;
+  water: "WATER",
+  sewer: "SEWER",
+} as const satisfies Record<string, SiteHookupAmenityCode>;
 
 export type HookupAmenityFilterKey = keyof typeof HOOKUP_AMENITY_CODES;
 
@@ -36,6 +45,15 @@ export type CampgroundHookupFilters = {
   amps: ElectricityAmpFilterOption[];
   water: boolean;
   sewer: boolean;
+};
+
+/** Guest site/park filters beyond geo/province (issue #25/#26/#27). */
+export type CampgroundSiteFilters = CampgroundHookupFilters & {
+  dumpStation: boolean;
+  drivewayType?: DrivewayType;
+  /** Guest rig length (feet); ignored when stay is lodging. */
+  rigLength?: number;
+  stayKind?: StayKind;
 };
 
 export type CampgroundListFilters = {
@@ -48,6 +66,10 @@ export type CampgroundListFilters = {
   amps?: ElectricityAmpFilterOption[];
   water?: boolean;
   sewer?: boolean;
+  dumpStation?: boolean;
+  drivewayType?: DrivewayType;
+  rigLength?: number;
+  stayKind?: StayKind;
 };
 
 export type CampgroundGeo = {
@@ -234,10 +256,49 @@ export function parseCampgroundHookups(params: {
   };
 }
 
+/**
+ * Parse dump / driveway / rig / stay URL params (issue #27).
+ * Rig length and driveway are ignored when stay=lodging (cabin sites).
+ */
+export function parseCampgroundSiteFilters(params: {
+  amps?: string;
+  electricity?: string;
+  water?: string;
+  sewer?: string;
+  dump?: string;
+  driveway?: string;
+  rigLength?: string;
+  stay?: string;
+}): CampgroundSiteFilters {
+  const stayKind = parseStayKind(params.stay);
+  const campingFilters = stayKindAllowsRigLength(stayKind);
+  return {
+    ...parseCampgroundHookups(params),
+    dumpStation: parseHookupFlag(params.dump),
+    drivewayType: campingFilters
+      ? parseDrivewayUrlParam(params.driveway)
+      : undefined,
+    rigLength: campingFilters
+      ? parseGuestRigLength(params.rigLength)
+      : undefined,
+    stayKind,
+  };
+}
+
 export function anyHookupFilterActive(
   hookups: CampgroundHookupFilters,
 ): boolean {
   return hookups.amps.length > 0 || hookups.water || hookups.sewer;
+}
+
+export function anySiteFilterActive(filters: CampgroundSiteFilters): boolean {
+  return (
+    anyHookupFilterActive(filters) ||
+    filters.dumpStation ||
+    filters.drivewayType != null ||
+    filters.rigLength != null ||
+    filters.stayKind != null
+  );
 }
 
 /** Serialize amp filters for URL (`none,15,30`). Empty → omit. */
@@ -248,3 +309,4 @@ export function formatCampgroundAmpsParam(
   if (normalized.length === 0) return undefined;
   return normalized.join(",");
 }
+

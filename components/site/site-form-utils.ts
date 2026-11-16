@@ -1,4 +1,5 @@
 import { Site } from "@/entities/sites";
+import type { DrivewayType } from "@/lib/driveway-type";
 import type { ElectricityAmp } from "@/lib/electricity-amps";
 import { normalizeElectricityAmps } from "@/lib/electricity-amps";
 
@@ -11,6 +12,7 @@ export type SiteFormData = {
   price_per_night: string;
   min_stay_nights: string;
   electricity_amps: ElectricityAmp[];
+  driveway_type: DrivewayType | "";
 };
 
 /**
@@ -30,5 +32,6 @@ export function toSiteFormData(site: Site): SiteFormData | undefined {
     price_per_night: String(site.price_per_night ?? ""),
     min_stay_nights: String(site.min_stay_nights ?? ""),
     electricity_amps: normalizeElectricityAmps(site.electricity_amps ?? []),
+    driveway_type: site.driveway_type ?? "",
   };
 }

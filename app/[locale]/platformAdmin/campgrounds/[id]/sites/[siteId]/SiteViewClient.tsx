@@ -6,6 +6,7 @@ import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Site } from "@/entities/sites";
 import { formatElectricityAmps } from "@/lib/electricity-amps";
+import { isLodgingSiteType } from "@/lib/site-rig-length";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -96,12 +97,28 @@ export default function SiteViewClient({ site, amenities }: Props) {
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  {t_sites("form.maxRigLengthLabel")}
-                </h3>
-                <p>{site.max_rig_length}</p>
-              </div>
+              {!isLodgingSiteType(site.site_type_code) ? (
+                <>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                      {t_sites("form.maxRigLengthLabel")}
+                    </h3>
+                    <p>{site.max_rig_length ?? "—"}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                      {t_sites("form.drivewayLabel")}
+                    </h3>
+                    <p>
+                      {site.driveway_type === "PULL_THROUGH"
+                        ? t_sites("form.drivewayPullThrough")
+                        : site.driveway_type === "BACK_IN"
+                          ? t_sites("form.drivewayBackIn")
+                          : t_sites("form.drivewayPlaceholder")}
+                    </p>
+                  </div>
+                </>
+              ) : null}
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
