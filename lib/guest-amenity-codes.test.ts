@@ -50,6 +50,27 @@ describe("guestAmenityOptionsFromCatalogAndSelection", () => {
       [{ code: "WIFI" }, { code: "PET FRIENDLY" }, { code: "POOL" }],
     );
   });
+
+  it("bounds URL-only chips (skips over-long, caps extras)", () => {
+    const overlong = "A".repeat(AMENITY_CODE_MAX_LENGTH + 1);
+    const many = Array.from(
+      { length: GUEST_AMENITY_CODES_MAX + 5 },
+      (_, i) => `Z${String(i + 1).padStart(2, "0")}`,
+    );
+    const options = guestAmenityOptionsFromCatalogAndSelection(
+      [{ code: "WIFI" }],
+      [...many, overlong],
+    );
+    assert.ok(!options.some((o) => o.code === overlong));
+    const urlOnly = options.filter((o) => o.code !== "WIFI");
+    assert.equal(urlOnly.length, GUEST_AMENITY_CODES_MAX);
+    // Normalizer still preserves overflow for the RPC path.
+    assert.ok(normalizeGuestAmenityCodes([...many, overlong]).includes(overlong));
+    assert.equal(
+      normalizeGuestAmenityCodes([...many, overlong]).length,
+      many.length + 1,
+    );
+  });
 });
 
 describe("parseGuestAmenityCodes / format", () => {

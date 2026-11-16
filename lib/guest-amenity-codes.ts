@@ -97,8 +97,12 @@ export function guestSearchAmenityCatalog<T extends { code: string }>(
 }
 
 /**
- * Checkbox options: catalog codes (deduped by canonical key) plus any
- * URL-only selected keys so stale filters stay visible/clearable.
+ * Checkbox options: catalog codes (deduped by canonical key) plus a bounded
+ * set of URL-only selected keys so stale-but-plausible filters stay
+ * visible/clearable. Over-long keys and extras past
+ * {@link GUEST_AMENITY_CODES_MAX} are omitted from the display list only —
+ * {@link normalizeGuestAmenityCodes} still keeps them for the RPC fail-closed
+ * path (Clear all / rewriting the URL clears the whole amenities param).
  */
 export function guestAmenityOptionsFromCatalogAndSelection(
   catalog: readonly { code: string }[],
@@ -112,10 +116,14 @@ export function guestAmenityOptionsFromCatalogAndSelection(
     seen.add(key);
     options.push({ code: row.code });
   }
+  let urlOnlyAdded = 0;
   for (const key of normalizeGuestAmenityCodes(selectedKeys)) {
     if (seen.has(key)) continue;
+    if (key.length > AMENITY_CODE_MAX_LENGTH) continue;
+    if (urlOnlyAdded >= GUEST_AMENITY_CODES_MAX) break;
     seen.add(key);
     options.push({ code: key });
+    urlOnlyAdded += 1;
   }
   return options;
 }
