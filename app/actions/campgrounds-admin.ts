@@ -2,6 +2,10 @@
 
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { redirect } from "@/i18n/navigation";
+import {
+  GUEST_PRICE_CURRENCY,
+  resolveCampgroundPriceCurrency,
+} from "@/lib/campground-price";
 import { ActionResult, DbErrorCode, resultError } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
 import { CAMPGROUND_PROVINCES_CACHE_TAG } from "@/data/campgrounds/get-campgrounds";
@@ -129,6 +133,9 @@ export async function updateCampgroundAction(
           city: input.city || null,
           province: input.province || null,
           country: input.country || null,
+          currency: resolveCampgroundPriceCurrency(
+            input.currency || GUEST_PRICE_CURRENCY,
+          ),
           website: websiteResult.data,
           phone: input.phone || null,
           updated_at: new Date().toISOString(),
@@ -187,6 +194,9 @@ export async function createCampgroundAction(
           city: input.city?.trim() || null,
           province: input.province?.trim() || null,
           country: input.country?.trim() || null,
+          currency: resolveCampgroundPriceCurrency(
+            input.currency || GUEST_PRICE_CURRENCY,
+          ),
           website: websiteResult.data,
           phone: input.phone?.trim() || null,
           location: `SRID=4326;${locationWKT}`,

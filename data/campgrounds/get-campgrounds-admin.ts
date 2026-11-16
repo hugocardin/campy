@@ -18,6 +18,7 @@ type CampgroundAdminRow = {
   city: string;
   province: string;
   country: string;
+  currency: string | null;
   latitude: number;
   longitude: number;
   website: string | null;
@@ -37,6 +38,7 @@ function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
     city: row.city,
     province: row.province,
     country: row.country,
+    currency: row.currency ?? "CAD",
     location: {
       lat: Number(row.latitude),
       lng: Number(row.longitude),

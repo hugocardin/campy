@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   GUEST_MAX_PRICE_CAP,
+  GUEST_PRICE_CURRENCY,
   formatCampgroundPricePerNight,
   formatGuestMaxPriceParam,
+  formatGuestPriceCurrencyParam,
   parseGuestMaxPrice,
+  parseGuestPriceCurrency,
+  resolveCampgroundPriceCurrency,
+  resolveGuestPriceCurrencyFilter,
 } from "./campground-price";
 
 describe("parseGuestMaxPrice", () => {
@@ -30,8 +35,61 @@ describe("formatGuestMaxPriceParam / display", () => {
     assert.equal(formatGuestMaxPriceParam(0), undefined);
   });
 
-  it("formats CAD for cards", () => {
+  it("formats CAD for cards by default", () => {
     assert.equal(formatCampgroundPricePerNight(48, "en-CA"), "$48");
     assert.equal(formatCampgroundPricePerNight(null, "en-CA"), null);
+  });
+
+  it("formats USD / MXN when provided", () => {
+    assert.equal(formatCampgroundPricePerNight(40, "en-CA", "USD"), "US$40");
+    assert.match(
+      formatCampgroundPricePerNight(40, "en-CA", "MXN") ?? "",
+      /40/,
+    );
+  });
+});
+
+describe("guest price currency", () => {
+  it("parses CAD/USD/MXN and rejects junk", () => {
+    assert.equal(parseGuestPriceCurrency("cad"), "CAD");
+    assert.equal(parseGuestPriceCurrency("USD"), "USD");
+    assert.equal(parseGuestPriceCurrency("mxn"), "MXN");
+    assert.equal(parseGuestPriceCurrency("EUR"), undefined);
+    assert.equal(parseGuestPriceCurrency(""), undefined);
+  });
+
+  it("serializes and resolves with CAD default", () => {
+    assert.equal(formatGuestPriceCurrencyParam("USD"), "USD");
+    assert.equal(resolveCampgroundPriceCurrency(null), GUEST_PRICE_CURRENCY);
+    assert.equal(resolveCampgroundPriceCurrency("usd"), "USD");
+  });
+
+  it("scopes filter currency only when comparing amounts", () => {
+    assert.equal(
+      resolveGuestPriceCurrencyFilter({ sort: "name" }),
+      undefined,
+    );
+    assert.equal(
+      resolveGuestPriceCurrencyFilter({ maxPrice: 50 }),
+      "CAD",
+    );
+    assert.equal(
+      resolveGuestPriceCurrencyFilter({
+        maxPrice: 50,
+        currency: "USD",
+      }),
+      "USD",
+    );
+    assert.equal(
+      resolveGuestPriceCurrencyFilter({ sort: "price" }),
+      "CAD",
+    );
+    assert.equal(
+      resolveGuestPriceCurrencyFilter({
+        sort: "price-desc",
+        currency: "MXN",
+      }),
+      "MXN",
+    );
   });
 });

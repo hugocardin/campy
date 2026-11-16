@@ -18,6 +18,11 @@ export interface Campground {
    * filters (or all sites when no site filters). From search RPCs (#24).
    */
   minPricePerNight?: number | null;
+  /**
+   * Listing currency for `minPricePerNight` / site base prices
+   * (`campgrounds.currency`: CAD / USD / MXN).
+   */
+  priceCurrency?: string | null;
   website: string;
   phone: string;
 }

@@ -9,6 +9,8 @@ export interface CampgroundAdmin {
   city: string;
   province: string;
   country: string;
+  /** Listing currency for site base prices (CAD / USD / MXN). */
+  currency: string;
   location: {
     lat: number;
     lng: number;

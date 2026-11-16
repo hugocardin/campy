@@ -22,6 +22,8 @@
     "provincePlaceholder": "ex. Québec, Ontario, Colombie-Britannique...",
     "countryLabel": "Pays",
     "countryPlaceholder": "ex. Canada, États-Unis...",
+    "currencyLabel": "Devise affichée",
+    "currencyHint": "Devise des tarifs de nuitée de base (pas de conversion).",
     "latitudeLabel": "Latitude",
     "latitudePlaceholder": "ex. 45.4215",
     "latitudeRange": "Intervalle\u00A0: -90° à +90°",

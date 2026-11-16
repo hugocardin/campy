@@ -61,6 +61,7 @@ export default async function Home({ searchParams }: PageProps) {
     stay: firstParam(params.stay),
     types: firstParam(params.types),
     maxPrice: firstParam(params.maxPrice),
+    currency: firstParam(params.currency),
     amenities: firstParam(params.amenities),
   });
   const sort = parseCampgroundSort(firstParam(params.sort), {

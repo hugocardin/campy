@@ -7,6 +7,8 @@ export interface CampgroundCreateUpdateInput {
   city: string;
   province: string;
   country: string;
+  /** Listing currency for site base prices (CAD / USD / MXN). */
+  currency: string;
   website: string;
   phone: string;
   location: {

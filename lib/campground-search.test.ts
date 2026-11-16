@@ -261,6 +261,7 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         stayKind: "camping",
         siteTypes: [],
         maxPrice: undefined,
+        priceCurrency: undefined,
         amenityCodes: [],
       },
     );
@@ -309,6 +310,13 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
     assert.equal(
       parseCampgroundSiteFilters({ maxPrice: "75" }).maxPrice,
       75,
+    );
+    assert.equal(
+      parseCampgroundSiteFilters({
+        maxPrice: "75",
+        currency: "usd",
+      }).priceCurrency,
+      "USD",
     );
   });
 

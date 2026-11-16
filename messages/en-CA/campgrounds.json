@@ -22,6 +22,8 @@
     "provincePlaceholder": "e.g. Quebec, Ontario, British Columbia...",
     "countryLabel": "Country",
     "countryPlaceholder": "e.g. Canada, United States...",
+    "currencyLabel": "Listing currency",
+    "currencyHint": "Currency for site nightly base prices (no conversion).",
     "latitudeLabel": "Latitude",
     "latitudePlaceholder": "e.g. 45.4215",
     "latitudeRange": "Range: -90° to +90°",

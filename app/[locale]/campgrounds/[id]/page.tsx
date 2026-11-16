@@ -19,6 +19,7 @@ import {
   formatElectricityAmps,
   unionElectricityAmps,
 } from "@/lib/electricity-amps";
+import { formatCampgroundPricePerNight } from "@/lib/campground-price";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { isUuid } from "@/lib/is-uuid";
 import { routes } from "@/lib/routes";
@@ -157,11 +158,6 @@ export default async function CampgroundDetailsPage({
           unionElectricityAmps(sites.map((site) => site.electricity_amps)),
         )
       : null;
-
-  const priceFormatter = new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "CAD",
-  });
 
   const locationLine = formatCampgroundLocation(
     campground.city,
@@ -382,8 +378,10 @@ export default async function CampgroundDetailsPage({
                             />
                           </TableCell>
                           <TableCell>
-                            {priceFormatter.format(
+                            {formatCampgroundPricePerNight(
                               Number(site.price_per_night),
+                              locale,
+                              campground.priceCurrency ?? undefined,
                             )}
                           </TableCell>
                           <TableCell>{site.min_stay_nights}</TableCell>

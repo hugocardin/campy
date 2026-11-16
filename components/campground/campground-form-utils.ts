@@ -1,4 +1,8 @@
 import type { CampgroundAdmin } from "@/entities/campground-admin";
+import {
+  GUEST_PRICE_CURRENCY,
+  resolveCampgroundPriceCurrency,
+} from "@/lib/campground-price";
 
 export type CampgroundFormData = {
   id?: string;
@@ -9,6 +13,7 @@ export type CampgroundFormData = {
   city: string;
   province: string;
   country: string;
+  currency: string;
   website: string;
   phone: string;
   location: {
@@ -36,6 +41,9 @@ export function toCampgroundFormData(
     city: campground.city ?? "",
     province: campground.province ?? "",
     country: campground.country ?? "",
+    currency: resolveCampgroundPriceCurrency(
+      campground.currency ?? GUEST_PRICE_CURRENCY,
+    ),
     website: campground.website ?? "",
     phone: campground.phone ?? "",
     location: {

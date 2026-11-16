@@ -42,6 +42,7 @@ function CampgroundCard({
   const priceLabel = formatCampgroundPricePerNight(
     campground.minPricePerNight,
     locale,
+    campground.priceCurrency ?? undefined,
   );
   const cardRef = useRef<HTMLDivElement>(null);
 
