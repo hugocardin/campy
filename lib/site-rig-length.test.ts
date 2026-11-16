@@ -15,6 +15,7 @@ import {
   parseRigLengthToFeet,
   parseRigLengthUnit,
   parseStoredRigLengthUnit,
+  feetFromRigLengthUrlState,
   guestRigLengthToUrlState,
   resolveGuestRigLengthFeet,
   resolveGuestRigLengthState,
@@ -216,6 +217,20 @@ describe("site-rig-length", () => {
     assert.equal(guestRigLengthToUrlState(null, 35), null);
     assert.equal(guestRigLengthToUrlState(null, null), undefined);
     assert.equal(guestRigLengthToUrlState(undefined, 35), undefined);
+    // Compare against normalized default (round/cap), not the raw store value.
+    assert.equal(guestRigLengthToUrlState(35, 35.004), undefined);
+    // Metres draft that round-trips to the same normalized feet stays omit.
+    const fromMetres = parseGuestRigLength("10,67", "m");
+    assert.equal(fromMetres, 35);
+    assert.equal(guestRigLengthToUrlState(fromMetres, 35), undefined);
+  });
+
+  it("feetFromRigLengthUrlState mirrors resolve for omit / clear / value", () => {
+    assert.equal(feetFromRigLengthUrlState(undefined, 35, true), 35);
+    assert.equal(feetFromRigLengthUrlState(null, 35, true), undefined);
+    assert.equal(feetFromRigLengthUrlState(40, 35, true), 40);
+    assert.equal(feetFromRigLengthUrlState(undefined, 35, false), undefined);
+    assert.equal(feetFromRigLengthUrlState(40, 35, false), undefined);
   });
 
   it("converts display values and formats drafts from feet", () => {

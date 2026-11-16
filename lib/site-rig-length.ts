@@ -207,21 +207,58 @@ export function resolveGuestRigLengthFeet(
 }
 
 /**
+ * Normalized feet from a stored profile default, or null when unset / invalid.
+ */
+export function normalizedDefaultRigLengthFeet(
+  defaultFeet?: number | null,
+): number | null {
+  if (defaultFeet == null) return null;
+  const parsed = normalizeStoredRigLengthFeet(defaultFeet);
+  return parsed.ok ? parsed.feet : null;
+}
+
+/**
  * Map a draft / pending feet value to URL tri-state.
- * Keeps omit when the value equals the profile default so unrelated filter
- * changes do not materialize a personal default into shared links.
- * Emits `null` (→ `?rigLength=`) only when a default would otherwise reapply.
+ * Keeps omit when the value equals the *normalized* profile default so
+ * unrelated filter changes do not materialize a personal default into shared
+ * links. Emits `null` (→ `?rigLength=`) only when a default would otherwise
+ * reapply.
  */
 export function guestRigLengthToUrlState(
   feet: number | null | undefined,
   defaultFeet?: number | null,
 ): number | null | undefined {
+  const normalizedDefault = normalizedDefaultRigLengthFeet(defaultFeet);
   if (feet === null) {
-    return defaultFeet != null ? null : undefined;
+    return normalizedDefault != null ? null : undefined;
   }
   if (feet == null) return undefined;
-  if (defaultFeet != null && feet === defaultFeet) return undefined;
+  if (normalizedDefault != null && feet === normalizedDefault) {
+    return undefined;
+  }
   return feet;
+}
+
+/**
+ * Resolve display/RPC feet from URL tri-state + profile default.
+ * Inverse of {@link guestRigLengthToUrlState} for a known camping context.
+ */
+export function feetFromRigLengthUrlState(
+  urlState: number | null | undefined,
+  defaultFeet?: number | null,
+  campingOk = true,
+): number | undefined {
+  return resolveGuestRigLengthState({
+    raw:
+      urlState === null
+        ? ""
+        : typeof urlState === "number"
+          ? String(urlState)
+          : undefined,
+    present: urlState !== undefined,
+    defaultFeet,
+    campingOk,
+  }).feet;
 }
 
 /**

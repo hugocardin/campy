@@ -59,6 +59,7 @@ import {
 import { routes } from "@/lib/routes";
 import {
   convertRigDraftOnUnitChange,
+  feetFromRigLengthUrlState,
   formatRigLengthForDisplay,
   guestRigLengthToUrlState,
   parseGuestRigLength,
@@ -525,15 +526,31 @@ export default function CampgroundListControls({
     setLastPushedQ(trimmedQ);
     setActivePlace(next.place);
     setPrevPlaceLabel(next.place);
-    const nextKey = siteFiltersKey(siteFiltersFromQueryState(next));
     const nextUnit: RigLengthUnit = next.rigUnit === "m" ? "m" : "ft";
+    const campingAttrsOk = campingSiteAttrsAllowed(
+      next.stayKind,
+      next.siteTypes,
+    );
+    // URL state (omit / null / number) vs resolved feet for localFilters /
+    // lastPushed key — must match what URL sync will resolve after replace,
+    // or our own echo is treated as external and clobbers mid-type drafts.
+    const resolvedFeet = feetFromRigLengthUrlState(
+      next.rigLength,
+      defaultRigLength,
+      campingAttrsOk,
+    );
+    const filtersForKey = {
+      ...siteFiltersFromQueryState(next),
+      rigLength: resolvedFeet,
+    };
+    const nextKey = siteFiltersKey(filtersForKey);
     setLastPushedFiltersKey(nextKey);
     setLastPushedRigUnit(nextUnit);
-    setLocalFilters(siteFiltersFromQueryState(next));
+    setLocalFilters(filtersForKey);
     setRigLengthUrlState(next.rigLength);
     updateRigUnit(nextUnit);
     // Do not overwrite mid-typing drafts here — external URL sync does that.
-    if (!campingSiteAttrsAllowed(next.stayKind, next.siteTypes)) {
+    if (!campingAttrsOk) {
       updateRigDraft("");
     }
     latestParamsRef.current = next;
