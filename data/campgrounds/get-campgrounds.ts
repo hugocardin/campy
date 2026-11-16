@@ -181,10 +181,14 @@ export const getCampgroundProvinces = cache(
   },
 );
 
-function siteFilterRpcArgs(filters: CampgroundSiteFilters) {
+function siteFilterRpcArgs(
+  filters: CampgroundSiteFilters,
+  sort?: string,
+) {
   const priceCurrency = resolveGuestPriceCurrencyFilter({
     currency: filters.priceCurrency,
     maxPrice: filters.maxPrice,
+    sort,
   });
   return {
     require_amps: electricityAmpsToRpcArg(filters.amps),
@@ -306,7 +310,7 @@ export const getCampgrounds = cache(
             q: term || null,
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
-            ...siteFilterRpcArgs(siteFilters),
+            ...siteFilterRpcArgs(siteFilters, resolvedSort),
             sort_key: resolvedSort,
             result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
@@ -337,7 +341,7 @@ export const getCampgrounds = cache(
           q: term || null,
           province_aliases:
             provinceAliases.length > 0 ? provinceAliases : null,
-          ...siteFilterRpcArgs(siteFilters),
+          ...siteFilterRpcArgs(siteFilters, nonGeoSort),
           sort_key: nonGeoSort,
           result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
         }),

@@ -47,6 +47,7 @@
     "priceCurrencyLabel": "Price currency",
     "priceCurrencyScopeNote": "Prices in {currency} · parks listed in other currencies are hidden (no conversion).",
     "noResultsCurrencyScope": "No parks match this max price in {currency}. Clear the price filter or try another currency.",
+    "noResultsForCurrencyScope": "No parks match “{query}” with this max price in {currency}. Clear the price filter, try another currency, or change your search.",
     "electricityAmpsLabel": "Electricity (amps)",
     "waterSewerLabel": "Water & sewer",
     "drivewayLabel": "Driveway",

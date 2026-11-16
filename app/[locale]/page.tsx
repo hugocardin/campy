@@ -7,6 +7,7 @@ import {
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
 import { getCurrentRigSearchPrefs } from "@/data/profile/get-rig-search-prefs";
+import { resolveGuestPriceCurrencyFilter } from "@/lib/campground-price";
 import {
   parseCampgroundGeo,
   parseCampgroundSiteFilters,
@@ -200,16 +201,28 @@ export default async function Home({ searchParams }: PageProps) {
             searchKey={mapSearchKey}
             searchQuery={q}
             detailQuery={detailQuery}
-            emptyMessage={
-              siteFiltersParsed.maxPrice != null
-                ? tControls("noResultsCurrencyScope", {
-                    currency:
-                      siteFiltersParsed.priceCurrency ?? "CAD",
-                  })
-                : q?.trim()
-                  ? tControls("noResultsFor", { query: q.trim() })
-                  : tControls("noResults")
-            }
+            emptyMessage={(() => {
+              const trimmedQ = q?.trim();
+              const scopedCurrency = resolveGuestPriceCurrencyFilter({
+                currency: siteFiltersParsed.priceCurrency,
+                maxPrice: siteFiltersParsed.maxPrice,
+              });
+              if (scopedCurrency != null && trimmedQ) {
+                return tControls("noResultsForCurrencyScope", {
+                  query: trimmedQ,
+                  currency: scopedCurrency,
+                });
+              }
+              if (scopedCurrency != null) {
+                return tControls("noResultsCurrencyScope", {
+                  currency: scopedCurrency,
+                });
+              }
+              if (trimmedQ) {
+                return tControls("noResultsFor", { query: trimmedQ });
+              }
+              return tControls("noResults");
+            })()}
           />
         </div>
       </div>

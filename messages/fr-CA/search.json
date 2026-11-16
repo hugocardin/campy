@@ -47,6 +47,7 @@
     "priceCurrencyLabel": "Devise du prix",
     "priceCurrencyScopeNote": "Tarifs en {currency} · les campings dans d’autres devises sont masqués (pas de conversion).",
     "noResultsCurrencyScope": "Aucun camping ne correspond à ce prix max en {currency}. Effacez le filtre de prix ou essayez une autre devise.",
+    "noResultsForCurrencyScope": "Aucun camping ne correspond à « {query} » avec ce prix max en {currency}. Effacez le filtre de prix, essayez une autre devise ou modifiez votre recherche.",
     "electricityAmpsLabel": "Électricité (ampères)",
     "waterSewerLabel": "Eau et égouts",
     "drivewayLabel": "Allée",

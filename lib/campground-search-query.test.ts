@@ -92,7 +92,7 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.get("amenities"), "pet_friendly,wifi");
   });
 
-  it("emits currency with maxPrice; price sort alone does not scope", () => {
+  it("emits currency with maxPrice or price-sort preference (sort does not scope)", () => {
     const usd = buildCampgroundSearchParams({
       ...base,
       maxPrice: 60,
@@ -115,7 +115,8 @@ describe("buildCampgroundSearchParams / clear", () => {
       siteTypes: [],
       amenityCodes: [],
     });
-    assert.equal(priceSort.get("currency"), null);
+    // Preference for grouping (CAD default) — RPC still lists other currencies.
+    assert.equal(priceSort.get("currency"), "CAD");
     assert.equal(priceSort.get("sort"), "price");
   });
 

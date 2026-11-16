@@ -7,7 +7,8 @@
  * RPC rejects ≤0 and > {@link GUEST_MAX_PRICE_CAP}.
  *
  * Keep {@link GUEST_PRICE_CURRENCIES} in sync with SQL
- * `public.normalize_listing_currency` (asserted in tests).
+ * `public.normalize_listing_currency` (TS pin in tests; SQL probe in
+ * `supabase/probes/search-multi-currency.md`).
  */
 
 /** Default listing / filter currency (Canada-first catalog). */
@@ -54,15 +55,19 @@ export function resolveCampgroundPriceCurrency(
 }
 
 /**
- * Currency to send to search RPCs when filtering by maxPrice.
- * Price sort alone must not scope (would hide other-currency parks) — #51.
- * Defaults to CAD when maxPrice is set without an explicit currency.
+ * Currency to send as RPC `filter_currency`.
+ * - With maxPrice: scopes results to that currency (default CAD).
+ * - With price sort alone: preference only — RPC groups that currency first
+ *   then sorts within each currency (does **not** hide other parks) — #51.
  */
 export function resolveGuestPriceCurrencyFilter(options: {
   currency?: GuestPriceCurrency;
   maxPrice?: number;
+  /** When `price` / `price-desc`, send preference even without maxPrice. */
+  sort?: string;
 }): GuestPriceCurrency | undefined {
-  if (options.maxPrice == null) return undefined;
+  const priceSort = options.sort === "price" || options.sort === "price-desc";
+  if (options.maxPrice == null && !priceSort) return undefined;
   return options.currency ?? GUEST_PRICE_CURRENCY;
 }
 

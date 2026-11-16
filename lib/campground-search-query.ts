@@ -260,11 +260,12 @@ export function buildCampgroundSearchParams(
   if (typesParam) params.set("types", typesParam);
   const maxPriceParam = formatGuestMaxPriceParam(next.maxPrice);
   if (maxPriceParam) params.set("maxPrice", maxPriceParam);
-  // Emit currency when maxPrice scopes amounts, or when not the CAD default so
-  // shared links keep a non-CAD preference. Price sort alone does not emit
-  // (must not hide other-currency parks — #51).
+  // Emit currency when maxPrice scopes amounts, when price-sorting (preference
+  // for grouping — does not hide other currencies), or when not CAD default.
+  const priceSort = next.sort === "price" || next.sort === "price-desc";
   const needsCurrency =
     maxPriceParam != null ||
+    priceSort ||
     (next.priceCurrency != null &&
       next.priceCurrency !== GUEST_PRICE_CURRENCY);
   if (needsCurrency) {
