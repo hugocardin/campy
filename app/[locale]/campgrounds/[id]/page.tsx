@@ -22,6 +22,10 @@ import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { isUuid } from "@/lib/is-uuid";
 import { routes } from "@/lib/routes";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
+import {
+  formatRigLength,
+  parseRigLengthUnit,
+} from "@/lib/site-rig-length";
 import { translateCode } from "@/lib/translate-code";
 import { MapPin } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -31,6 +35,7 @@ const PAGE_NAMESPACE = "campgrounds.CampgroundDetailsPage" as const;
 
 type PageProps = {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 type Translator = {
@@ -93,8 +98,16 @@ function groupAmenitiesForLocale(
     .sort((a, b) => a.categoryLabel.localeCompare(b.categoryLabel, locale));
 }
 
-export default async function CampgroundDetailsPage({ params }: PageProps) {
+export default async function CampgroundDetailsPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { locale, id } = await params;
+  const query = await searchParams;
+  const rawRigUnit = query.rigUnit;
+  const primaryRigUnit = parseRigLengthUnit(
+    Array.isArray(rawRigUnit) ? rawRigUnit[0] : rawRigUnit,
+  );
 
   if (!isUuid(id)) {
     notFound();
@@ -365,11 +378,13 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                             })()}
                           </TableCell>
                           <TableCell>
-                            {site.max_rig_length != null
-                              ? tSites("rigLengthFeet", {
-                                  length: Number(site.max_rig_length),
-                                })
-                              : "—"}
+                            {formatRigLength(Number(site.max_rig_length), {
+                              labels: {
+                                ft: tSites("form.rigLengthUnitFt"),
+                                m: tSites("form.rigLengthUnitM"),
+                              },
+                              primaryUnit: primaryRigUnit,
+                            }) ?? "—"}
                           </TableCell>
                           <TableCell>
                             {priceFormatter.format(

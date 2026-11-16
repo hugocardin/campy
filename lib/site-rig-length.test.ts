@@ -5,6 +5,7 @@ import {
   RIG_LENGTH_MAX_M,
   convertRigLengthDisplay,
   formatGuestRigLengthParam,
+  formatRigLength,
   formatRigLengthForDisplay,
   formatRigLengthUnitParam,
   isLodgingSiteType,
@@ -108,5 +109,21 @@ describe("site-rig-length", () => {
     assert.equal(formatRigLengthForDisplay(undefined, "m"), "");
     assert.equal(formatGuestRigLengthParam(35), "35");
     assert.equal(formatGuestRigLengthParam(35.12), "35.1");
+  });
+
+  it("formats dual ft/m for site cards (1 decimal)", () => {
+    const en = { ft: "ft", m: "m" };
+    const fr = { ft: "pi", m: "m" };
+    // 11 m stored as 36.1 ft (1-decimal metres→feet).
+    assert.equal(formatRigLength(36.1, { labels: en }), "36.1 ft (11 m)");
+    assert.equal(formatRigLength(36.1, { labels: fr }), "36.1 pi (11 m)");
+    assert.equal(
+      formatRigLength(36.1, { labels: en, primaryUnit: "m" }),
+      "11 m (36.1 ft)",
+    );
+    assert.equal(formatRigLength(35, { labels: en }), "35 ft (10.7 m)");
+    assert.equal(formatRigLength(undefined, { labels: en }), null);
+    assert.equal(formatRigLength(0, { labels: en }), null);
+    assert.equal(formatRigLength(-1, { labels: en }), null);
   });
 });

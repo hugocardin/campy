@@ -2,7 +2,6 @@
   "singular": "Emplacement",
   "plural": "Emplacements",
   "noResult": "Aucun emplacement",
-  "rigLengthFeet": "{length} pi",
 
   "types": {
     "TENT": "Tente",

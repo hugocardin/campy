@@ -6,7 +6,7 @@ import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Site } from "@/entities/sites";
 import { formatElectricityAmps } from "@/lib/electricity-amps";
-import { isLodgingSiteType } from "@/lib/site-rig-length";
+import { formatRigLength, isLodgingSiteType } from "@/lib/site-rig-length";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -104,11 +104,12 @@ export default function SiteViewClient({ site, amenities }: Props) {
                       {t_sites("form.maxRigLengthLabel")}
                     </h3>
                     <p>
-                      {site.max_rig_length != null
-                        ? t_sites("rigLengthFeet", {
-                            length: Number(site.max_rig_length),
-                          })
-                        : "—"}
+                      {formatRigLength(Number(site.max_rig_length), {
+                        labels: {
+                          ft: t_sites("form.rigLengthUnitFt"),
+                          m: t_sites("form.rigLengthUnitM"),
+                        },
+                      }) ?? "—"}
                     </p>
                   </div>
                   <div>

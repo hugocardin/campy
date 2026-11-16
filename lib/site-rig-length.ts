@@ -3,6 +3,7 @@
  *
  * Canonical storage is **feet** on `sites.max_rig_length` (and guest URL
  * `rigLength`). Metres are a display / input unit only; convert at the edge.
+ * Site-card / admin read views use {@link formatRigLength} (dual ft + m).
  *
  * Keep site-type rules in sync with SQL `sites_enforce_type_attributes`
  * (`supabase/migrations/20261116024448_*` / `20261116024947_*`).
@@ -141,6 +142,41 @@ export function formatRigLengthForDisplay(
   if (feet == null || !Number.isFinite(feet) || feet <= 0) return "";
   if (unit === "ft") return String(roundRigLength(feet, 1));
   return String(roundRigLength(feetToMetres(feet), 2));
+}
+
+export type FormatRigLengthLabels = {
+  /** Localized feet label (`ft` / `pi`). */
+  ft: string;
+  /** Localized metres label (`m`). */
+  m: string;
+};
+
+export type FormatRigLengthOptions = {
+  labels: FormatRigLengthLabels;
+  /**
+   * Leading unit; the other is shown in parentheses.
+   * Default `"ft"` (canonical storage). Guest pages may pass `rigUnit`.
+   */
+  primaryUnit?: RigLengthUnit;
+};
+
+/**
+ * Format canonical feet for site cards / admin read views (issue #34).
+ * Always shows both units, each rounded to 1 decimal
+ * (e.g. `36.1 ft (11 m)` or `11 m (36.1 ft)` when `primaryUnit` is `"m"`).
+ * Returns `null` when feet is missing / invalid so callers can render "—".
+ */
+export function formatRigLength(
+  feet: number | undefined | null,
+  options: FormatRigLengthOptions,
+): string | null {
+  if (feet == null || !Number.isFinite(feet) || feet <= 0) return null;
+  const ft = roundRigLength(feet, 1);
+  const m = roundRigLength(feetToMetres(feet), 1);
+  const { labels, primaryUnit = "ft" } = options;
+  const ftPart = `${ft} ${labels.ft}`;
+  const mPart = `${m} ${labels.m}`;
+  return primaryUnit === "m" ? `${mPart} (${ftPart})` : `${ftPart} (${mPart})`;
 }
 
 /**
