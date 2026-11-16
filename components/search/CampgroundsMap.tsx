@@ -4,6 +4,7 @@ import { Campground } from "@/entities/campground";
 import { Link } from "@/i18n/navigation";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 import L, { type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
@@ -44,6 +45,26 @@ function hasValidCoords(
   return Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 }
 
+/**
+ * Remember the last mappable result set across empty searches so pins are not
+ * blanked on soft navigation. Intentionally client-session only: a hard load /
+ * refresh / shared empty-search URL starts with no prior pins (passing a full
+ * catalog for that case is out of scope for #22).
+ *
+ * When the current search has results, always sync — including clearing when
+ * results exist but none are mappable — so sticky pins never lag two searches.
+ */
+function useStickyLocated(
+  locatedFromProps: LocatedCampground[],
+  isEmptySearch: boolean,
+): LocatedCampground[] {
+  const [stickyLocated, setStickyLocated] = useState(locatedFromProps);
+  if (!isEmptySearch && locatedFromProps !== stickyLocated) {
+    setStickyLocated(locatedFromProps);
+  }
+  return stickyLocated;
+}
+
 function FitMarkers({
   positions,
   searchCenter,
@@ -53,7 +74,7 @@ function FitMarkers({
   positions: LatLngTuple[];
   searchCenter?: LatLngTuple;
   radiusKm?: number;
-  /** When true (e.g. empty search), leave the current map view alone. */
+  /** When true (empty non-geo search), leave the current map view alone. */
   freezeView?: boolean;
 }) {
   const map = useMap();
@@ -117,25 +138,17 @@ export default function CampgroundsMap({
     [campgrounds],
   );
 
-  // Keep the last mappable set so an empty search does not blank pins.
-  // Adjust during render (React-approved) — avoids setState-in-effect / refs-in-render lint.
-  const [stickyLocated, setStickyLocated] = useState(locatedFromProps);
-  if (
-    locatedFromProps.length > 0 &&
-    locatedFromProps !== stickyLocated
-  ) {
-    setStickyLocated(locatedFromProps);
-  }
-
   const isEmptySearch = campgrounds.length === 0;
-  const withCoords =
-    isEmptySearch && stickyLocated.length > 0
-      ? stickyLocated
-      : locatedFromProps;
+  const stickyLocated = useStickyLocated(locatedFromProps, isEmptySearch);
+  const showingStalePins = isEmptySearch && stickyLocated.length > 0;
+  const displayedCampgrounds = showingStalePins
+    ? stickyLocated
+    : locatedFromProps;
 
   const positions: LatLngTuple[] = useMemo(
-    () => withCoords.map((c) => [c.location.lat, c.location.lng]),
-    [withCoords],
+    () =>
+      displayedCampgrounds.map((c) => [c.location.lat, c.location.lng]),
+    [displayedCampgrounds],
   );
 
   const centerLat = searchCenter?.lat;
@@ -154,11 +167,15 @@ export default function CampgroundsMap({
       : undefined;
 
   const showNoResultsOverlay = isEmptySearch;
+  // Use current-search located pins (not sticky) so geo + ungeocoded results
+  // still explain why the circle has no markers.
   const showMapEmptyOverlay =
-    !isEmptySearch && withCoords.length === 0 && !centerTuple;
+    !isEmptySearch && locatedFromProps.length === 0;
 
   return (
-    <div className={className ?? "absolute inset-0 h-full w-full"}>
+    <div
+      className={cn("relative", className ?? "absolute inset-0 h-full w-full")}
+    >
       <MapContainer
         center={centerTuple ?? positions[0] ?? DEFAULT_CENTER}
         zoom={positions.length === 1 && !centerTuple ? 9 : DEFAULT_ZOOM}
@@ -174,10 +191,12 @@ export default function CampgroundsMap({
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitMarkers
-          positions={positions}
+          // Empty search: don't pull the view toward leftover/stale pins;
+          // geo empty still fits the circle via searchCenter + radiusKm.
+          positions={isEmptySearch ? [] : positions}
           searchCenter={centerTuple}
           radiusKm={radiusKm}
-          freezeView={isEmptySearch}
+          freezeView={isEmptySearch && !centerTuple}
         />
         {centerTuple && radiusMeters != null ? (
           <Circle
@@ -207,10 +226,11 @@ export default function CampgroundsMap({
             </Popup>
           </CircleMarker>
         ) : null}
-        {withCoords.map((campground) => (
+        {displayedCampgrounds.map((campground) => (
           <Marker
             key={campground.id}
             position={[campground.location.lat, campground.location.lng]}
+            opacity={showingStalePins ? 0.5 : 1}
           >
             <Popup>
               <div className="space-y-1 min-w-40">
@@ -236,8 +256,11 @@ export default function CampgroundsMap({
       </MapContainer>
 
       {showNoResultsOverlay || showMapEmptyOverlay ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex justify-center p-3">
-          <p className="rounded-md border border-border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] flex justify-center pl-14 pr-3 pt-3">
+          <p
+            role="status"
+            className="max-w-[calc(100%-0.5rem)] rounded-md border border-border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm"
+          >
             {showNoResultsOverlay ? t("noResults") : t("mapEmpty")}
           </p>
         </div>
