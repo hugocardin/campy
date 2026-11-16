@@ -1,10 +1,7 @@
 import {
   type SiteHookupAmenityCode,
 } from "@/lib/amenities/hookup-codes";
-import {
-  formatGuestMaxPriceParam,
-  parseGuestMaxPrice,
-} from "@/lib/campground-price";
+import { parseGuestMaxPrice } from "@/lib/campground-price";
 import {
   type DrivewayType,
   parseDrivewayUrlParam,
@@ -16,7 +13,7 @@ import {
 } from "@/lib/electricity-amps";
 import {
   type GuestSiteTypeCode,
-  formatGuestSiteTypesParam,
+  campingSiteAttrsAllowed,
   parseGuestSiteTypes,
   siteTypesForStayKind,
 } from "@/lib/guest-site-types";
@@ -24,7 +21,6 @@ import { parseGuestRigLength } from "@/lib/site-rig-length";
 import {
   type StayKind,
   parseStayKind,
-  stayKindAllowsRigLength,
 } from "@/lib/stay-kind";
 
 export type CampgroundSort =
@@ -114,9 +110,6 @@ export const CAMPGROUND_COLUMN_SORT_CONFIG: Record<
   city: { column: "city", ascending: true },
   province: { column: "province", ascending: true },
 };
-
-/** @deprecated Prefer CAMPGROUND_COLUMN_SORT_CONFIG; kept for call-site clarity. */
-export const CAMPGROUND_SORT_CONFIG = CAMPGROUND_COLUMN_SORT_CONFIG;
 
 const CAMPGROUND_SORT_VALUES = new Set<string>([
   "name",
@@ -331,7 +324,11 @@ export function parseCampgroundSiteFilters(params: {
   maxPrice?: string;
 }): CampgroundSiteFilters {
   const stayKind = parseStayKind(params.stay);
-  const campingFilters = stayKindAllowsRigLength(stayKind);
+  const siteTypes = siteTypesForStayKind(
+    parseGuestSiteTypes(params.types),
+    stayKind,
+  );
+  const campingFilters = campingSiteAttrsAllowed(stayKind, siteTypes);
   return {
     ...parseCampgroundHookups(params),
     dumpStation: parseHookupFlag(params.dump),
@@ -342,10 +339,7 @@ export function parseCampgroundSiteFilters(params: {
       ? parseGuestRigLength(params.rigLength)
       : undefined,
     stayKind,
-    siteTypes: siteTypesForStayKind(
-      parseGuestSiteTypes(params.types),
-      stayKind,
-    ),
+    siteTypes,
     maxPrice: parseGuestMaxPrice(params.maxPrice),
   };
 }
@@ -367,8 +361,6 @@ export function anySiteFilterActive(filters: CampgroundSiteFilters): boolean {
     filters.maxPrice != null
   );
 }
-
-export { formatGuestMaxPriceParam, formatGuestSiteTypesParam };
 
 /** Serialize amp filters for URL (`none,15,30`). Empty → omit. */
 export function formatCampgroundAmpsParam(

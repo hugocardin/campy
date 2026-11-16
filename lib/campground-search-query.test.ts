@@ -198,4 +198,16 @@ describe("buildCampgroundSearchParams / clear", () => {
     });
     assert.deepEqual(next.siteTypes, []);
   });
+
+  it("clears rig/driveway when fine types become lodging-only", () => {
+    const next = withLatestCampgroundFilters(base, {
+      q: "lake",
+      sort: "name",
+      siteTypes: ["LODGING"],
+      stayKind: undefined,
+    });
+    assert.deepEqual(next.siteTypes, ["LODGING"]);
+    assert.equal(next.rigLength, undefined);
+    assert.equal(next.drivewayType, undefined);
+  });
 });

@@ -5,17 +5,18 @@ import {
   CampgroundSort,
   campgroundSortQueryValue,
   formatCampgroundAmpsParam,
-  formatGuestMaxPriceParam,
-  formatGuestSiteTypesParam,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
 import { provinceFilterKey } from "@/lib/canadian-provinces";
+import { formatGuestMaxPriceParam } from "@/lib/campground-price";
 import type { DrivewayType } from "@/lib/driveway-type";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import type { ElectricityAmpFilterOption } from "@/lib/electricity-amps";
 import { normalizeElectricityAmpFilters } from "@/lib/electricity-amps";
 import {
   type GuestSiteTypeCode,
+  campingSiteAttrsAllowed,
+  formatGuestSiteTypesParam,
   siteTypesForStayKind,
 } from "@/lib/guest-site-types";
 import {
@@ -24,7 +25,7 @@ import {
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import type { StayKind } from "@/lib/stay-kind";
-import { formatStayKindParam, stayKindAllowsRigLength } from "@/lib/stay-kind";
+import { formatStayKindParam } from "@/lib/stay-kind";
 
 export type CampgroundQueryState = {
   q: string;
@@ -64,14 +65,15 @@ export function withLatestCampgroundFilters(
 ): CampgroundQueryState {
   const stayKind =
     "stayKind" in patch ? patch.stayKind : latest.stayKind;
-  const campingOk = stayKindAllowsRigLength(stayKind);
+  const siteTypesRaw =
+    "siteTypes" in patch ? (patch.siteTypes ?? []) : latest.siteTypes;
+  const siteTypes = siteTypesForStayKind(siteTypesRaw, stayKind);
+  const campingOk = campingSiteAttrsAllowed(stayKind, siteTypes);
   const rigLengthRaw =
     "rigLength" in patch ? patch.rigLength : latest.rigLength;
   const rigUnitRaw = "rigUnit" in patch ? patch.rigUnit : latest.rigUnit;
   const drivewayRaw =
     "drivewayType" in patch ? patch.drivewayType : latest.drivewayType;
-  const siteTypesRaw =
-    "siteTypes" in patch ? (patch.siteTypes ?? []) : latest.siteTypes;
   const maxPriceRaw =
     "maxPrice" in patch ? patch.maxPrice : latest.maxPrice;
   return {
@@ -87,14 +89,14 @@ export function withLatestCampgroundFilters(
     sewer: patch.sewer ?? latest.sewer,
     dumpStation: patch.dumpStation ?? latest.dumpStation,
     stayKind,
-    // Drop rig + driveway when lodging (cabins; issue #27).
+    // Drop fine types incompatible with coarse stay (#24).
+    siteTypes,
+    // Drop rig + driveway when lodging stay or lodging-only fine types (#27/#40).
     drivewayType: campingOk ? drivewayRaw : undefined,
     rigLength: campingOk ? rigLengthRaw : undefined,
     // Keep unit preference through lodging so camping↔lodging restores the toggle
     // (also emitted in the URL — see buildCampgroundSearchParams).
     rigUnit: rigUnitRaw === "m" ? "m" : undefined,
-    // Drop fine types incompatible with coarse stay (#24).
-    siteTypes: siteTypesForStayKind(siteTypesRaw, stayKind),
     maxPrice: maxPriceRaw,
   };
 }
@@ -123,7 +125,8 @@ export function siteFiltersFromQueryState(
     | "maxPrice"
   >,
 ): CampgroundSiteFilters {
-  const campingOk = stayKindAllowsRigLength(state.stayKind);
+  const siteTypes = siteTypesForStayKind(state.siteTypes, state.stayKind);
+  const campingOk = campingSiteAttrsAllowed(state.stayKind, siteTypes);
   return {
     amps: state.amps,
     water: state.water,
@@ -132,7 +135,7 @@ export function siteFiltersFromQueryState(
     drivewayType: campingOk ? state.drivewayType : undefined,
     rigLength: campingOk ? state.rigLength : undefined,
     stayKind: state.stayKind,
-    siteTypes: siteTypesForStayKind(state.siteTypes, state.stayKind),
+    siteTypes,
     maxPrice: state.maxPrice,
   };
 }
@@ -191,11 +194,11 @@ export function buildCampgroundSearchParams(
   if (next.water) params.set("water", "1");
   if (next.sewer) params.set("sewer", "1");
   if (next.dumpStation) params.set("dump", "1");
-  const drivewayParam = formatDrivewayUrlParam(next.drivewayType);
-  if (drivewayParam) params.set("driveway", drivewayParam);
   const stayParam = formatStayKindParam(next.stayKind);
   if (stayParam) params.set("stay", stayParam);
-  if (stayKindAllowsRigLength(next.stayKind)) {
+  if (campingSiteAttrsAllowed(next.stayKind, next.siteTypes)) {
+    const drivewayParam = formatDrivewayUrlParam(next.drivewayType);
+    if (drivewayParam) params.set("driveway", drivewayParam);
     const rigParam = formatGuestRigLengthParam(next.rigLength);
     if (rigParam) params.set("rigLength", rigParam);
   }

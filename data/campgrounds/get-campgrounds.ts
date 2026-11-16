@@ -12,17 +12,17 @@ import {
   SEARCH_CAMPGROUNDS_LIMIT,
   campgroundRadiusMeters,
   formatCampgroundAmpsParam,
-  formatGuestMaxPriceParam,
-  formatGuestSiteTypesParam,
   isCampgroundPriceSort,
   parseCampgroundSiteFilters,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
+import { formatGuestMaxPriceParam } from "@/lib/campground-price";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
+import { formatGuestSiteTypesParam } from "@/lib/guest-site-types";
 import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
 import { formatStayKindParam } from "@/lib/stay-kind";
 import { getSupabaseAnon } from "@/lib/supabase/anon-server";
@@ -69,23 +69,23 @@ type CampgroundRow = {
   min_price_per_night?: number | null;
 };
 
-function toCoord(value: number | null): number | null {
+function toFiniteNumber(value: number | null | undefined): number | null {
   if (value == null) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
 export function toCampgroundDomain(row: CampgroundRow): Campground {
-  const lat = toCoord(row.latitude);
-  const lng = toCoord(row.longitude);
+  const lat = toFiniteNumber(row.latitude);
+  const lng = toFiniteNumber(row.longitude);
   const location =
     lat != null && lng != null ? { lat, lng } : null;
   const distanceMeters =
-    row.distance_m == null ? undefined : toCoord(row.distance_m);
+    row.distance_m == null ? undefined : toFiniteNumber(row.distance_m);
   const minPrice =
     row.min_price_per_night == null
       ? undefined
-      : toCoord(Number(row.min_price_per_night));
+      : toFiniteNumber(Number(row.min_price_per_night));
 
   return {
     id: row.id,
@@ -103,6 +103,13 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
   };
 }
 
+/** Stable name+id tie-break (matches SQL `lower(name), id`). */
+function compareCampgroundNameId(a: Campground, b: Campground): number {
+  const byName = a.name.localeCompare(b.name, "en", { sensitivity: "base" });
+  if (byName !== 0) return byName;
+  return a.id.localeCompare(b.id);
+}
+
 function sortCampgrounds(
   campgrounds: Campground[],
   sort: CampgroundSort,
@@ -111,11 +118,11 @@ function sortCampgrounds(
     return [...campgrounds].sort((a, b) => {
       const ad = a.distanceMeters;
       const bd = b.distanceMeters;
-      if (ad == null && bd == null) return a.name.localeCompare(b.name);
+      if (ad == null && bd == null) return compareCampgroundNameId(a, b);
       if (ad == null) return 1;
       if (bd == null) return -1;
       if (ad !== bd) return ad - bd;
-      return a.name.localeCompare(b.name);
+      return compareCampgroundNameId(a, b);
     });
   }
 
@@ -124,11 +131,11 @@ function sortCampgrounds(
     return [...campgrounds].sort((a, b) => {
       const ap = a.minPricePerNight;
       const bp = b.minPricePerNight;
-      if (ap == null && bp == null) return a.name.localeCompare(b.name);
+      if (ap == null && bp == null) return compareCampgroundNameId(a, b);
       if (ap == null) return 1;
       if (bp == null) return -1;
       if (ap !== bp) return (ap - bp) * dir;
-      return a.name.localeCompare(b.name);
+      return compareCampgroundNameId(a, b);
     });
   }
 
@@ -144,10 +151,10 @@ function sortCampgrounds(
   return [...campgrounds].sort((a, b) => {
     const av = (a[column] ?? "").toString();
     const bv = (b[column] ?? "").toString();
-    const primary = av.localeCompare(bv) * dir;
+    const primary =
+      av.localeCompare(bv, "en", { sensitivity: "base" }) * dir;
     if (primary !== 0) return primary;
-    if (column === "name") return 0;
-    return a.name.localeCompare(b.name);
+    return compareCampgroundNameId(a, b);
   });
 }
 
@@ -353,9 +360,11 @@ export const getCampgrounds = cache(
       const nonGeoSort =
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
 
-      // Always use search_campgrounds for non-geo (#24): unaccent/trigram,
+      // Always use search_campgrounds for non-geo (#24/#40): unaccent/trigram,
       // site filters, min_price_per_night, ORDER BY + LIMIT in SQL.
-      // Trust SQL order (no JS re-sort). Fetch limit+1 to detect truncation.
+      // RPC defers min_price to post-LIMIT when not site-filtering / price-sorting
+      // (sites already indexed on campground_id). Trust SQL order (no JS re-sort).
+      // Fetch limit+1 to detect truncation.
       const result = await handleDbResponse(
         supabase.rpc("search_campgrounds", {
           q: term || null,

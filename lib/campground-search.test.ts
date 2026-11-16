@@ -242,6 +242,17 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
     assert.equal(filters.drivewayType, undefined);
   });
 
+  it("ignores rig length and driveway when fine types are lodging-only", () => {
+    const filters = parseCampgroundSiteFilters({
+      types: "lodging",
+      rigLength: "40",
+      driveway: "pull_through",
+    });
+    assert.deepEqual(filters.siteTypes, ["LODGING"]);
+    assert.equal(filters.rigLength, undefined);
+    assert.equal(filters.drivewayType, undefined);
+  });
+
   it("parses fine site types and maxPrice; drops types incompatible with stay", () => {
     assert.deepEqual(
       parseCampgroundSiteFilters({

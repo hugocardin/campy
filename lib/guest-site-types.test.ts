@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  campingSiteAttrsAllowed,
   formatGuestSiteTypesParam,
   normalizeGuestSiteTypes,
   parseGuestSiteTypes,
@@ -43,6 +44,19 @@ describe("siteTypesForStayKind", () => {
     assert.deepEqual(
       siteTypesForStayKind(["TENT", "LODGING"], undefined),
       ["TENT", "LODGING"],
+    );
+  });
+});
+
+describe("campingSiteAttrsAllowed", () => {
+  it("hides rig/driveway for lodging stay or lodging-only fine types", () => {
+    assert.equal(campingSiteAttrsAllowed(undefined, []), true);
+    assert.equal(campingSiteAttrsAllowed("camping", ["TENT"]), true);
+    assert.equal(campingSiteAttrsAllowed("lodging", []), false);
+    assert.equal(campingSiteAttrsAllowed(undefined, ["LODGING"]), false);
+    assert.equal(
+      campingSiteAttrsAllowed(undefined, ["TENT", "LODGING"]),
+      true,
     );
   });
 });

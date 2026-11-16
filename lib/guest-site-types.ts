@@ -94,3 +94,19 @@ export function stayKindAllowsCampingSiteTypes(
 ): boolean {
   return stayKindAllowsRigLength(stay);
 }
+
+/**
+ * Rig length / driveway apply unless the guest is lodging-only:
+ * coarse `stay=lodging`, or fine types exactly `[LODGING]`.
+ */
+export function campingSiteAttrsAllowed(
+  stayKind: StayKind | undefined | null,
+  siteTypes: readonly GuestSiteTypeCode[] | undefined | null,
+): boolean {
+  if (!stayKindAllowsRigLength(stayKind)) return false;
+  const normalized = normalizeGuestSiteTypes(siteTypes);
+  if (normalized.length === 1 && isLodgingSiteType(normalized[0])) {
+    return false;
+  }
+  return true;
+}

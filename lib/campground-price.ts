@@ -1,8 +1,12 @@
 /**
  * Guest max-price filter helpers (issue #24).
- * Canonical unit: currency amount per night (CAD in seed data).
+ * MVP: amounts are **CAD base** nightly prices (`sites.price_per_night_base`).
+ * Multi-currency and `pricing_rules` effective prices are Phase D / later.
  * RPC rejects ≤0 and > {@link GUEST_MAX_PRICE_CAP}.
  */
+
+/** Display / compare currency until campgrounds carry a currency column. */
+export const GUEST_PRICE_CURRENCY = "CAD";
 
 /** Upper bound accepted by search RPCs / URL parsers. */
 export const GUEST_MAX_PRICE_CAP = 100_000;
@@ -32,18 +36,20 @@ export function formatGuestMaxPriceParam(
 }
 
 /**
- * Format a nightly price for cards / controls (CAD).
+ * Format a nightly **base** price for cards / controls ({@link GUEST_PRICE_CURRENCY}).
  * Returns null when missing / non-finite.
  */
 export function formatCampgroundPricePerNight(
   amount: number | null | undefined,
   locale: string,
-  currency = "CAD",
+  currency = GUEST_PRICE_CURRENCY,
 ): string | null {
   if (amount == null || !Number.isFinite(amount)) return null;
+  const fractionDigits = amount % 1 === 0 ? 0 : 2;
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
-    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(amount);
 }

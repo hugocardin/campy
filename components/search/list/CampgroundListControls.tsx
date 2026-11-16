@@ -52,6 +52,7 @@ import type { SearchSuggestion } from "@/lib/geocoding/types";
 import {
   GUEST_SITE_TYPE_CODES,
   type GuestSiteTypeCode,
+  campingSiteAttrsAllowed,
   normalizeGuestSiteTypes,
 } from "@/lib/guest-site-types";
 import { routes } from "@/lib/routes";
@@ -64,7 +65,6 @@ import {
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import type { StayKind } from "@/lib/stay-kind";
-import { stayKindAllowsRigLength } from "@/lib/stay-kind";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -429,12 +429,8 @@ export default function CampgroundListControls({
   function resolveMaxPriceDraft(): number | undefined {
     const draft = maxPriceDraftRef.current.trim();
     if (draft === "") return undefined;
-    const parsed = parseGuestMaxPrice(draft);
-    if (parsed == null) {
-      updateMaxPriceDraft("");
-      return undefined;
-    }
-    return parsed;
+    // Keep invalid mid-typing drafts in the field; only apply when parseable.
+    return parseGuestMaxPrice(draft);
   }
 
   function takePendingMaxPrice(): number | undefined {
@@ -463,7 +459,7 @@ export default function CampgroundListControls({
     setLocalFilters(siteFiltersFromQueryState(next));
     updateRigUnit(nextUnit);
     // Do not overwrite mid-typing drafts here — external URL sync does that.
-    if (!stayKindAllowsRigLength(next.stayKind)) {
+    if (!campingSiteAttrsAllowed(next.stayKind, next.siteTypes)) {
       updateRigDraft("");
     }
     latestParamsRef.current = next;
@@ -613,7 +609,7 @@ export default function CampgroundListControls({
         q: search,
         ...leavePatch,
         place: undefined,
-        rigLength: stayKindAllowsRigLength(latest.stayKind)
+        rigLength: campingSiteAttrsAllowed(latest.stayKind, latest.siteTypes)
           ? rigLength
           : undefined,
         maxPrice,
@@ -694,7 +690,10 @@ export default function CampgroundListControls({
   const selectedAmps = new Set(localFilters.amps);
   const selectedSiteTypes = new Set(localFilters.siteTypes);
   // Rig + driveway are camping/RV site attributes (hidden for lodging searches).
-  const showCampingSiteAttrs = stayKindAllowsRigLength(localFilters.stayKind);
+  const showCampingSiteAttrs = campingSiteAttrsAllowed(
+    localFilters.stayKind,
+    localFilters.siteTypes,
+  );
   // Fine site-type checkboxes: hide LODGING when stay=camping and vice versa.
   const visibleSiteTypes = GUEST_SITE_TYPE_CODES.filter((code) => {
     if (localFilters.stayKind === "lodging") return code === "LODGING";
