@@ -1,6 +1,7 @@
 import {
   type SiteHookupAmenityCode,
 } from "@/lib/amenities/hookup-codes";
+import { parseGuestMaxPrice } from "@/lib/campground-price";
 import {
   type DrivewayType,
   parseDrivewayUrlParam,
@@ -10,11 +11,16 @@ import {
   type ElectricityAmpFilterOption,
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
+import {
+  type GuestSiteTypeCode,
+  campingSiteAttrsAllowed,
+  parseGuestSiteTypes,
+  siteTypesForStayKind,
+} from "@/lib/guest-site-types";
 import { parseGuestRigLength } from "@/lib/site-rig-length";
 import {
   type StayKind,
   parseStayKind,
-  stayKindAllowsRigLength,
 } from "@/lib/stay-kind";
 
 export type CampgroundSort =
@@ -22,7 +28,9 @@ export type CampgroundSort =
   | "name-desc"
   | "city"
   | "province"
-  | "distance";
+  | "distance"
+  | "price"
+  | "price-desc";
 
 /**
  * Guest list/near page size. SQL RPCs must allow at least this + 1 so the app
@@ -55,13 +63,17 @@ export type CampgroundHookupFilters = {
   sewer: boolean;
 };
 
-/** Guest site/park filters beyond geo/province (issue #25/#26/#27). */
+/** Guest site/park filters beyond geo/province (issue #25/#26/#27/#24). */
 export type CampgroundSiteFilters = CampgroundHookupFilters & {
   dumpStation: boolean;
   drivewayType?: DrivewayType;
   /** Guest rig length in canonical feet; ignored when stay is lodging. */
   rigLength?: number;
   stayKind?: StayKind;
+  /** Fine site types (TENT/RV/…); AND with stay when both set. */
+  siteTypes: GuestSiteTypeCode[];
+  /** Max nightly base price on a matching site (CAD). */
+  maxPrice?: number;
 };
 
 export type CampgroundListFilters = {
@@ -78,6 +90,8 @@ export type CampgroundListFilters = {
   drivewayType?: DrivewayType;
   rigLength?: number;
   stayKind?: StayKind;
+  siteTypes?: GuestSiteTypeCode[];
+  maxPrice?: number;
 };
 
 export type CampgroundGeo = {
@@ -86,8 +100,9 @@ export type CampgroundGeo = {
   radiusKm: CampgroundRadiusKm;
 };
 
-export const CAMPGROUND_SORT_CONFIG: Record<
-  Exclude<CampgroundSort, "distance">,
+/** Name/city/province sorts that map to a column on Campground / v_campgrounds. */
+export const CAMPGROUND_COLUMN_SORT_CONFIG: Record<
+  "name" | "name-desc" | "city" | "province",
   { column: "name" | "city" | "province"; ascending: boolean }
 > = {
   name: { column: "name", ascending: true },
@@ -96,6 +111,16 @@ export const CAMPGROUND_SORT_CONFIG: Record<
   province: { column: "province", ascending: true },
 };
 
+const CAMPGROUND_SORT_VALUES = new Set<string>([
+  "name",
+  "name-desc",
+  "city",
+  "province",
+  "distance",
+  "price",
+  "price-desc",
+]);
+
 export function parseCampgroundSort(
   value: string | undefined,
   options?: { geoActive?: boolean },
@@ -103,11 +128,16 @@ export function parseCampgroundSort(
   if (value === "distance") {
     return options?.geoActive ? "distance" : "name";
   }
-  if (value && Object.hasOwn(CAMPGROUND_SORT_CONFIG, value)) {
-    return value as Exclude<CampgroundSort, "distance">;
+  if (value && CAMPGROUND_SORT_VALUES.has(value) && value !== "distance") {
+    return value as CampgroundSort;
   }
   // Geo default: closest first. Non-geo default: name A–Z.
   return options?.geoActive ? "distance" : "name";
+}
+
+/** True when sort needs min_price_per_night from search RPCs. */
+export function isCampgroundPriceSort(sort: CampgroundSort): boolean {
+  return sort === "price" || sort === "price-desc";
 }
 
 /** Default sort for the current mode — omit from the URL when active. */
@@ -277,8 +307,9 @@ export function parseCampgroundHookups(params: {
 }
 
 /**
- * Parse dump / driveway / rig / stay URL params (issue #27).
- * Rig length and driveway are ignored when stay=lodging (cabin sites).
+ * Parse dump / driveway / rig / stay / types / maxPrice URL params
+ * (issues #27 / #24). Rig length and driveway are ignored when stay=lodging.
+ * Fine site types incompatible with stay are dropped.
  */
 export function parseCampgroundSiteFilters(params: {
   amps?: string;
@@ -289,9 +320,15 @@ export function parseCampgroundSiteFilters(params: {
   driveway?: string;
   rigLength?: string;
   stay?: string;
+  types?: string;
+  maxPrice?: string;
 }): CampgroundSiteFilters {
   const stayKind = parseStayKind(params.stay);
-  const campingFilters = stayKindAllowsRigLength(stayKind);
+  const siteTypes = siteTypesForStayKind(
+    parseGuestSiteTypes(params.types),
+    stayKind,
+  );
+  const campingFilters = campingSiteAttrsAllowed(stayKind, siteTypes);
   return {
     ...parseCampgroundHookups(params),
     dumpStation: parseHookupFlag(params.dump),
@@ -302,6 +339,8 @@ export function parseCampgroundSiteFilters(params: {
       ? parseGuestRigLength(params.rigLength)
       : undefined,
     stayKind,
+    siteTypes,
+    maxPrice: parseGuestMaxPrice(params.maxPrice),
   };
 }
 
@@ -317,7 +356,9 @@ export function anySiteFilterActive(filters: CampgroundSiteFilters): boolean {
     filters.dumpStation ||
     filters.drivewayType != null ||
     filters.rigLength != null ||
-    filters.stayKind != null
+    filters.stayKind != null ||
+    filters.siteTypes.length > 0 ||
+    filters.maxPrice != null
   );
 }
 

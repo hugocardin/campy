@@ -23,6 +23,8 @@ const base = {
   drivewayType: "PULL_THROUGH" as const,
   rigLength: 35,
   stayKind: "camping" as const,
+  siteTypes: ["TENT" as const, "RV" as const],
+  maxPrice: 80,
 };
 
 describe("withLatestCampgroundFilters", () => {
@@ -64,7 +66,7 @@ describe("withLatestCampgroundFilters", () => {
 });
 
 describe("buildCampgroundSearchParams / clear", () => {
-  it("emits dump, driveway, rigLength, stay", () => {
+  it("emits dump, driveway, rigLength, stay, types, maxPrice", () => {
     const params = buildCampgroundSearchParams({
       ...base,
       lat: undefined,
@@ -80,6 +82,8 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.get("rigLength"), "35");
     assert.equal(params.get("rigUnit"), null);
     assert.equal(params.get("stay"), "camping");
+    assert.equal(params.get("types"), "tent,rv");
+    assert.equal(params.get("maxPrice"), "80");
   });
 
   it("emits rigUnit=m when metres selected (rigLength stays feet)", () => {
@@ -175,12 +179,35 @@ describe("buildCampgroundSearchParams / clear", () => {
         drivewayType: "BACK_IN",
         rigLength: 28,
         stayKind: "camping",
+        siteTypes: ["TENT"],
+        maxPrice: 60,
       }),
-      "none,30|0|1|1|BACK_IN|28|camping",
+      "none,30|0|1|1|BACK_IN|28|camping|tent|60",
     );
     assert.equal(
       hookupsKey({ amps: [], water: false, sewer: false }),
       "|0|0",
     );
+  });
+
+  it("clears camping site types when switching to lodging", () => {
+    const next = withLatestCampgroundFilters(base, {
+      q: "lake",
+      sort: "name",
+      stayKind: "lodging",
+    });
+    assert.deepEqual(next.siteTypes, []);
+  });
+
+  it("clears rig/driveway when fine types become lodging-only", () => {
+    const next = withLatestCampgroundFilters(base, {
+      q: "lake",
+      sort: "name",
+      siteTypes: ["LODGING"],
+      stayKind: undefined,
+    });
+    assert.deepEqual(next.siteTypes, ["LODGING"]);
+    assert.equal(next.rigLength, undefined);
+    assert.equal(next.drivewayType, undefined);
   });
 });

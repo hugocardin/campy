@@ -49,6 +49,8 @@ describe("parseCampgroundSort", () => {
   it("accepts known sorts and defaults otherwise", () => {
     assert.equal(parseCampgroundSort("city"), "city");
     assert.equal(parseCampgroundSort("name-desc"), "name-desc");
+    assert.equal(parseCampgroundSort("price"), "price");
+    assert.equal(parseCampgroundSort("price-desc"), "price-desc");
     assert.equal(parseCampgroundSort(undefined), "name");
     assert.equal(parseCampgroundSort("nope"), "name");
   });
@@ -205,7 +207,7 @@ describe("hookup URL filters", () => {
   });
 });
 
-describe("site filters (dump / driveway / rig / stay)", () => {
+describe("site filters (dump / driveway / rig / stay / types / price)", () => {
   it("parses dump driveway rig stay URL params", () => {
     assert.deepEqual(
       parseCampgroundSiteFilters({
@@ -223,6 +225,8 @@ describe("site filters (dump / driveway / rig / stay)", () => {
         drivewayType: "PULL_THROUGH",
         rigLength: 35,
         stayKind: "camping",
+        siteTypes: [],
+        maxPrice: undefined,
       },
     );
   });
@@ -238,6 +242,32 @@ describe("site filters (dump / driveway / rig / stay)", () => {
     assert.equal(filters.drivewayType, undefined);
   });
 
+  it("ignores rig length and driveway when fine types are lodging-only", () => {
+    const filters = parseCampgroundSiteFilters({
+      types: "lodging",
+      rigLength: "40",
+      driveway: "pull_through",
+    });
+    assert.deepEqual(filters.siteTypes, ["LODGING"]);
+    assert.equal(filters.rigLength, undefined);
+    assert.equal(filters.drivewayType, undefined);
+  });
+
+  it("parses fine site types and maxPrice; drops types incompatible with stay", () => {
+    assert.deepEqual(
+      parseCampgroundSiteFilters({
+        types: "tent,rv,lodging",
+        maxPrice: "75",
+        stay: "camping",
+      }).siteTypes,
+      ["TENT", "RV"],
+    );
+    assert.equal(
+      parseCampgroundSiteFilters({ maxPrice: "75" }).maxPrice,
+      75,
+    );
+  });
+
   it("detects any site filter active", () => {
     assert.equal(
       anySiteFilterActive({
@@ -245,6 +275,7 @@ describe("site filters (dump / driveway / rig / stay)", () => {
         water: false,
         sewer: false,
         dumpStation: false,
+        siteTypes: [],
       }),
       false,
     );
@@ -254,6 +285,28 @@ describe("site filters (dump / driveway / rig / stay)", () => {
         water: false,
         sewer: false,
         dumpStation: true,
+        siteTypes: [],
+      }),
+      true,
+    );
+    assert.equal(
+      anySiteFilterActive({
+        amps: [],
+        water: false,
+        sewer: false,
+        dumpStation: false,
+        siteTypes: ["TENT"],
+      }),
+      true,
+    );
+    assert.equal(
+      anySiteFilterActive({
+        amps: [],
+        water: false,
+        sewer: false,
+        dumpStation: false,
+        siteTypes: [],
+        maxPrice: 40,
       }),
       true,
     );

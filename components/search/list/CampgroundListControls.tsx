@@ -30,9 +30,15 @@ import {
   roundCampgroundCoord,
 } from "@/lib/campground-search";
 import {
+  GUEST_MAX_PRICE_CAP,
+  formatGuestMaxPriceParam,
+  parseGuestMaxPrice,
+} from "@/lib/campground-price";
+import {
   CampgroundQueryState,
   buildCampgroundSearchParams,
   clearedCampgroundQueryState,
+  siteFiltersFromQueryState,
   siteFiltersKey,
   withLatestCampgroundFilters,
 } from "@/lib/campground-search-query";
@@ -43,6 +49,12 @@ import {
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
 import type { SearchSuggestion } from "@/lib/geocoding/types";
+import {
+  GUEST_SITE_TYPE_CODES,
+  type GuestSiteTypeCode,
+  campingSiteAttrsAllowed,
+  normalizeGuestSiteTypes,
+} from "@/lib/guest-site-types";
 import { routes } from "@/lib/routes";
 import {
   convertRigLengthDisplay,
@@ -53,7 +65,6 @@ import {
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import type { StayKind } from "@/lib/stay-kind";
-import { stayKindAllowsRigLength } from "@/lib/stay-kind";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -95,6 +106,16 @@ const HOOKUP_AMENITY_FILTERS: {
   { key: "sewer", labelKey: "filterSewer" },
 ];
 
+const SITE_TYPE_LABEL_KEYS: Record<
+  GuestSiteTypeCode,
+  "siteTypeTENT" | "siteTypeRV" | "siteTypeRV_AND_TENT" | "siteTypeLODGING"
+> = {
+  TENT: "siteTypeTENT",
+  RV: "siteTypeRV",
+  RV_AND_TENT: "siteTypeRV_AND_TENT",
+  LODGING: "siteTypeLODGING",
+};
+
 function toggleAmpFilter(
   current: ElectricityAmpFilterOption[],
   value: ElectricityAmpFilterOption,
@@ -117,6 +138,8 @@ function queryStateFromFilters(
     | "rigLength"
     | "rigUnit"
     | "stayKind"
+    | "siteTypes"
+    | "maxPrice"
   >,
   filters: ReturnType<typeof parseCampgroundSiteFilters>,
   rigUnit?: RigLengthUnit,
@@ -131,7 +154,20 @@ function queryStateFromFilters(
     rigLength: filters.rigLength,
     rigUnit: rigUnit === "m" ? "m" : undefined,
     stayKind: filters.stayKind,
+    siteTypes: filters.siteTypes,
+    maxPrice: filters.maxPrice,
   };
+}
+
+function toggleSiteTypeFilter(
+  current: GuestSiteTypeCode[],
+  value: GuestSiteTypeCode,
+  checked: boolean,
+): GuestSiteTypeCode[] {
+  const set = new Set(normalizeGuestSiteTypes(current));
+  if (checked) set.add(value);
+  else set.delete(value);
+  return normalizeGuestSiteTypes([...set]);
 }
 
 export default function CampgroundListControls({
@@ -172,6 +208,8 @@ export default function CampgroundListControls({
     driveway: searchParams.get("driveway") ?? undefined,
     rigLength: searchParams.get("rigLength") ?? undefined,
     stay: searchParams.get("stay") ?? undefined,
+    types: searchParams.get("types") ?? undefined,
+    maxPrice: searchParams.get("maxPrice") ?? undefined,
   });
   const urlRigUnit = parseRigLengthUnit(searchParams.get("rigUnit"));
   const urlFiltersKey = siteFiltersKey(urlFilters);
@@ -203,12 +241,17 @@ export default function CampgroundListControls({
   const [rigDraft, setRigDraft] = useState(
     formatRigLengthForDisplay(urlFilters.rigLength, urlRigUnit),
   );
+  const [maxPriceDraft, setMaxPriceDraft] = useState(
+    formatGuestMaxPriceParam(urlFilters.maxPrice) ?? "",
+  );
   // Ref so search debounce flush never reads a stale rigDraft closure.
   const rigDraftRef = useRef(rigDraft);
   const rigUnitRef = useRef(rigUnit);
+  const maxPriceDraftRef = useRef(maxPriceDraft);
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const rigDebounceRef = useRef<number | null>(null);
+  const maxPriceDebounceRef = useRef<number | null>(null);
   /** True after editing away from a place label until the leave navigation lands. */
   const [leavePlacePending, setLeavePlacePending] = useState(false);
   const geoRequestIdRef = useRef(0);
@@ -261,6 +304,7 @@ export default function CampgroundListControls({
       // setState only during render (react-hooks/refs); effects sync refs below.
       setRigUnit(urlRigUnit);
       setRigDraft(formatRigLengthForDisplay(urlFilters.rigLength, urlRigUnit));
+      setMaxPriceDraft(formatGuestMaxPriceParam(urlFilters.maxPrice) ?? "");
     }
     setLocalFilters(urlFilters);
   }
@@ -310,6 +354,10 @@ export default function CampgroundListControls({
   useEffect(() => {
     rigUnitRef.current = rigUnit;
   }, [rigUnit]);
+
+  useEffect(() => {
+    maxPriceDraftRef.current = maxPriceDraft;
+  }, [maxPriceDraft]);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -373,6 +421,27 @@ export default function CampgroundListControls({
     return latestParamsRef.current.rigLength;
   }
 
+  function updateMaxPriceDraft(value: string) {
+    maxPriceDraftRef.current = value;
+    setMaxPriceDraft(value);
+  }
+
+  function resolveMaxPriceDraft(): number | undefined {
+    const draft = maxPriceDraftRef.current.trim();
+    if (draft === "") return undefined;
+    // Keep invalid mid-typing drafts in the field; only apply when parseable.
+    return parseGuestMaxPrice(draft);
+  }
+
+  function takePendingMaxPrice(): number | undefined {
+    if (maxPriceDebounceRef.current != null) {
+      window.clearTimeout(maxPriceDebounceRef.current);
+      maxPriceDebounceRef.current = null;
+      return resolveMaxPriceDraft();
+    }
+    return latestParamsRef.current.maxPrice;
+  }
+
   function cancelGeolocation() {
     geoRequestIdRef.current += 1;
     setGeoBusy(false);
@@ -383,22 +452,14 @@ export default function CampgroundListControls({
     setLastPushedQ(trimmedQ);
     setActivePlace(next.place);
     setPrevPlaceLabel(next.place);
-    const nextKey = siteFiltersKey(next);
+    const nextKey = siteFiltersKey(siteFiltersFromQueryState(next));
     const nextUnit: RigLengthUnit = next.rigUnit === "m" ? "m" : "ft";
     setLastPushedFiltersKey(nextKey);
     setLastPushedRigUnit(nextUnit);
-    setLocalFilters({
-      amps: next.amps,
-      water: next.water,
-      sewer: next.sewer,
-      dumpStation: next.dumpStation,
-      drivewayType: next.drivewayType,
-      rigLength: next.rigLength,
-      stayKind: next.stayKind,
-    });
+    setLocalFilters(siteFiltersFromQueryState(next));
     updateRigUnit(nextUnit);
-    // Do not overwrite mid-typing rigDraft here — external URL sync does that.
-    if (!stayKindAllowsRigLength(next.stayKind)) {
+    // Do not overwrite mid-typing drafts here — external URL sync does that.
+    if (!campingSiteAttrsAllowed(next.stayKind, next.siteTypes)) {
       updateRigDraft("");
     }
     latestParamsRef.current = next;
@@ -490,7 +551,7 @@ export default function CampgroundListControls({
     );
   }
 
-  /** Apply a filter patch; flush any pending rig draft so it is not dropped. */
+  /** Apply a filter patch; flush pending rig / max-price drafts so they are not dropped. */
   function replaceWithFilters(
     patch: Parameters<typeof withLatestCampgroundFilters>[1],
   ) {
@@ -505,6 +566,7 @@ export default function CampgroundListControls({
         : undefined;
     if (leavePlacePending) setLeavePlacePending(false);
     const rigLength = takePendingRigLength();
+    const maxPrice = takePendingMaxPrice();
     replaceQuery(
       withLatestCampgroundFilters(latest, {
         ...leavePatch,
@@ -513,6 +575,7 @@ export default function CampgroundListControls({
         sort: patch.sort ?? leavePatch?.sort ?? latest.sort,
         // Flush only when camping stays allowed; lodging clears via withLatest.
         ...("rigLength" in patch ? {} : { rigLength }),
+        ...("maxPrice" in patch ? {} : { maxPrice }),
       }),
     );
   }
@@ -537,6 +600,7 @@ export default function CampgroundListControls({
       setLeavePlacePending(false);
       const latest = latestParamsRef.current;
       const rigLength = takePendingRigLength();
+      const maxPrice = takePendingMaxPrice();
       // Sync effect may have restored URL geo + distance sort into the ref;
       // when leaving place, clear those here in the same navigation as typed q.
       const leavePatch = leavingPlace ? leavePlaceUrlPatch(latest) : {};
@@ -545,9 +609,10 @@ export default function CampgroundListControls({
         q: search,
         ...leavePatch,
         place: undefined,
-        rigLength: stayKindAllowsRigLength(latest.stayKind)
+        rigLength: campingSiteAttrsAllowed(latest.stayKind, latest.siteTypes)
           ? rigLength
           : undefined,
+        maxPrice,
       });
     }, 300);
 
@@ -623,8 +688,18 @@ export default function CampgroundListControls({
   // typing is not blurred/lost while router.replace transitions.
   const discreteControlsDisabled = geoBusy || isPending;
   const selectedAmps = new Set(localFilters.amps);
+  const selectedSiteTypes = new Set(localFilters.siteTypes);
   // Rig + driveway are camping/RV site attributes (hidden for lodging searches).
-  const showCampingSiteAttrs = stayKindAllowsRigLength(localFilters.stayKind);
+  const showCampingSiteAttrs = campingSiteAttrsAllowed(
+    localFilters.stayKind,
+    localFilters.siteTypes,
+  );
+  // Fine site-type checkboxes: hide LODGING when stay=camping and vice versa.
+  const visibleSiteTypes = GUEST_SITE_TYPE_CODES.filter((code) => {
+    if (localFilters.stayKind === "lodging") return code === "LODGING";
+    if (localFilters.stayKind === "camping") return code !== "LODGING";
+    return true;
+  });
 
   return (
     <div
@@ -658,6 +733,8 @@ export default function CampgroundListControls({
             ) : null}
             <SelectItem value="name">{t("sortNameAsc")}</SelectItem>
             <SelectItem value="name-desc">{t("sortNameDesc")}</SelectItem>
+            <SelectItem value="price">{t("sortPriceAsc")}</SelectItem>
+            <SelectItem value="price-desc">{t("sortPriceDesc")}</SelectItem>
             <SelectItem value="city">{t("sortCity")}</SelectItem>
             <SelectItem value="province">{t("sortProvince")}</SelectItem>
           </SelectContent>
@@ -764,10 +841,15 @@ export default function CampgroundListControls({
                 window.clearTimeout(rigDebounceRef.current);
                 rigDebounceRef.current = null;
               }
+              if (maxPriceDebounceRef.current != null) {
+                window.clearTimeout(maxPriceDebounceRef.current);
+                maxPriceDebounceRef.current = null;
+              }
               cancelGeolocation();
               setSearch("");
               setActivePlace(undefined);
               updateRigDraft("");
+              updateMaxPriceDraft("");
               setGeoError(null);
               replaceQuery(clearedCampgroundQueryState());
             }}
@@ -796,6 +878,41 @@ export default function CampgroundListControls({
         >
           {t("siteFiltersLabel")}
         </p>
+        <fieldset
+          className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
+          disabled={discreteControlsDisabled}
+        >
+          <legend className="text-sm font-medium text-muted-foreground mr-1 float-left">
+            {t("siteTypesLabel")}
+          </legend>
+          {visibleSiteTypes.map((code) => {
+            const id = `site-type-${code}`;
+            return (
+              <div key={code} className="flex items-center gap-2">
+                <Checkbox
+                  id={id}
+                  checked={selectedSiteTypes.has(code)}
+                  disabled={discreteControlsDisabled}
+                  onCheckedChange={(checked) => {
+                    replaceWithFilters({
+                      q: search,
+                      sort: latestParamsRef.current.sort,
+                      siteTypes: toggleSiteTypeFilter(
+                        latestParamsRef.current.siteTypes,
+                        code,
+                        checked === true,
+                      ),
+                    });
+                  }}
+                />
+                <Label htmlFor={id} className="font-normal cursor-pointer">
+                  {t(SITE_TYPE_LABEL_KEYS[code])}
+                </Label>
+              </div>
+            );
+          })}
+        </fieldset>
+
         <fieldset
           className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
           disabled={discreteControlsDisabled}
@@ -960,6 +1077,48 @@ export default function CampgroundListControls({
               </div>
             </div>
           ) : null}
+
+          <div>
+            <Label
+              htmlFor="max-price-filter"
+              className="text-sm font-medium text-muted-foreground"
+            >
+              {t("maxPriceLabel")}
+            </Label>
+            <Input
+              id="max-price-filter"
+              type="number"
+              min={1}
+              max={GUEST_MAX_PRICE_CAP}
+              step="any"
+              inputMode="decimal"
+              className="w-32 mt-1.5"
+              placeholder={t("maxPricePlaceholder")}
+              value={maxPriceDraft}
+              disabled={geoBusy}
+              aria-describedby="max-price-hint"
+              onChange={(e) => {
+                const value = e.target.value;
+                updateMaxPriceDraft(value);
+                if (maxPriceDebounceRef.current != null) {
+                  window.clearTimeout(maxPriceDebounceRef.current);
+                }
+                maxPriceDebounceRef.current = window.setTimeout(() => {
+                  maxPriceDebounceRef.current = null;
+                  replaceQuery(
+                    withLatestCampgroundFilters(latestParamsRef.current, {
+                      q: latestParamsRef.current.q,
+                      sort: latestParamsRef.current.sort,
+                      maxPrice: resolveMaxPriceDraft(),
+                    }),
+                  );
+                }, 300);
+              }}
+            />
+            <p id="max-price-hint" className="sr-only">
+              {t("maxPriceHint")}
+            </p>
+          </div>
         </div>
         <p id="site-filters-hint" className="text-xs text-muted-foreground">
           {t("siteFiltersHint")}

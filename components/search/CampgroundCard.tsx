@@ -8,9 +8,10 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Campground } from "@/entities/campground";
 import { Link } from "@/i18n/navigation";
 import { formatDistanceKm } from "@/lib/campground-search";
+import { formatCampgroundPricePerNight } from "@/lib/campground-price";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes, type CampgroundDetailQuery } from "@/lib/routes";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 interface Props {
   campground: Campground;
@@ -20,7 +21,12 @@ interface Props {
 
 export default function CampgroundCard({ campground, detailQuery }: Props) {
   const t = useTranslations("search.controls");
+  const locale = useLocale();
   const distanceLabel = formatDistanceKm(campground.distanceMeters);
+  const priceLabel = formatCampgroundPricePerNight(
+    campground.minPricePerNight,
+    locale,
+  );
 
   return (
     <Card className="overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
@@ -48,6 +54,11 @@ export default function CampgroundCard({ campground, detailQuery }: Props) {
         {distanceLabel ? (
           <p className="mt-1 text-sm text-muted-foreground">
             {t("distanceKm", { km: distanceLabel })}
+          </p>
+        ) : null}
+        {priceLabel ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("fromPrice", { price: priceLabel })}
           </p>
         ) : null}
       </CardContent>
