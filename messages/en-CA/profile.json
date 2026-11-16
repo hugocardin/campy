@@ -11,7 +11,7 @@
     "role": "Role",
     "joined": "Joined",
     "defaultRigLengthLabel": "Default rig length",
-    "defaultRigLengthHint": "Used as your preferred length for search. Leave blank if you have no default.",
+    "defaultRigLengthHint": "Saved for future searches. Leave blank if you have no default.",
     "rigLengthPlaceholderFt": "e.g. 35",
     "rigLengthPlaceholderM": "e.g. 11",
     "rigLengthUnitGroupLabel": "Length unit",
@@ -22,8 +22,8 @@
 
   "errors": {
     "nameRequired": "Please enter your name",
-    "nameTooLong": "Name is too long (120 characters max)",
-    "invalidRigLength": "Enter a length between 1 and {max} {unit}, or leave blank"
+    "nameTooLong": "Name is too long ({max, number} characters max)",
+    "invalidRigLength": "Enter a positive length up to {max, number} {unit}, or leave blank"
   },
 
   "ProfilePage": {

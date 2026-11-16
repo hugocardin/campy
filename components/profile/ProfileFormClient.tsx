@@ -16,6 +16,10 @@ import {
   withErrorReference,
 } from "@/lib/errors";
 import {
+  FULL_NAME_MAX_LENGTH,
+  normalizePersonName,
+} from "@/lib/profile-validation";
+import {
   convertRigLengthDisplay,
   formatRigLengthForDisplay,
   maxRigLengthInUnit,
@@ -23,27 +27,47 @@ import {
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 type Props = {
   profile: UserProfile;
   onSubmit: (input: ProfileUpdateInput) => Promise<ActionResult>;
 };
 
+function defaultRigUnitForLocale(locale: string): RigLengthUnit {
+  return locale.toLowerCase().startsWith("fr") ? "m" : "ft";
+}
+
 export default function ProfileFormClient({ profile, onSubmit }: Props) {
   const tc = useTranslations("common");
   const t_errors = useTranslations("errors");
   const t_profile = useTranslations("profile");
+  const locale = useLocale();
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fullName, setFullName] = useState(profile.full_name);
-  const [rigUnit, setRigUnit] = useState<RigLengthUnit>("ft");
+  const [rigUnit, setRigUnit] = useState<RigLengthUnit>(() =>
+    defaultRigUnitForLocale(locale),
+  );
   const [rigDraft, setRigDraft] = useState(() =>
-    formatRigLengthForDisplay(profile.default_rig_length, "ft"),
+    formatRigLengthForDisplay(
+      profile.default_rig_length,
+      defaultRigUnitForLocale(locale),
+    ),
   );
 
-  const isFormValid = fullName.trim().length > 0;
+  const unitLabel =
+    rigUnit === "m"
+      ? t_profile("form.rigLengthUnitM")
+      : t_profile("form.rigLengthUnitFt");
+
+  const invalidRigLengthMessage = t_profile("errors.invalidRigLength", {
+    max: maxRigLengthInUnit(rigUnit),
+    unit: unitLabel,
+  });
+
+  const isFormValid = normalizePersonName(fullName).length > 0;
 
   const handleRigUnitChange = (nextUnit: RigLengthUnit) => {
     if (nextUnit === rigUnit) return;
@@ -63,9 +87,14 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
     e.preventDefault();
     setError(null);
 
-    const trimmedName = fullName.trim();
-    if (!trimmedName) {
+    const normalizedName = normalizePersonName(fullName);
+    if (!normalizedName) {
       return setError(t_profile("errors.nameRequired"));
+    }
+    if (normalizedName.length > FULL_NAME_MAX_LENGTH) {
+      return setError(
+        t_profile("errors.nameTooLong", { max: FULL_NAME_MAX_LENGTH }),
+      );
     }
 
     const trimmedRig = rigDraft.trim();
@@ -73,21 +102,13 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
     if (trimmedRig !== "") {
       const parsed = parseRigLengthToFeet(trimmedRig, rigUnit);
       if (!parsed.ok) {
-        return setError(
-          t_profile("errors.invalidRigLength", {
-            max: maxRigLengthInUnit(rigUnit),
-            unit:
-              rigUnit === "m"
-                ? t_profile("form.rigLengthUnitM")
-                : t_profile("form.rigLengthUnitFt"),
-          }),
-        );
+        return setError(invalidRigLengthMessage);
       }
       defaultRigLength = parsed.feet;
     }
 
     const payload: ProfileUpdateInput = {
-      full_name: trimmedName,
+      full_name: normalizedName,
       default_rig_length: defaultRigLength,
     };
 
@@ -105,16 +126,12 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
               {
                 fieldMessages: {
                   full_name: t_profile("errors.nameRequired"),
-                  default_rig_length: t_profile("errors.invalidRigLength", {
-                    max: maxRigLengthInUnit(rigUnit),
-                    unit:
-                      rigUnit === "m"
-                        ? t_profile("form.rigLengthUnitM")
-                        : t_profile("form.rigLengthUnitFt"),
-                  }),
+                  default_rig_length: invalidRigLengthMessage,
                 },
                 fieldTooLongMessages: {
-                  full_name: t_profile("errors.nameTooLong"),
+                  full_name: t_profile("errors.nameTooLong", {
+                    max: FULL_NAME_MAX_LENGTH,
+                  }),
                 },
               },
             ),
@@ -130,7 +147,12 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
     <div className="space-y-10">
       <ErrorAlert errorMsg={error} />
 
-      <form id="profile-form" onSubmit={handleSubmit} className="space-y-8">
+      <form
+        id="profile-form"
+        noValidate
+        onSubmit={handleSubmit}
+        className="space-y-8"
+      >
         <div className="space-y-6 max-w-xl">
           <div>
             <Label htmlFor="full_name">
@@ -146,7 +168,7 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
                 setError(null);
               }}
               required
-              maxLength={120}
+              maxLength={FULL_NAME_MAX_LENGTH}
               className="mt-1.5"
               placeholder={t_profile("form.namePlaceholder")}
               autoComplete="name"
@@ -176,10 +198,8 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
               <Input
                 id="default_rig_length"
                 name="default_rig_length"
-                type="number"
-                min={1}
-                max={maxRigLengthInUnit(rigUnit)}
-                step="any"
+                type="text"
+                inputMode="decimal"
                 value={rigDraft}
                 onChange={(e) => {
                   setRigDraft(e.target.value);

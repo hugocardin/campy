@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserProfile } from "@/entities/user-profile";
+import { getInitials } from "@/lib/person-initials";
 import { routes } from "@/lib/routes";
 import { User } from "@supabase/supabase-js";
 import { Calendar, Mail, Ruler } from "lucide-react";
@@ -19,13 +20,7 @@ type Props = {
 export default function ProfileClient({ profile, user }: Props) {
   const t_profile = useTranslations("profile");
 
-  const initials = profile.full_name
-    ? profile.full_name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-    : profile.email?.[0]?.toUpperCase();
+  const initials = getInitials(profile.full_name, profile.email);
 
   const currentLocale = useLocale();
   const joinedDate = new Date(user.created_at).toLocaleDateString(
