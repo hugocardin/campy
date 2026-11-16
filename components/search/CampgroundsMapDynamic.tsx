@@ -8,6 +8,7 @@ type Props = {
   campgrounds: Campground[];
   searchCenter?: { lat: number; lng: number };
   radiusKm?: number;
+  searchKey?: string;
 };
 
 const CampgroundsMap = dynamic(() => import("./CampgroundsMap"), {
@@ -28,12 +29,14 @@ export default function CampgroundsMapDynamic({
   campgrounds,
   searchCenter,
   radiusKm,
+  searchKey,
 }: Props) {
   return (
     <CampgroundsMap
       campgrounds={campgrounds}
       searchCenter={searchCenter}
       radiusKm={radiusKm}
+      searchKey={searchKey}
     />
   );
 }

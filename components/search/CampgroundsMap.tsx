@@ -23,6 +23,8 @@ type Props = {
   campgrounds: Campground[];
   searchCenter?: { lat: number; lng: number };
   radiusKm?: number;
+  /** Changes when the active search identity changes (q/filters/geo). */
+  searchKey?: string;
   className?: string;
 };
 
@@ -65,6 +67,35 @@ function useStickyLocated(
     setStickyLocated(locatedFromProps);
   }
   return stickyLocated;
+}
+
+/**
+ * Persistent live region that re-announces when `announcementKey` changes even
+ * if the message string is identical (e.g. two consecutive empty searches).
+ * Clears on key change, then fills on the next render so SRs see a change.
+ */
+function MapStatusLiveRegion({
+  announcementKey,
+  message,
+}: {
+  announcementKey: string;
+  message: string;
+}) {
+  const [seenKey, setSeenKey] = useState(announcementKey);
+  const [text, setText] = useState("");
+
+  if (announcementKey !== seenKey) {
+    setSeenKey(announcementKey);
+    setText("");
+  } else if (text !== message) {
+    setText(message);
+  }
+
+  return (
+    <p role="status" className="sr-only">
+      {text}
+    </p>
+  );
 }
 
 function FitMarkers({
@@ -131,6 +162,7 @@ export default function CampgroundsMap({
   campgrounds,
   searchCenter,
   radiusKm,
+  searchKey = "",
   className,
 }: Props) {
   const t = useTranslations("search.controls");
@@ -173,6 +205,14 @@ export default function CampgroundsMap({
   // still explain why the circle has no markers.
   const showMapEmptyOverlay =
     !isEmptySearch && locatedFromProps.length === 0;
+
+  const statusMessage = showNoResultsOverlay
+    ? t("noResults")
+    : showMapEmptyOverlay
+      ? t("mapEmpty")
+      : "";
+  // Include message kind so empty↔mapEmpty transitions also re-announce.
+  const statusAnnouncementKey = `${searchKey}|${statusMessage}`;
 
   return (
     <div
@@ -257,21 +297,17 @@ export default function CampgroundsMap({
         ))}
       </MapContainer>
 
-      {/* Keep status mounted so SRs announce text changes into an existing live region. */}
-      <p role="status" className="sr-only">
-        {showNoResultsOverlay
-          ? t("noResults")
-          : showMapEmptyOverlay
-            ? t("mapEmpty")
-            : ""}
-      </p>
+      <MapStatusLiveRegion
+        announcementKey={statusAnnouncementKey}
+        message={statusMessage}
+      />
       {showNoResultsOverlay || showMapEmptyOverlay ? (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 z-[500] flex justify-center pl-14 pr-3 pt-3"
         >
           <p className="max-w-[calc(100%-0.5rem)] rounded-md border border-border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm">
-            {showNoResultsOverlay ? t("noResults") : t("mapEmpty")}
+            {statusMessage}
           </p>
         </div>
       ) : null}
