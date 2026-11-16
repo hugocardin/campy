@@ -43,14 +43,18 @@ FROM search_campgrounds_near(
   sort_key := 'price-desc', result_limit := 10
 );
 
--- Must be name-ordered (not distance). Regression for #48 name ASC fix.
+-- Name vs distance must disagree for a real regression check.
+-- From Vancouver, Alice is nearer than Gold Creek, so name ASC matches
+-- distance order and does not prove the fix. name-desc must put Gold Creek
+-- first (alphabetically later but farther) — old buggy distance ORDER would
+-- still put Alice first.
 SELECT name, round(distance_m::numeric) AS distance_m
 FROM search_campgrounds_near(
   lat := 49.28, lng := -123.12, radius_m := 500000,
   sort_key := 'name', result_limit := 10
 );
 
-SELECT name
+SELECT name, round(distance_m::numeric) AS distance_m
 FROM search_campgrounds_near(
   lat := 49.28, lng := -123.12, radius_m := 500000,
   sort_key := 'name-desc', result_limit := 10
@@ -69,4 +73,8 @@ FROM search_campgrounds_near(
 );
 ```
 
-Expect: distance order ≠ price order when parks differ; `sort_key=name` is alphabetical (Alice before Gold Creek even when Alice is nearer).
+Expect:
+
+- distance ≠ price order when parks differ
+- `name-desc`: **Gold Creek then Alice** (proves name order — Alice is nearer, so a distance-ordered bug would still put Alice first)
+- `name` ASC: Alice then Gold Creek (same pair; alone does not discriminate from distance)
