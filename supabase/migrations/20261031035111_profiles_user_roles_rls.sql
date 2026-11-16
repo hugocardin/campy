@@ -26,7 +26,7 @@
 --
 -- Applied migration — leave this allow-list immutable. Later editable columns
 -- (e.g. preferred_rig_unit in 20261116135025 / grant helper in
--- 20261116140000_profiles_update_allowlist_helper) extend grants in forward
+-- 20261116140131_profiles_update_allowlist_helper) extend grants in forward
 -- migrations; re-applying *this* script after those land will RAISE until the
 -- new cols are classified via the helper / a dedicated forward migration.
 --

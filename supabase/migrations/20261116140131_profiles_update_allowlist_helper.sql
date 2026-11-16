@@ -1,7 +1,8 @@
 -- Canonical profiles UPDATE allow-list helper (#42 step 2 review).
--- Future editable columns: extend the array below and call this function
--- instead of copying the DO $$ grant block from 20261031035111 /
--- 20261116135025.
+-- Future editable columns: add a *new* forward migration that calls
+--   private.grant_profiles_authenticated_update_allowlist(ARRAY[...full list...])
+-- Do not edit this already-applied migration's array (or copy the old DO $$
+-- grant blocks from 20261031035111 / 20261116135025).
 --
 -- Idempotent: safe to re-run. Creates `private` schema if missing.
 

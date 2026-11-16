@@ -36,6 +36,7 @@ export const getCurrentPreferredRigUnit = cache(
         return null;
       }
       if (!data) return null;
+      // TODO: regenerate DB types so preferred_rig_unit is typed without a cast.
       return parseStoredRigLengthUnit(
         (data as { preferred_rig_unit?: string | null }).preferred_rig_unit,
       );
