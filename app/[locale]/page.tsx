@@ -54,6 +54,8 @@ export default async function Home({ searchParams }: PageProps) {
     driveway: firstParam(params.driveway),
     rigLength: firstParam(params.rigLength),
     stay: firstParam(params.stay),
+    types: firstParam(params.types),
+    maxPrice: firstParam(params.maxPrice),
   });
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),

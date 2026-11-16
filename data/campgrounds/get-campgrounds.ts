@@ -6,13 +6,15 @@ import {
   uniqueProvinceFilterKeys,
 } from "@/lib/canadian-provinces";
 import {
-  CAMPGROUND_SORT_CONFIG,
+  CAMPGROUND_COLUMN_SORT_CONFIG,
   CampgroundSiteFilters,
   CampgroundSort,
   SEARCH_CAMPGROUNDS_LIMIT,
-  anySiteFilterActive,
   campgroundRadiusMeters,
   formatCampgroundAmpsParam,
+  formatGuestMaxPriceParam,
+  formatGuestSiteTypesParam,
+  isCampgroundPriceSort,
   parseCampgroundSiteFilters,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
@@ -64,6 +66,7 @@ type CampgroundRow = {
   website: string | null;
   phone: string | null;
   distance_m?: number | null;
+  min_price_per_night?: number | null;
 };
 
 function toCoord(value: number | null): number | null {
@@ -79,6 +82,10 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
     lat != null && lng != null ? { lat, lng } : null;
   const distanceMeters =
     row.distance_m == null ? undefined : toCoord(row.distance_m);
+  const minPrice =
+    row.min_price_per_night == null
+      ? undefined
+      : toCoord(Number(row.min_price_per_night));
 
   return {
     id: row.id,
@@ -90,6 +97,7 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
     country: row.country,
     location,
     distanceMeters: distanceMeters ?? undefined,
+    minPricePerNight: minPrice ?? undefined,
     website: row.website ?? "",
     phone: row.phone ?? "",
   };
@@ -111,7 +119,27 @@ function sortCampgrounds(
     });
   }
 
-  const { column, ascending } = CAMPGROUND_SORT_CONFIG[sort];
+  if (isCampgroundPriceSort(sort)) {
+    const dir = sort === "price" ? 1 : -1;
+    return [...campgrounds].sort((a, b) => {
+      const ap = a.minPricePerNight;
+      const bp = b.minPricePerNight;
+      if (ap == null && bp == null) return a.name.localeCompare(b.name);
+      if (ap == null) return 1;
+      if (bp == null) return -1;
+      if (ap !== bp) return (ap - bp) * dir;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  const columnSort =
+    sort === "name" ||
+    sort === "name-desc" ||
+    sort === "city" ||
+    sort === "province"
+      ? sort
+      : ("name" as const);
+  const { column, ascending } = CAMPGROUND_COLUMN_SORT_CONFIG[columnSort];
   const dir = ascending ? 1 : -1;
   return [...campgrounds].sort((a, b) => {
     const av = (a[column] ?? "").toString();
@@ -199,6 +227,9 @@ function siteFilterRpcArgs(filters: CampgroundSiteFilters) {
     require_driveway_type: filters.drivewayType ?? null,
     min_rig_length: filters.rigLength ?? null,
     stay_kind: filters.stayKind ?? null,
+    require_site_types:
+      filters.siteTypes.length > 0 ? filters.siteTypes : null,
+    max_price: filters.maxPrice ?? null,
   };
 }
 
@@ -221,6 +252,10 @@ export function buildCampgroundSiteFiltersCacheKey(
   if (stay) params.set("stay", stay);
   const rig = formatGuestRigLengthParam(filters.rigLength);
   if (rig) params.set("rigLength", rig);
+  const types = formatGuestSiteTypesParam(filters.siteTypes);
+  if (types) params.set("types", types);
+  const maxPrice = formatGuestMaxPriceParam(filters.maxPrice);
+  if (maxPrice) params.set("maxPrice", maxPrice);
   return params.toString();
 }
 
@@ -234,6 +269,8 @@ function parseSiteFiltersCacheKey(key: string): CampgroundSiteFilters {
     driveway: params.get("driveway") ?? undefined,
     rigLength: params.get("rigLength") ?? undefined,
     stay: params.get("stay") ?? undefined,
+    types: params.get("types") ?? undefined,
+    maxPrice: params.get("maxPrice") ?? undefined,
   });
 }
 
@@ -262,7 +299,6 @@ export const getCampgrounds = cache(
       // Unknown / malicious ?province= is ignored (All provinces).
       const provinceCode = resolveProvinceCode(province);
       const siteFilters = parseSiteFiltersCacheKey(siteFiltersKey);
-      const siteFiltersActive = anySiteFilterActive(siteFilters);
 
       let provinceAliases: string[] = [];
       if (provinceCode) {
@@ -292,7 +328,7 @@ export const getCampgrounds = cache(
             ...siteFilterRpcArgs(siteFilters),
             // Always distance-ordered in SQL (cap after that). App may
             // re-sort the capped set for other keys — truncation still means
-            // "more within radius", not "more in name order".
+            // "more within radius", not "more in name/price order".
             result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
         );
@@ -317,60 +353,30 @@ export const getCampgrounds = cache(
       const nonGeoSort =
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
 
-      // Text / province / site filters use search_campgrounds (unaccent + trigram
-      // via campground_text_matches; ORDER BY + LIMIT in SQL — #24 / #25).
+      // Always use search_campgrounds for non-geo (#24): unaccent/trigram,
+      // site filters, min_price_per_night, ORDER BY + LIMIT in SQL.
       // Trust SQL order (no JS re-sort). Fetch limit+1 to detect truncation.
-      if (term || provinceAliases.length > 0 || siteFiltersActive) {
-        const result = await handleDbResponse(
-          supabase.rpc("search_campgrounds", {
-            q: term || null,
-            province_aliases:
-              provinceAliases.length > 0 ? provinceAliases : null,
-            ...siteFilterRpcArgs(siteFilters),
-            sort_key: nonGeoSort,
-            result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
-          }),
-        );
-
-        if (!result.success) {
-          return result;
-        }
-
-        const mapped = (result.data as CampgroundRow[]).map(toCampgroundDomain);
-        const truncated = mapped.length > SEARCH_CAMPGROUNDS_LIMIT;
-        const campgrounds = truncated
-          ? mapped.slice(0, SEARCH_CAMPGROUNDS_LIMIT)
-          : mapped;
-        return resultSuccess({ campgrounds, truncated });
-      }
-
-      const { column, ascending } = CAMPGROUND_SORT_CONFIG[nonGeoSort];
-
-      let query = supabase
-        .from("v_campgrounds")
-        .select(GUEST_CAMPGROUND_COLUMNS);
-
-      query = query.order(column, { ascending });
-      if (column !== "name") {
-        query = query.order("name", { ascending: true });
-      }
-      // Cap like the RPC path (don't rely solely on PostgREST max_rows).
-      query = query.limit(SEARCH_CAMPGROUNDS_LIMIT + 1);
-
-      const result = await handleDbResponse(query);
+      const result = await handleDbResponse(
+        supabase.rpc("search_campgrounds", {
+          q: term || null,
+          province_aliases:
+            provinceAliases.length > 0 ? provinceAliases : null,
+          ...siteFilterRpcArgs(siteFilters),
+          sort_key: nonGeoSort,
+          result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
+        }),
+      );
 
       if (!result.success) {
         return result;
       }
 
-      const mapped = result.data.map(toCampgroundDomain);
+      const mapped = (result.data as CampgroundRow[]).map(toCampgroundDomain);
       const truncated = mapped.length > SEARCH_CAMPGROUNDS_LIMIT;
-      return resultSuccess({
-        campgrounds: truncated
-          ? mapped.slice(0, SEARCH_CAMPGROUNDS_LIMIT)
-          : mapped,
-        truncated,
-      });
+      const campgrounds = truncated
+        ? mapped.slice(0, SEARCH_CAMPGROUNDS_LIMIT)
+        : mapped;
+      return resultSuccess({ campgrounds, truncated });
     } catch (err) {
       return handleUnexpectedError(err);
     }

@@ -13,6 +13,11 @@ export interface Campground {
   } | null;
   /** Metres from search center when geo search is active; otherwise omitted. */
   distanceMeters?: number | null;
+  /**
+   * Min `sites.price_per_night_base` among sites matching current guest
+   * filters (or all sites when no site filters). From search RPCs (#24).
+   */
+  minPricePerNight?: number | null;
   website: string;
   phone: string;
 }

@@ -5,6 +5,8 @@ import {
   CampgroundSort,
   campgroundSortQueryValue,
   formatCampgroundAmpsParam,
+  formatGuestMaxPriceParam,
+  formatGuestSiteTypesParam,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
 import { provinceFilterKey } from "@/lib/canadian-provinces";
@@ -12,6 +14,10 @@ import type { DrivewayType } from "@/lib/driveway-type";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import type { ElectricityAmpFilterOption } from "@/lib/electricity-amps";
 import { normalizeElectricityAmpFilters } from "@/lib/electricity-amps";
+import {
+  type GuestSiteTypeCode,
+  siteTypesForStayKind,
+} from "@/lib/guest-site-types";
 import {
   formatGuestRigLengthParam,
   formatRigLengthUnitParam,
@@ -45,6 +51,10 @@ export type CampgroundQueryState = {
    */
   rigUnit?: RigLengthUnit;
   stayKind?: StayKind;
+  /** Fine site types (URL `types`). */
+  siteTypes: GuestSiteTypeCode[];
+  /** Max nightly base price (URL `maxPrice`). */
+  maxPrice?: number;
 };
 
 /** Merge a partial update onto the latest query state (hookups / geo / province). */
@@ -60,6 +70,10 @@ export function withLatestCampgroundFilters(
   const rigUnitRaw = "rigUnit" in patch ? patch.rigUnit : latest.rigUnit;
   const drivewayRaw =
     "drivewayType" in patch ? patch.drivewayType : latest.drivewayType;
+  const siteTypesRaw =
+    "siteTypes" in patch ? (patch.siteTypes ?? []) : latest.siteTypes;
+  const maxPriceRaw =
+    "maxPrice" in patch ? patch.maxPrice : latest.maxPrice;
   return {
     q: patch.q,
     sort: patch.sort,
@@ -79,6 +93,9 @@ export function withLatestCampgroundFilters(
     // Keep unit preference through lodging so camping↔lodging restores the toggle
     // (also emitted in the URL — see buildCampgroundSearchParams).
     rigUnit: rigUnitRaw === "m" ? "m" : undefined,
+    // Drop fine types incompatible with coarse stay (#24).
+    siteTypes: siteTypesForStayKind(siteTypesRaw, stayKind),
+    maxPrice: maxPriceRaw,
   };
 }
 
@@ -102,6 +119,8 @@ export function siteFiltersFromQueryState(
     | "drivewayType"
     | "rigLength"
     | "stayKind"
+    | "siteTypes"
+    | "maxPrice"
   >,
 ): CampgroundSiteFilters {
   const campingOk = stayKindAllowsRigLength(state.stayKind);
@@ -113,6 +132,8 @@ export function siteFiltersFromQueryState(
     drivewayType: campingOk ? state.drivewayType : undefined,
     rigLength: campingOk ? state.rigLength : undefined,
     stayKind: state.stayKind,
+    siteTypes: siteTypesForStayKind(state.siteTypes, state.stayKind),
+    maxPrice: state.maxPrice,
   };
 }
 
@@ -125,7 +146,7 @@ export function hookupsKey(hookups: CampgroundHookupFilters): string {
   ].join("|");
 }
 
-/** Stable key for optimistic site-filter sync (includes dump/driveway/rig/stay). */
+/** Stable key for optimistic site-filter sync (includes dump/driveway/rig/stay/types/price). */
 export function siteFiltersKey(filters: CampgroundSiteFilters): string {
   return [
     hookupsKey(filters),
@@ -133,6 +154,8 @@ export function siteFiltersKey(filters: CampgroundSiteFilters): string {
     filters.drivewayType ?? "",
     filters.rigLength != null ? String(filters.rigLength) : "",
     filters.stayKind ?? "",
+    formatGuestSiteTypesParam(filters.siteTypes) ?? "",
+    formatGuestMaxPriceParam(filters.maxPrice) ?? "",
   ].join("|");
 }
 
@@ -183,6 +206,12 @@ export function buildCampgroundSearchParams(
   if (unitParam) {
     params.set("rigUnit", unitParam);
   }
+  const typesParam = formatGuestSiteTypesParam(
+    siteTypesForStayKind(next.siteTypes, next.stayKind),
+  );
+  if (typesParam) params.set("types", typesParam);
+  const maxPriceParam = formatGuestMaxPriceParam(next.maxPrice);
+  if (maxPriceParam) params.set("maxPrice", maxPriceParam);
   return params;
 }
 
@@ -197,6 +226,7 @@ export function clearedCampgroundQueryState(): CampgroundQueryState {
     water: false,
     sewer: false,
     dumpStation: false,
+    siteTypes: [],
   };
 }
 
