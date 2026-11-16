@@ -2,7 +2,7 @@
 
 import { MapPin } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { formatDistanceKm } from "@/lib/campground-search";
 import { formatCampgroundPricePerNight } from "@/lib/campground-price";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes, type CampgroundDetailQuery } from "@/lib/routes";
+import { scrollChildIntoContainer } from "@/lib/search-hover-sync";
 import { cn } from "@/lib/utils";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -21,16 +22,18 @@ interface Props {
   detailQuery?: CampgroundDetailQuery;
   /** Shared list ↔ map hover highlight (#24 §4). */
   highlighted?: boolean;
-  /** Scroll into view when the map drives the highlight. */
+  /** Scroll into view when the map drives the highlight (lg+ only). */
   scrollIntoViewOnHighlight?: boolean;
+  scrollContainerRef?: RefObject<HTMLElement | null>;
   onHover?: (id: string | null) => void;
 }
 
-export default function CampgroundCard({
+function CampgroundCard({
   campground,
   detailQuery,
   highlighted = false,
   scrollIntoViewOnHighlight = false,
+  scrollContainerRef,
   onHover,
 }: Props) {
   const t = useTranslations("search.controls");
@@ -44,8 +47,15 @@ export default function CampgroundCard({
 
   useEffect(() => {
     if (!highlighted || !scrollIntoViewOnHighlight) return;
-    cardRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [highlighted, scrollIntoViewOnHighlight]);
+    const container = scrollContainerRef?.current;
+    const card = cardRef.current;
+    if (!container || !card) return;
+    // Brief delay so a quick sweep across pins does not chain-scroll.
+    const timer = window.setTimeout(() => {
+      scrollChildIntoContainer(container, card);
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [highlighted, scrollIntoViewOnHighlight, scrollContainerRef]);
 
   return (
     <Card
@@ -58,8 +68,16 @@ export default function CampgroundCard({
           ? "shadow-md ring-2 ring-primary ring-offset-2 ring-offset-background"
           : "hover:shadow-md",
       )}
-      onMouseEnter={() => onHover?.(campground.id)}
-      onMouseLeave={() => onHover?.(null)}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "touch") return;
+        onHover?.(campground.id);
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType === "touch") return;
+        // Keep highlight if keyboard focus is still inside this card.
+        if (cardRef.current?.contains(document.activeElement)) return;
+        onHover?.(null);
+      }}
       onFocusCapture={() => onHover?.(campground.id)}
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -110,3 +128,5 @@ export default function CampgroundCard({
     </Card>
   );
 }
+
+export default memo(CampgroundCard);

@@ -2,7 +2,12 @@
 
 import { Campground } from "@/entities/campground";
 import type { CampgroundDetailQuery } from "@/lib/routes";
-import { useCallback, useState } from "react";
+import {
+  resolveSearchHover,
+  shouldScrollListOnMapHover,
+  type SearchHoverState,
+} from "@/lib/search-hover-sync";
+import { useCallback, useEffect, useRef, useState } from "react";
 import CampgroundList from "./CampgroundList";
 import CampgroundsMapDynamic from "./CampgroundsMapDynamic";
 
@@ -14,14 +19,6 @@ type Props = {
   searchQuery?: string;
   detailQuery?: CampgroundDetailQuery;
   emptyMessage: string;
-};
-
-type HoverState = {
-  /** Search identity this hover belongs to — reset when it changes. */
-  key: string;
-  id: string | null;
-  /** Which pane drove the hover — list→map never scrolls; map→list does. */
-  source: "list" | "map" | null;
 };
 
 /**
@@ -37,19 +34,27 @@ export default function SearchResultsPanel({
   detailQuery,
   emptyMessage,
 }: Props) {
-  const [hover, setHover] = useState<HoverState>({
+  const [hover, setHover] = useState<SearchHoverState>({
     key: searchKey,
     id: null,
     source: null,
   });
+  const [sideBySide, setSideBySide] = useState(false);
+  const listScrollRef = useRef<HTMLDivElement>(null);
 
-  // Adjust during render when search identity changes (avoid setState-in-effect).
-  if (hover.key !== searchKey) {
-    setHover({ key: searchKey, id: null, source: null });
-  }
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setSideBySide(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
-  const hoveredId = hover.key === searchKey ? hover.id : null;
-  const hoverSource = hover.key === searchKey ? hover.source : null;
+  // Derived only — writers stamp searchKey; stale hover is ignored.
+  const { id: hoveredId, source: hoverSource } = resolveSearchHover(
+    hover,
+    searchKey,
+  );
 
   const hoverFromList = useCallback(
     (id: string | null) => {
@@ -82,23 +87,25 @@ export default function SearchResultsPanel({
         </div>
       </div>
 
-      <div className="flex flex-col min-h-0 rounded-xl border border-border">
-        <div className="flex-1">
-          <div className="p-6">
-            {campgrounds.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-12">
-                {emptyMessage}
-              </p>
-            ) : (
-              <CampgroundList
-                campgrounds={campgrounds}
-                detailQuery={detailQuery}
-                highlightedId={hoveredId}
-                scrollHighlightedIntoView={hoverSource === "map"}
-                onHoverCampground={hoverFromList}
-              />
-            )}
-          </div>
+      <div className="flex flex-col min-h-0 rounded-xl border border-border overflow-hidden">
+        <div ref={listScrollRef} className="flex-1 min-h-0 overflow-auto p-6">
+          {campgrounds.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-12">
+              {emptyMessage}
+            </p>
+          ) : (
+            <CampgroundList
+              campgrounds={campgrounds}
+              detailQuery={detailQuery}
+              highlightedId={hoveredId}
+              scrollHighlightedIntoView={shouldScrollListOnMapHover(
+                hoverSource,
+                sideBySide,
+              )}
+              scrollContainerRef={listScrollRef}
+              onHoverCampground={hoverFromList}
+            />
+          )}
         </div>
       </div>
     </div>

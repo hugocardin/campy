@@ -15,6 +15,7 @@ import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import {
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -32,6 +33,10 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+
+/** Search-center / accent colours (circle + marker highlight). */
+const MAP_ACCENT_STROKE = "#0f766e";
+const MAP_ACCENT_FILL = "#14b8a6";
 
 type Props = {
   campgrounds: Campground[];
@@ -280,6 +285,94 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const MARKER_HIGHLIGHT_CLASS = "campground-marker--highlighted";
+
+type CampgroundMarkerProps = {
+  campground: LocatedCampground;
+  isHighlighted: boolean;
+  faded: boolean;
+  detailQuery?: CampgroundDetailQuery;
+  viewLabel: string;
+  onHover?: (id: string | null) => void;
+};
+
+/**
+ * Memoized pin so hover only re-renders the two markers involved, and
+ * `eventHandlers` stay stable (avoids rebinding every Leaflet listener).
+ */
+const CampgroundMarker = memo(function CampgroundMarker({
+  campground,
+  isHighlighted,
+  faded,
+  detailQuery,
+  viewLabel,
+  onHover,
+}: CampgroundMarkerProps) {
+  const markerRef = useRef<L.Marker | null>(null);
+
+  const eventHandlers = useMemo(
+    () => ({
+      mouseover: () => {
+        if (faded) return;
+        onHover?.(campground.id);
+      },
+      mouseout: () => {
+        if (faded) return;
+        onHover?.(null);
+      },
+    }),
+    [campground.id, faded, onHover],
+  );
+
+  // CSS class on the pin body — no icon swap, no tip-centered CircleMarker.
+  useEffect(() => {
+    const el = markerRef.current?.getElement();
+    if (!el) return;
+    el.classList.toggle(MARKER_HIGHLIGHT_CLASS, isHighlighted);
+  }, [isHighlighted]);
+
+  // Keyboard parity: Leaflet markers are focusable by default.
+  useEffect(() => {
+    if (faded || !onHover) return;
+    const el = markerRef.current?.getElement();
+    if (!el) return;
+    const onFocus = () => onHover(campground.id);
+    const onBlur = () => onHover(null);
+    el.addEventListener("focus", onFocus);
+    el.addEventListener("blur", onBlur);
+    return () => {
+      el.removeEventListener("focus", onFocus);
+      el.removeEventListener("blur", onBlur);
+    };
+  }, [campground.id, faded, onHover]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[campground.location.lat, campground.location.lng]}
+      opacity={faded ? 0.5 : 1}
+      icon={DefaultIcon}
+      zIndexOffset={isHighlighted ? 1000 : 0}
+      eventHandlers={eventHandlers}
+    >
+      <Popup>
+        <div className="space-y-1 min-w-40">
+          <p className="font-medium text-sm leading-tight">{campground.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatCampgroundLocation(campground.city, campground.province)}
+          </p>
+          <Link
+            href={routes.campgroundDetail(campground.id, detailQuery)}
+            className="text-xs text-primary hover:underline"
+          >
+            {viewLabel}
+          </Link>
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
+
 export default function CampgroundsMap({
   campgrounds,
   searchCenter,
@@ -310,13 +403,6 @@ export default function CampgroundsMap({
       displayedCampgrounds.map((c) => [c.location.lat, c.location.lng]),
     [displayedCampgrounds],
   );
-
-  const highlightedCampground = useMemo(() => {
-    if (showingStalePins || !highlightedId) return null;
-    return (
-      displayedCampgrounds.find((c) => c.id === highlightedId) ?? null
-    );
-  }, [displayedCampgrounds, highlightedId, showingStalePins]);
 
   const centerLat = searchCenter?.lat;
   const centerLng = searchCenter?.lng;
@@ -392,8 +478,8 @@ export default function CampgroundsMap({
             center={centerTuple}
             radius={radiusMeters}
             pathOptions={{
-              color: "#0f766e",
-              fillColor: "#14b8a6",
+              color: MAP_ACCENT_STROKE,
+              fillColor: MAP_ACCENT_FILL,
               fillOpacity: 0.08,
               weight: 1.5,
             }}
@@ -404,8 +490,8 @@ export default function CampgroundsMap({
             center={centerTuple}
             radius={8}
             pathOptions={{
-              color: "#0f766e",
-              fillColor: "#14b8a6",
+              color: MAP_ACCENT_STROKE,
+              fillColor: MAP_ACCENT_FILL,
               fillOpacity: 0.85,
               weight: 2,
             }}
@@ -415,68 +501,17 @@ export default function CampgroundsMap({
             </Popup>
           </CircleMarker>
         ) : null}
-        {displayedCampgrounds.map((campground) => {
-          const isHighlighted = highlightedId === campground.id;
-          return (
-            <Marker
-              key={campground.id}
-              position={[campground.location.lat, campground.location.lng]}
-              opacity={showingStalePins ? 0.5 : 1}
-              // Keep DefaultIcon always — swapping icons on hover remounts the
-              // marker DOM and can flicker mouseout/mouseover (#24 §4).
-              icon={DefaultIcon}
-              zIndexOffset={isHighlighted ? 1000 : 0}
-              eventHandlers={{
-                mouseover: () => {
-                  if (showingStalePins) return;
-                  onHoverCampground?.(campground.id);
-                },
-                mouseout: () => {
-                  if (showingStalePins) return;
-                  onHoverCampground?.(null);
-                },
-              }}
-            >
-              <Popup>
-                <div className="space-y-1 min-w-40">
-                  <p className="font-medium text-sm leading-tight">
-                    {campground.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCampgroundLocation(
-                      campground.city,
-                      campground.province,
-                    )}
-                  </p>
-                  <Link
-                    href={routes.campgroundDetail(campground.id, detailQuery)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    {t("viewCampground")}
-                  </Link>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
-        {/* Halo under the pin — visual highlight without remounting the marker. */}
-        {highlightedCampground ? (
-          <CircleMarker
-            key={`highlight-${highlightedCampground.id}`}
-            center={[
-              highlightedCampground.location.lat,
-              highlightedCampground.location.lng,
-            ]}
-            radius={16}
-            pathOptions={{
-              color: "#0f766e",
-              fillColor: "#14b8a6",
-              fillOpacity: 0.35,
-              weight: 2,
-            }}
-            interactive={false}
+        {displayedCampgrounds.map((campground) => (
+          <CampgroundMarker
+            key={campground.id}
+            campground={campground}
+            isHighlighted={highlightedId === campground.id}
+            faded={showingStalePins}
+            detailQuery={detailQuery}
+            viewLabel={t("viewCampground")}
+            onHover={onHoverCampground}
           />
-        ) : null}
+        ))}
         <MapHandle onReady={setMapInstance} />
         <MapUserMoveWatcher
           suppressRef={suppressUserMoveRef}

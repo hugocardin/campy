@@ -157,3 +157,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Guest search list ↔ map hover: highlight the pin body (not a tip-centered halo). */
+.campground-marker--highlighted {
+  filter: drop-shadow(0 0 6px rgba(15, 118, 110, 0.85));
+  z-index: 1000 !important;
+}
+
+.campground-marker--highlighted img {
+  transform: scale(1.12);
+  transform-origin: bottom center;
+}
