@@ -111,19 +111,39 @@ describe("site-rig-length", () => {
     assert.equal(formatGuestRigLengthParam(35.12), "35.1");
   });
 
-  it("formats dual ft/m for site cards (1 decimal)", () => {
+  it("formats dual ft/m for site cards (locale + 2-decimal metres)", () => {
     const en = { ft: "ft", m: "m" };
     const fr = { ft: "pi", m: "m" };
     // 11 m stored as 36.1 ft (1-decimal metres→feet).
-    assert.equal(formatRigLength(36.1, { labels: en }), "36.1 ft (11 m)");
-    assert.equal(formatRigLength(36.1, { labels: fr }), "36.1 pi (11 m)");
     assert.equal(
-      formatRigLength(36.1, { labels: en, primaryUnit: "m" }),
+      formatRigLength(36.1, { labels: en, locale: "en-CA" }),
+      "36.1 ft (11 m)",
+    );
+    assert.equal(
+      formatRigLength(36.1, { labels: fr, locale: "fr-CA" }),
+      "36,1 pi (11 m)",
+    );
+    assert.equal(
+      formatRigLength(36.1, {
+        labels: en,
+        locale: "en-CA",
+        primaryUnit: "m",
+      }),
       "11 m (36.1 ft)",
     );
-    assert.equal(formatRigLength(35, { labels: en }), "35 ft (10.7 m)");
+    // 36 ft is 10.9728 m — 2-decimal display must not overstate as 11 m.
+    assert.equal(
+      formatRigLength(36, { labels: en, locale: "en-CA" }),
+      "36 ft (10.97 m)",
+    );
+    assert.equal(
+      formatRigLength(35, { labels: en, locale: "en-CA" }),
+      "35 ft (10.67 m)",
+    );
+    assert.equal(formatRigLength(null, { labels: en }), null);
     assert.equal(formatRigLength(undefined, { labels: en }), null);
     assert.equal(formatRigLength(0, { labels: en }), null);
+    assert.equal(formatRigLength(0.04, { labels: en }), null);
     assert.equal(formatRigLength(-1, { labels: en }), null);
   });
 });

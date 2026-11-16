@@ -154,6 +154,11 @@ export type FormatRigLengthLabels = {
 export type FormatRigLengthOptions = {
   labels: FormatRigLengthLabels;
   /**
+   * BCP 47 locale for decimal separators (e.g. `en-CA` / `fr-CA`).
+   * When omitted, uses JS default `.` (fine for unit tests).
+   */
+  locale?: string;
+  /**
    * Leading unit; the other is shown in parentheses.
    * Default `"ft"` (canonical storage). Guest pages may pass `rigUnit`.
    */
@@ -162,20 +167,33 @@ export type FormatRigLengthOptions = {
 
 /**
  * Format canonical feet for site cards / admin read views (issue #34).
- * Always shows both units, each rounded to 1 decimal
- * (e.g. `36.1 ft (11 m)` or `11 m (36.1 ft)` when `primaryUnit` is `"m"`).
- * Returns `null` when feet is missing / invalid so callers can render "—".
+ * Always shows both units:
+ * - feet to **1** decimal (storage / parse precision)
+ * - metres to **2** decimals (same as {@link formatRigLengthForDisplay} /
+ *   {@link convertRigLengthDisplay}) so a max-length label never overstates
+ *   capacity vs the guest filter (e.g. 36 ft → `10.97 m`, not `11 m`)
+ *
+ * Numbers are locale-formatted when `locale` is set (`36,1` in fr-CA).
+ * Returns `null` when feet is missing / non-finite / rounds to ≤ 0.
  */
 export function formatRigLength(
   feet: number | undefined | null,
   options: FormatRigLengthOptions,
 ): string | null {
-  if (feet == null || !Number.isFinite(feet) || feet <= 0) return null;
+  if (feet == null || !Number.isFinite(feet)) return null;
   const ft = roundRigLength(feet, 1);
-  const m = roundRigLength(feetToMetres(feet), 1);
-  const { labels, primaryUnit = "ft" } = options;
-  const ftPart = `${ft} ${labels.ft}`;
-  const mPart = `${m} ${labels.m}`;
+  // Match parseRigLengthToFeet: reject values that round to 0.
+  if (ft <= 0) return null;
+  const m = roundRigLength(feetToMetres(feet), 2);
+  const { labels, primaryUnit = "ft", locale } = options;
+  const formatNumber = (value: number, maxFractionDigits: number) =>
+    locale
+      ? new Intl.NumberFormat(locale, {
+          maximumFractionDigits: maxFractionDigits,
+        }).format(value)
+      : String(value);
+  const ftPart = `${formatNumber(ft, 1)} ${labels.ft}`;
+  const mPart = `${formatNumber(m, 2)} ${labels.m}`;
   return primaryUnit === "m" ? `${mPart} (${ftPart})` : `${ftPart} (${mPart})`;
 }
 

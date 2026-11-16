@@ -1,6 +1,7 @@
 "use client";
 
 import { Campground } from "@/entities/campground";
+import type { CampgroundDetailQuery } from "@/lib/routes";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 
@@ -9,6 +10,7 @@ type Props = {
   searchCenter?: { lat: number; lng: number };
   radiusKm?: number;
   searchKey?: string;
+  detailQuery?: CampgroundDetailQuery;
 };
 
 const CampgroundsMap = dynamic(() => import("./CampgroundsMap"), {
@@ -30,6 +32,7 @@ export default function CampgroundsMapDynamic({
   searchCenter,
   radiusKm,
   searchKey,
+  detailQuery,
 }: Props) {
   return (
     <CampgroundsMap
@@ -37,6 +40,7 @@ export default function CampgroundsMapDynamic({
       searchCenter={searchCenter}
       radiusKm={radiusKm}
       searchKey={searchKey}
+      detailQuery={detailQuery}
     />
   );
 }

@@ -8,11 +8,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import FormattedRigLength from "@/components/rig-length/FormattedRigLength";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Site } from "@/entities/sites";
 import { useRouter } from "@/i18n/navigation";
 import { routes } from "@/lib/routes";
-import { formatRigLength } from "@/lib/site-rig-length";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -55,12 +55,7 @@ export default function SitesClient({ campground, sites }: Props) {
                 <TableCell>{site.description}</TableCell>
                 <TableCell>{site.site_type_code}</TableCell>
                 <TableCell>
-                  {formatRigLength(Number(site.max_rig_length), {
-                    labels: {
-                      ft: t_sites("form.rigLengthUnitFt"),
-                      m: t_sites("form.rigLengthUnitM"),
-                    },
-                  }) ?? "—"}
+                  <FormattedRigLength feet={site.max_rig_length} />
                 </TableCell>
                 <TableCell>{site.price_per_night}</TableCell>
                 <TableCell>{site.min_stay_nights}</TableCell>

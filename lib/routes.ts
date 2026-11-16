@@ -1,7 +1,32 @@
+import {
+  formatGuestRigLengthParam,
+  formatRigLengthUnitParam,
+  type RigLengthUnit,
+} from "@/lib/site-rig-length";
+
+export type CampgroundDetailQuery = {
+  /** Guest display/input unit; omitted / feet → no query param. */
+  rigUnit?: RigLengthUnit;
+  /** Canonical feet when the guest filter had a length. */
+  rigLength?: number;
+};
+
 export const routes = {
   home: () => "/",
   campgrounds: () => "/campgrounds",
-  campgroundDetail: (id: string) => `/campgrounds/${id}`,
+  /**
+   * Guest campground detail. Optional query carries search rig prefs so the
+   * sites table can lead with metres when the guest filtered in m (#34).
+   */
+  campgroundDetail: (id: string, query?: CampgroundDetailQuery) => {
+    const params = new URLSearchParams();
+    const unit = formatRigLengthUnitParam(query?.rigUnit);
+    if (unit) params.set("rigUnit", unit);
+    const length = formatGuestRigLengthParam(query?.rigLength);
+    if (length) params.set("rigLength", length);
+    const qs = params.toString();
+    return qs ? `/campgrounds/${id}?${qs}` : `/campgrounds/${id}`;
+  },
 
   auth: () => "/auth",
   profile: () => "/profile",

@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Site } from "@/entities/sites";
+import FormattedRigLength from "@/components/rig-length/FormattedRigLength";
 import { formatElectricityAmps } from "@/lib/electricity-amps";
-import { formatRigLength, isLodgingSiteType } from "@/lib/site-rig-length";
+import { isLodgingSiteType } from "@/lib/site-rig-length";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -104,12 +105,7 @@ export default function SiteViewClient({ site, amenities }: Props) {
                       {t_sites("form.maxRigLengthLabel")}
                     </h3>
                     <p>
-                      {formatRigLength(Number(site.max_rig_length), {
-                        labels: {
-                          ft: t_sites("form.rigLengthUnitFt"),
-                          m: t_sites("form.rigLengthUnitM"),
-                        },
-                      }) ?? "—"}
+                      <FormattedRigLength feet={site.max_rig_length} />
                     </p>
                   </div>
                   <div>

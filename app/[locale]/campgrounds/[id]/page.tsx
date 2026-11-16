@@ -1,4 +1,5 @@
 import { BackHeader } from "@/components/layout/back-header";
+import FormattedRigLength from "@/components/rig-length/FormattedRigLength";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,10 +23,7 @@ import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { isUuid } from "@/lib/is-uuid";
 import { routes } from "@/lib/routes";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
-import {
-  formatRigLength,
-  parseRigLengthUnit,
-} from "@/lib/site-rig-length";
+import { parseRigLengthUnit } from "@/lib/site-rig-length";
 import { translateCode } from "@/lib/translate-code";
 import { MapPin } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -378,13 +376,10 @@ export default async function CampgroundDetailsPage({
                             })()}
                           </TableCell>
                           <TableCell>
-                            {formatRigLength(Number(site.max_rig_length), {
-                              labels: {
-                                ft: tSites("form.rigLengthUnitFt"),
-                                m: tSites("form.rigLengthUnitM"),
-                              },
-                              primaryUnit: primaryRigUnit,
-                            }) ?? "—"}
+                            <FormattedRigLength
+                              feet={site.max_rig_length}
+                              primaryUnit={primaryRigUnit}
+                            />
                           </TableCell>
                           <TableCell>
                             {priceFormatter.format(

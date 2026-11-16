@@ -9,14 +9,16 @@ import { Campground } from "@/entities/campground";
 import { Link } from "@/i18n/navigation";
 import { formatDistanceKm } from "@/lib/campground-search";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
-import { routes } from "@/lib/routes";
+import { routes, type CampgroundDetailQuery } from "@/lib/routes";
 import { useTranslations } from "next-intl";
 
 interface Props {
   campground: Campground;
+  /** Carry guest rig prefs into the detail URL (#34). */
+  detailQuery?: CampgroundDetailQuery;
 }
 
-export default function CampgroundCard({ campground }: Props) {
+export default function CampgroundCard({ campground, detailQuery }: Props) {
   const t = useTranslations("search.controls");
   const distanceLabel = formatDistanceKm(campground.distanceMeters);
 
@@ -52,7 +54,7 @@ export default function CampgroundCard({ campground }: Props) {
 
       <CardFooter className="p-4 pt-0 flex items-center justify-start">
         <Button size="sm" asChild>
-          <Link href={routes.campgroundDetail(campground.id)}>
+          <Link href={routes.campgroundDetail(campground.id, detailQuery)}>
             {t("viewCampground")}
           </Link>
         </Button>
