@@ -11,15 +11,12 @@ import {
   CampgroundSort,
   anyHookupFilterActive,
   campgroundRadiusMeters,
+  parseCampgroundAmps,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
-import {
-  type ElectricityAmpFilterOption,
-  electricityAmpsToRpcArg,
-  normalizeElectricityAmpFilters,
-} from "@/lib/electricity-amps";
+import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import {
   handleDbResponse,
@@ -182,13 +179,8 @@ export const getCampgrounds = cache(
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       // Unknown / malicious ?province= is ignored (All provinces).
       const provinceCode = resolveProvinceCode(province);
-      const amps = normalizeElectricityAmpFilters(
-        ampsKey
-          ? ampsKey.split(",").map((part) => part.trim().toLowerCase())
-          : [],
-      ) as ElectricityAmpFilterOption[];
       const hookups: CampgroundHookupFilters = {
-        amps,
+        amps: parseCampgroundAmps({ amps: ampsKey || undefined }),
         water: Boolean(water),
         sewer: Boolean(sewer),
       };

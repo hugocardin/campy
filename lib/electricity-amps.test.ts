@@ -9,6 +9,7 @@ import {
   normalizeElectricityAmpFilters,
   normalizeElectricityAmps,
   parseElectricityAmp,
+  parseElectricityAmpsInput,
   unionElectricityAmps,
 } from "./electricity-amps";
 
@@ -17,11 +18,14 @@ describe("electricity amps helpers", () => {
     assert.deepEqual([...ELECTRICITY_AMP_VALUES], [15, 20, 30, 50]);
   });
 
-  it("parses only allowed integer amps", () => {
+  it("parses only allowed plain integer amps", () => {
     assert.equal(parseElectricityAmp(30), 30);
     assert.equal(parseElectricityAmp("50"), 50);
     assert.equal(parseElectricityAmp(25), undefined);
     assert.equal(parseElectricityAmp(15.5), undefined);
+    assert.equal(parseElectricityAmp("0x1e"), undefined);
+    assert.equal(parseElectricityAmp("3e1"), undefined);
+    assert.equal(parseElectricityAmp("30.0"), undefined);
   });
 
   it("normalizes site amps with dedupe and fixed order", () => {
@@ -31,6 +35,17 @@ describe("electricity amps helpers", () => {
       50,
     ]);
     assert.deepEqual(normalizeElectricityAmps([]), []);
+  });
+
+  it("strictly validates admin amp writes", () => {
+    assert.deepEqual(parseElectricityAmpsInput([]), { ok: true, amps: [] });
+    assert.deepEqual(parseElectricityAmpsInput([50, 15]), {
+      ok: true,
+      amps: [15, 50],
+    });
+    assert.equal(parseElectricityAmpsInput(undefined).ok, false);
+    assert.equal(parseElectricityAmpsInput([25]).ok, false);
+    assert.equal(parseElectricityAmpsInput([15, 15]).ok, false);
   });
 
   it("normalizes guest filter options including none", () => {
@@ -43,8 +58,8 @@ describe("electricity amps helpers", () => {
     ]);
   });
 
-  it("formats display labels", () => {
-    assert.equal(formatElectricityAmps([50, 15]), "15 / 50 A");
+  it("formats display amp numbers without unit", () => {
+    assert.equal(formatElectricityAmps([50, 15]), "15 / 50");
     assert.equal(formatElectricityAmps([]), null);
     assert.equal(formatElectricityAmps(null), null);
   });

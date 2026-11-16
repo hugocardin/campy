@@ -1,5 +1,4 @@
 export {
-  LEGACY_ELECTRICITY_AMENITY_CODE,
   PROTECTED_HOOKUP_AMENITY_CODES,
   isProtectedHookupAmenityCode,
 } from "./hookup-codes";

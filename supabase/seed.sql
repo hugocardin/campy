@@ -3,7 +3,8 @@
 -- Prerequisites (not seeded here):
 --   * Amenity codes WATER / SEWER (from
 --     20261115191024_search_campgrounds_hookup_filters)
---   * sites.electricity_amps column (from 20261116014604_sites_electricity_amps)
+--   * sites.electricity_amps (20261116014604 + harden 20261116015837)
+--   * ELECTRICITY amenity retired (amps column only)
 --   * The named campgrounds and sites below (Campy demo catalog). On a fresh
 --     `supabase db reset` with no park/site seed, this INSERT matches nothing.
 --

@@ -140,7 +140,7 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
     amenities != null
       ? groupAmenitiesForLocale(amenities, tAmenities, locale)
       : [];
-  const campgroundAmpsLabel =
+  const campgroundAmpsNumbers =
     sites != null
       ? formatElectricityAmps(
           unionElectricityAmps(sites.map((site) => site.electricity_amps)),
@@ -250,12 +250,18 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                     <p>{campground.country}</p>
                   </div>
 
-                  {campgroundAmpsLabel ? (
+                  {sites != null ? (
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground mb-1">
                         {tSites("electricityAmps.summaryLabel")}
                       </h3>
-                      <p>{campgroundAmpsLabel}</p>
+                      <p>
+                        {campgroundAmpsNumbers != null
+                          ? tSites("electricityAmps.list", {
+                              amps: campgroundAmpsNumbers,
+                            })
+                          : tSites("electricityAmps.none")}
+                      </p>
                     </div>
                   ) : null}
                 </div>
@@ -349,8 +355,14 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                             )}
                           </TableCell>
                           <TableCell>
-                            {formatElectricityAmps(site.electricity_amps) ??
-                              tSites("electricityAmps.none")}
+                            {(() => {
+                              const amps = formatElectricityAmps(
+                                site.electricity_amps,
+                              );
+                              return amps != null
+                                ? tSites("electricityAmps.list", { amps })
+                                : tSites("electricityAmps.none");
+                            })()}
                           </TableCell>
                           <TableCell>
                             {site.max_rig_length != null

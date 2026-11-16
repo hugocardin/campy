@@ -1,6 +1,9 @@
 /**
  * Fixed site electricity amp options (never free text).
  * Guest search "None" is a filter token only — sites store `{}` for no power.
+ *
+ * Keep in sync with SQL `public.electricity_amp_values()`
+ * (`supabase/migrations/20261116015837_sites_electricity_amps_harden.sql`).
  */
 export const ELECTRICITY_AMP_VALUES = [15, 20, 30, 50] as const;
 
@@ -22,9 +25,20 @@ export function isElectricityAmp(value: number): value is ElectricityAmp {
   return AMP_SET.has(value);
 }
 
+/**
+ * Parse a single amp. Strings must be plain decimal digits (`/^\d+$/`).
+ * Numbers must be integers in the allowed set.
+ */
 export function parseElectricityAmp(value: unknown): ElectricityAmp | undefined {
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isInteger(n) || !isElectricityAmp(n)) return undefined;
+  if (typeof value === "number") {
+    if (!Number.isInteger(value) || !isElectricityAmp(value)) return undefined;
+    return value;
+  }
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return undefined;
+  const n = Number(trimmed);
+  if (!isElectricityAmp(n)) return undefined;
   return n;
 }
 
@@ -38,6 +52,34 @@ export function normalizeElectricityAmps(
     if (amp != null) selected.add(amp);
   }
   return ELECTRICITY_AMP_VALUES.filter((amp) => selected.has(amp));
+}
+
+/**
+ * Strict parse for admin writes: reject non-arrays and any invalid/duplicate
+ * entries (do not silently drop). Empty array = no electricity.
+ */
+export function parseElectricityAmpsInput(
+  value: unknown,
+):
+  | { ok: true; amps: ElectricityAmp[] }
+  | { ok: false; reason: "missing" | "invalid" } {
+  if (value == null) {
+    return { ok: false, reason: "missing" };
+  }
+  if (!Array.isArray(value)) {
+    return { ok: false, reason: "invalid" };
+  }
+  const normalized = normalizeElectricityAmps(value);
+  // Reject if any entry was junk or a duplicate of an allowed amp.
+  if (value.length !== normalized.length) {
+    return { ok: false, reason: "invalid" };
+  }
+  for (const entry of value) {
+    if (parseElectricityAmp(entry) == null) {
+      return { ok: false, reason: "invalid" };
+    }
+  }
+  return { ok: true, amps: normalized };
 }
 
 /**
@@ -62,13 +104,16 @@ export function normalizeElectricityAmpFilters(
     : normalized;
 }
 
-/** Display e.g. "15 / 50 A". Empty → null (caller shows em dash / None). */
+/**
+ * Amp numbers for display (e.g. "15 / 50"). Empty → null.
+ * Callers localize the unit via `sites.electricityAmps.list`.
+ */
 export function formatElectricityAmps(
   amps: readonly ElectricityAmp[] | null | undefined,
 ): string | null {
   const normalized = normalizeElectricityAmps(amps ?? []);
   if (normalized.length === 0) return null;
-  return `${normalized.join(" / ")} A`;
+  return normalized.join(" / ");
 }
 
 /** Union of amp options across sites (campground-level summary). */

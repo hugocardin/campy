@@ -124,7 +124,17 @@ export default function SiteFormClient({
       if (!result.success) {
         setError(
           withErrorReference(
-            translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
+            translateErrorCode(
+              result.errorCode,
+              t_errors,
+              tc("error"),
+              result.details,
+              {
+                fieldMessages: {
+                  electricity_amps: t_sites("errors.invalidElectricityAmps"),
+                },
+              },
+            ),
             result.details,
             (errorId) => tc("errorReference", { errorId }),
           ),

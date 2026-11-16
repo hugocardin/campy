@@ -29,7 +29,10 @@
     "codeRequired": "Amenity Name is required but was not provided.",
     "categoryRequired": "Category is required but was not provided.",
     "codeTooLong": "Amenity Name must be {max} characters or fewer.",
-    "hookupCodeProtected": "Water and sewer amenities are used by guest search and cannot be deleted or renamed.",
+    "hookupCodeProtected": "Water and sewer amenities are used by guest search and cannot be deleted or renamed."
+  },
+
+  "hints": {
     "electricityAmpsOnSiteForm": "Electricity amps are set on the site form, not as an amenity."
   },
 

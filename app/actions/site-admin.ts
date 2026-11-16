@@ -2,7 +2,7 @@
 
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { redirect } from "@/i18n/navigation";
-import { normalizeElectricityAmps } from "@/lib/electricity-amps";
+import { parseElectricityAmpsInput } from "@/lib/electricity-amps";
 import {
   ActionResult,
   CommonErrorCode,
@@ -47,7 +47,15 @@ export async function updateSiteAction(
     return resultError(CommonErrorCode.COMMON_MISSING_FIELD, { field: "id" });
   }
 
-  const electricityAmps = normalizeElectricityAmps(input.electricity_amps ?? []);
+  const ampsParsed = parseElectricityAmpsInput(input.electricity_amps);
+  if (!ampsParsed.ok) {
+    return resultError(
+      ampsParsed.reason === "missing"
+        ? CommonErrorCode.COMMON_MISSING_FIELD
+        : CommonErrorCode.COMMON_INVALID_FIELD,
+      { field: "electricity_amps" },
+    );
+  }
 
   try {
     const supabase = await createClient();
@@ -64,7 +72,7 @@ export async function updateSiteAction(
           price_per_night_base: input.price_per_night,
           min_stay_nights: input.min_stay_nights,
           description: input.description,
-          electricity_amps: electricityAmps,
+          electricity_amps: ampsParsed.amps,
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id)
@@ -97,7 +105,15 @@ export async function createSiteAction(
     return auth;
   }
 
-  const electricityAmps = normalizeElectricityAmps(input.electricity_amps ?? []);
+  const ampsParsed = parseElectricityAmpsInput(input.electricity_amps);
+  if (!ampsParsed.ok) {
+    return resultError(
+      ampsParsed.reason === "missing"
+        ? CommonErrorCode.COMMON_MISSING_FIELD
+        : CommonErrorCode.COMMON_INVALID_FIELD,
+      { field: "electricity_amps" },
+    );
+  }
 
   let newSiteId;
   try {
@@ -114,7 +130,7 @@ export async function createSiteAction(
           price_per_night_base: input.price_per_night,
           min_stay_nights: input.min_stay_nights,
           description: input.description,
-          electricity_amps: electricityAmps,
+          electricity_amps: ampsParsed.amps,
         })
 
         .select("id")

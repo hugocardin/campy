@@ -8,9 +8,6 @@ export const PROTECTED_HOOKUP_AMENITY_CODES = [
   "SEWER",
 ] as const;
 
-/** Legacy amenity code — migrated to `sites.electricity_amps`; hide from site amenity pickers. */
-export const LEGACY_ELECTRICITY_AMENITY_CODE = "ELECTRICITY" as const;
-
 export type ProtectedHookupAmenityCode =
   (typeof PROTECTED_HOOKUP_AMENITY_CODES)[number];
 

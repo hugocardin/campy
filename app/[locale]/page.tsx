@@ -7,6 +7,7 @@ import {
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
 import {
+  formatCampgroundAmpsParam,
   parseCampgroundGeo,
   parseCampgroundHookups,
   parseCampgroundSort,
@@ -50,9 +51,7 @@ export default async function Home({ searchParams }: PageProps) {
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
   });
-  const ampsKey = hookups.amps
-    .map((opt) => (opt === "none" ? "none" : String(opt)))
-    .join(",");
+  const ampsKey = formatCampgroundAmpsParam(hookups.amps) ?? "";
 
   const [campgroundsResult, provincesResult] = await Promise.all([
     getCampgrounds(

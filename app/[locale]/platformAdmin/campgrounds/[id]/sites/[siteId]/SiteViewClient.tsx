@@ -108,8 +108,12 @@ export default function SiteViewClient({ site, amenities }: Props) {
                   {t_sites("form.electricityAmpsLabel")}
                 </h3>
                 <p>
-                  {formatElectricityAmps(site.electricity_amps) ??
-                    t_sites("electricityAmps.none")}
+                  {(() => {
+                    const amps = formatElectricityAmps(site.electricity_amps);
+                    return amps != null
+                      ? t_sites("electricityAmps.list", { amps })
+                      : t_sites("electricityAmps.none");
+                  })()}
                 </p>
               </div>
             </div>

@@ -5,6 +5,7 @@ Migrations:
 - `20261115191024_search_campgrounds_hookup_filters` (codes + initial RPCs; demo `site_amenities` removed by follow-up)
 - `20261115191846_search_hookups_harden` (cleanup demo links, per-site AND, drop `province text` overload, protect codes)
 - `20261116014604_sites_electricity_amps` (site `electricity_amps`; `require_amps`; WATER/SEWER only)
+- `20261116015837_sites_electricity_amps_harden` (amp values helper; compat boolean overloads; retire ELECTRICITY amenity)
 
 ## Filters
 

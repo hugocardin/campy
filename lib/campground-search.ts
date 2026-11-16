@@ -3,7 +3,6 @@ import {
   type ProtectedHookupAmenityCode,
 } from "@/lib/amenities/hookup-codes";
 import {
-  ELECTRICITY_AMP_NONE,
   ELECTRICITY_AMP_VALUES,
   type ElectricityAmpFilterOption,
   normalizeElectricityAmpFilters,
@@ -31,9 +30,6 @@ export const HOOKUP_AMENITY_CODES = {
 } as const satisfies Record<string, ProtectedHookupAmenityCode>;
 
 export type HookupAmenityFilterKey = keyof typeof HOOKUP_AMENITY_CODES;
-
-/** Legacy alias — prefer {@link HookupAmenityFilterKey}. */
-export type HookupFilterKey = HookupAmenityFilterKey;
 
 export type CampgroundHookupFilters = {
   /** Exact amp multi-select; empty = no electricity restriction. */
@@ -250,7 +246,5 @@ export function formatCampgroundAmpsParam(
 ): string | undefined {
   const normalized = normalizeElectricityAmpFilters(amps);
   if (normalized.length === 0) return undefined;
-  return normalized
-    .map((opt) => (opt === ELECTRICITY_AMP_NONE ? ELECTRICITY_AMP_NONE : String(opt)))
-    .join(",");
+  return normalized.join(",");
 }

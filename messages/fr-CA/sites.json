@@ -34,6 +34,7 @@
     "amp20": "20 A",
     "amp30": "30 A",
     "amp50": "50 A",
+    "list": "{amps}\u00a0A",
     "summaryLabel": "Électricité"
   },
 
