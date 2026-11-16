@@ -7,7 +7,7 @@ import { routes } from "@/lib/routes";
 import L, { type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Circle,
   CircleMarker,
@@ -48,14 +48,19 @@ function FitMarkers({
   positions,
   searchCenter,
   radiusKm,
+  freezeView,
 }: {
   positions: LatLngTuple[];
   searchCenter?: LatLngTuple;
   radiusKm?: number;
+  /** When true (e.g. empty search), leave the current map view alone. */
+  freezeView?: boolean;
 }) {
   const map = useMap();
 
   useEffect(() => {
+    if (freezeView) return;
+
     if (
       searchCenter &&
       radiusKm != null &&
@@ -82,7 +87,7 @@ function FitMarkers({
       return;
     }
     map.fitBounds(all, { padding: [48, 48], maxZoom: 10 });
-  }, [map, positions, searchCenter, radiusKm]);
+  }, [map, positions, searchCenter, radiusKm, freezeView]);
 
   return null;
 }
@@ -107,10 +112,26 @@ export default function CampgroundsMap({
 }: Props) {
   const t = useTranslations("search.controls");
 
-  const withCoords = useMemo(
+  const locatedFromProps = useMemo(
     () => campgrounds.filter(hasValidCoords),
     [campgrounds],
   );
+
+  // Keep the last mappable set so an empty search does not blank pins.
+  // Adjust during render (React-approved) — avoids setState-in-effect / refs-in-render lint.
+  const [stickyLocated, setStickyLocated] = useState(locatedFromProps);
+  if (
+    locatedFromProps.length > 0 &&
+    locatedFromProps !== stickyLocated
+  ) {
+    setStickyLocated(locatedFromProps);
+  }
+
+  const isEmptySearch = campgrounds.length === 0;
+  const withCoords =
+    isEmptySearch && stickyLocated.length > 0
+      ? stickyLocated
+      : locatedFromProps;
 
   const positions: LatLngTuple[] = useMemo(
     () => withCoords.map((c) => [c.location.lat, c.location.lng]),
@@ -132,18 +153,9 @@ export default function CampgroundsMap({
       ? radiusKm * 1000
       : undefined;
 
-  if (withCoords.length === 0 && !centerTuple) {
-    return (
-      <div
-        className={
-          className ??
-          "absolute inset-0 flex items-center justify-center bg-muted/40 text-muted-foreground"
-        }
-      >
-        <p className="text-sm p-6 text-center">{t("mapEmpty")}</p>
-      </div>
-    );
-  }
+  const showNoResultsOverlay = isEmptySearch;
+  const showMapEmptyOverlay =
+    !isEmptySearch && withCoords.length === 0 && !centerTuple;
 
   return (
     <div className={className ?? "absolute inset-0 h-full w-full"}>
@@ -165,6 +177,7 @@ export default function CampgroundsMap({
           positions={positions}
           searchCenter={centerTuple}
           radiusKm={radiusKm}
+          freezeView={isEmptySearch}
         />
         {centerTuple && radiusMeters != null ? (
           <Circle
@@ -221,6 +234,14 @@ export default function CampgroundsMap({
           </Marker>
         ))}
       </MapContainer>
+
+      {showNoResultsOverlay || showMapEmptyOverlay ? (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex justify-center p-3">
+          <p className="rounded-md border border-border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm">
+            {showNoResultsOverlay ? t("noResults") : t("mapEmpty")}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
