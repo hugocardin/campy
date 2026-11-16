@@ -73,13 +73,17 @@ Migrations:
   rule; public RPC requires `is_platform_admin`; site `campground_id` moves)
 - `20261116223726_campground_currency_lock_rpc_definer` (public probe
   SECURITY DEFINER so it can call private without granting private USAGE)
+- `20261116224004_campground_currency_lock_grant_trim` (EXECUTE authenticated
+  only — service_role always fails `is_platform_admin`)
 
-Admin edit calls the RPC; update action maps trigger `23514` + DETAIL only
-(no TS pre-check).
+Admin edit calls the public RPC (platform_admin JWT). SQL Editor has no JWT,
+so probe the private helper instead. Update action maps trigger `23514` +
+DETAIL only (no TS pre-check).
 
 ```sql
 BEGIN;
-SELECT public.campground_currency_lock_reason(
+-- SQL Editor / postgres: use private (public RPC needs admin JWT)
+SELECT private.campground_currency_lock_reason(
   (SELECT campground_id FROM public.sites LIMIT 1)
 ); -- expect 'sites'
 
