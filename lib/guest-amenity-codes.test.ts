@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   amenityCodeCanonicalKey,
   formatGuestAmenityCodesParam,
+  GUEST_AMENITY_CODES_MAX,
   guestAmenityOptionsFromCatalogAndSelection,
   guestSearchAmenityCatalog,
   isExcludedGuestSearchAmenity,
@@ -10,6 +11,7 @@ import {
   normalizeGuestAmenityCodes,
   parseGuestAmenityCodes,
 } from "./guest-amenity-codes";
+import { AMENITY_CODE_MAX_LENGTH } from "./amenities/code";
 import { PROTECTED_HOOKUP_AMENITY_CODES } from "./amenities/hookup-codes";
 
 describe("amenityCodeCanonicalKey", () => {
@@ -72,6 +74,21 @@ describe("parseGuestAmenityCodes / format", () => {
       "WIFI",
     ]);
     assert.deepEqual(normalizeGuestAmenityCodes(["", "  ", "SEWER"]), []);
+  });
+
+  it("preserves over-long and >16 distinct keys for RPC fail-closed", () => {
+    const overlong = "A".repeat(AMENITY_CODE_MAX_LENGTH + 1);
+    assert.deepEqual(normalizeGuestAmenityCodes([overlong]), [overlong]);
+    assert.deepEqual(normalizeGuestAmenityCodes(["WIFI", overlong]), [
+      overlong,
+      "WIFI",
+    ]);
+    const many = Array.from(
+      { length: GUEST_AMENITY_CODES_MAX + 1 },
+      (_, i) => `X${i + 1}`,
+    );
+    assert.equal(normalizeGuestAmenityCodes(many).length, many.length);
+    assert.deepEqual(normalizeGuestAmenityCodes(many), [...many].sort());
   });
 });
 

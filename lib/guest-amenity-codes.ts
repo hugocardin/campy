@@ -4,15 +4,23 @@
  * Match is park-level AND on `campground_amenities` (not same-site).
  * Water / sewer / dump / retired electricity stay on dedicated controls.
  *
- * Excluded keys + max must stay in sync with
- * `normalize_guest_amenity_ids` in
+ * Excluded keys must stay in sync with `normalize_guest_amenity_ids` in
  * `supabase/migrations/*search_amenities*`.
+ *
+ * Overflow policy (intentional split):
+ * - This module dedupes, drops empty/excluded tokens, and sorts. It does
+ *   **not** drop over-long tokens or truncate past {@link GUEST_AMENITY_CODES_MAX}.
+ * - Fail-closed for over-long keys, >16 distinct keys, and raw cardinality >64
+ *   lives in the RPC (`NULL` → zero parks). Crafted URLs therefore keep the
+ *   bad tokens so `getCampgrounds` can pass them through and get zero rows,
+ *   instead of silently turning the filter off or applying a subset.
+ * - Normal UI checkbox paths never emit over-long or >16 selections.
  */
 import { AMENITY_CODE_MAX_LENGTH } from "@/lib/amenities/code";
 import { PROTECTED_HOOKUP_AMENITY_CODES } from "@/lib/amenities/hookup-codes";
 import { codeToMessageKey } from "@/lib/translate-code";
 
-/** Cap aligned with RPC `normalize_guest_amenity_ids` (abuse / DoS). */
+/** Cap enforced by RPC `normalize_guest_amenity_ids` (abuse / DoS). */
 export const GUEST_AMENITY_CODES_MAX = 16;
 
 /**
@@ -42,8 +50,9 @@ export function isGuestSearchAmenityCode(code: string): boolean {
 }
 
 /**
- * Dedupe + stable-sort by canonical key. Drops excluded / empty / oversized.
- * Caps at {@link GUEST_AMENITY_CODES_MAX}.
+ * Dedupe + stable-sort by canonical key. Drops excluded / empty only.
+ * Over-long and >{@link GUEST_AMENITY_CODES_MAX} distinct keys are preserved
+ * so the RPC can fail closed (see file header).
  */
 export function normalizeGuestAmenityCodes(
   codes: readonly string[] | undefined | null,
@@ -52,10 +61,9 @@ export function normalizeGuestAmenityCodes(
   const selected = new Set<string>();
   for (const raw of codes) {
     const key = amenityCodeCanonicalKey(String(raw));
-    if (!key || key.length > AMENITY_CODE_MAX_LENGTH) continue;
+    if (!key) continue;
     if (EXCLUDED_GUEST_AMENITY_KEYS.has(key)) continue;
     selected.add(key);
-    if (selected.size >= GUEST_AMENITY_CODES_MAX) break;
   }
   return [...selected].sort((a, b) => a.localeCompare(b));
 }
