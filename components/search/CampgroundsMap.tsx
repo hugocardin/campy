@@ -192,7 +192,7 @@ function FitMarkers({
   useEffect(() => {
     if (freezeView) return;
 
-    const runProgrammatic = (fn: () => void) => {
+    const runProgrammatic = (fn: () => void): (() => void) => {
       // Register before fn(): Leaflet can fire moveend synchronously inside
       // setView/fitBounds (same view, large jump, zero-size container).
       // Timeout fallback: no-op setView/fitBounds may never emit moveend.
@@ -202,6 +202,7 @@ function FitMarkers({
         if (cleared) return;
         cleared = true;
         window.clearTimeout(fallback);
+        map.off("moveend", clear);
         requestAnimationFrame(() => {
           suppressRef.current = false;
         });
@@ -209,6 +210,15 @@ function FitMarkers({
       const fallback = window.setTimeout(clear, 500);
       map.once("moveend", clear);
       fn();
+      return () => {
+        window.clearTimeout(fallback);
+        map.off("moveend", clear);
+        // Only release suppress if this run still owned it (newer run re-sets).
+        if (!cleared) {
+          cleared = true;
+          suppressRef.current = false;
+        }
+      };
     };
 
     if (
@@ -223,26 +233,23 @@ function FitMarkers({
       for (const position of positions) {
         bounds.extend(position);
       }
-      runProgrammatic(() => {
+      return runProgrammatic(() => {
         map.fitBounds(bounds, { padding: [48, 48], maxZoom: 10 });
       });
-      return;
     }
 
     const all = searchCenter ? [...positions, searchCenter] : positions;
     if (all.length === 0) {
-      runProgrammatic(() => {
+      return runProgrammatic(() => {
         map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       });
-      return;
     }
     if (all.length === 1) {
-      runProgrammatic(() => {
+      return runProgrammatic(() => {
         map.setView(all[0], 9);
       });
-      return;
     }
-    runProgrammatic(() => {
+    return runProgrammatic(() => {
       map.fitBounds(all, { padding: [48, 48], maxZoom: 10 });
     });
   }, [map, positions, searchCenter, radiusKm, freezeView, suppressRef]);

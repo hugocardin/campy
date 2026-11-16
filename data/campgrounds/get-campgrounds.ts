@@ -10,7 +10,6 @@ import {
   CampgroundSiteFilters,
   CampgroundSort,
   SEARCH_CAMPGROUNDS_LIMIT,
-  SEARCH_CAMPGROUNDS_RPC_MAX,
   anySiteFilterActive,
   campgroundRadiusMeters,
   formatCampgroundAmpsParam,
@@ -43,7 +42,7 @@ export type CampgroundSearchPayload = {
   campgrounds: Campground[];
   /**
    * True when the RPC/query returned more than SEARCH_CAMPGROUNDS_LIMIT
-   * (probed with LIMIT+1; SQL clamp ≤ SEARCH_CAMPGROUNDS_RPC_MAX).
+   * (probed with LIMIT+1; must stay ≤ SEARCH_CAMPGROUNDS_RPC_MAX — asserted in tests).
    */
   truncated: boolean;
 };
@@ -294,10 +293,7 @@ export const getCampgrounds = cache(
             // Always distance-ordered in SQL (cap after that). App may
             // re-sort the capped set for other keys — truncation still means
             // "more within radius", not "more in name order".
-            result_limit: Math.min(
-              SEARCH_CAMPGROUNDS_LIMIT + 1,
-              SEARCH_CAMPGROUNDS_RPC_MAX,
-            ),
+            result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
         );
 
@@ -332,10 +328,7 @@ export const getCampgrounds = cache(
               provinceAliases.length > 0 ? provinceAliases : null,
             ...siteFilterRpcArgs(siteFilters),
             sort_key: nonGeoSort,
-            result_limit: Math.min(
-              SEARCH_CAMPGROUNDS_LIMIT + 1,
-              SEARCH_CAMPGROUNDS_RPC_MAX,
-            ),
+            result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
         );
 
