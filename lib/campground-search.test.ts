@@ -227,7 +227,17 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         stayKind: "camping",
         siteTypes: [],
         maxPrice: undefined,
+        amenityCodes: [],
       },
+    );
+  });
+
+  it("parses amenities URL param (AND park amenities)", () => {
+    assert.deepEqual(
+      parseCampgroundSiteFilters({
+        amenities: "wifi,pet_friendly,water",
+      }).amenityCodes,
+      ["PET_FRIENDLY", "WIFI"],
     );
   });
 
@@ -276,6 +286,7 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         sewer: false,
         dumpStation: false,
         siteTypes: [],
+        amenityCodes: [],
       }),
       false,
     );
@@ -286,6 +297,7 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         sewer: false,
         dumpStation: true,
         siteTypes: [],
+        amenityCodes: [],
       }),
       true,
     );
@@ -296,6 +308,7 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         sewer: false,
         dumpStation: false,
         siteTypes: ["TENT"],
+        amenityCodes: [],
       }),
       true,
     );
@@ -307,6 +320,18 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         dumpStation: false,
         siteTypes: [],
         maxPrice: 40,
+        amenityCodes: [],
+      }),
+      true,
+    );
+    assert.equal(
+      anySiteFilterActive({
+        amps: [],
+        water: false,
+        sewer: false,
+        dumpStation: false,
+        siteTypes: [],
+        amenityCodes: ["WIFI"],
       }),
       true,
     );

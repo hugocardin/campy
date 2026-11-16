@@ -65,3 +65,21 @@ WHERE a.code = 'DUMP_STATION'
     'Green Point Campground – Pacific Rim'
   )
 ON CONFLICT (campground_id, amenity_id) DO NOTHING;
+
+-- Guest amenity filter demo (§24): park-level links (AND match).
+INSERT INTO public.campground_amenities (campground_id, amenity_id)
+SELECT c.id, a.id
+FROM public.campgrounds AS c
+CROSS JOIN public.amenities AS a
+WHERE (c.name, a.code) IN (
+  ('Alice Lake Provincial Park', 'WIFI'),
+  ('Alice Lake Provincial Park', 'PET FRIENDLY'),
+  ('Alice Lake Provincial Park', 'FIRE PIT'),
+  ('Emerald Lake Campground', 'WIFI'),
+  ('Emerald Lake Campground', 'FIRE PIT'),
+  ('Green Point Campground – Pacific Rim', 'PET FRIENDLY'),
+  ('Green Point Campground – Pacific Rim', 'FIRE PIT'),
+  ('Gold Creek Campground – Golden Ears', 'WIFI'),
+  ('Gold Creek Campground – Golden Ears', 'SOCCER')
+)
+ON CONFLICT (campground_id, amenity_id) DO NOTHING;

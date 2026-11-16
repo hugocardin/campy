@@ -12,6 +12,9 @@ import {
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
 import {
+  parseGuestAmenityCodes,
+} from "@/lib/guest-amenity-codes";
+import {
   type GuestSiteTypeCode,
   campingSiteAttrsAllowed,
   parseGuestSiteTypes,
@@ -74,6 +77,11 @@ export type CampgroundSiteFilters = CampgroundHookupFilters & {
   siteTypes: GuestSiteTypeCode[];
   /** Max nightly base price on a matching site (CAD). */
   maxPrice?: number;
+  /**
+   * Park amenities (canonical keys, e.g. PET_FRIENDLY). AND on
+   * `campground_amenities` — every selected code must be present.
+   */
+  amenityCodes: string[];
 };
 
 export type CampgroundListFilters = {
@@ -92,6 +100,7 @@ export type CampgroundListFilters = {
   stayKind?: StayKind;
   siteTypes?: GuestSiteTypeCode[];
   maxPrice?: number;
+  amenityCodes?: string[];
 };
 
 export type CampgroundGeo = {
@@ -307,7 +316,7 @@ export function parseCampgroundHookups(params: {
 }
 
 /**
- * Parse dump / driveway / rig / stay / types / maxPrice URL params
+ * Parse dump / driveway / rig / stay / types / maxPrice / amenities URL params
  * (issues #27 / #24). Rig length and driveway are ignored when stay=lodging.
  * Fine site types incompatible with stay are dropped.
  */
@@ -322,6 +331,7 @@ export function parseCampgroundSiteFilters(params: {
   stay?: string;
   types?: string;
   maxPrice?: string;
+  amenities?: string;
 }): CampgroundSiteFilters {
   const stayKind = parseStayKind(params.stay);
   const siteTypes = siteTypesForStayKind(
@@ -341,6 +351,7 @@ export function parseCampgroundSiteFilters(params: {
     stayKind,
     siteTypes,
     maxPrice: parseGuestMaxPrice(params.maxPrice),
+    amenityCodes: parseGuestAmenityCodes(params.amenities),
   };
 }
 
@@ -358,7 +369,8 @@ export function anySiteFilterActive(filters: CampgroundSiteFilters): boolean {
     filters.rigLength != null ||
     filters.stayKind != null ||
     filters.siteTypes.length > 0 ||
-    filters.maxPrice != null
+    filters.maxPrice != null ||
+    filters.amenityCodes.length > 0
   );
 }
 

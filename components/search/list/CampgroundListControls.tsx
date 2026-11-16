@@ -51,6 +51,10 @@ import {
 } from "@/lib/electricity-amps";
 import type { SearchSuggestion } from "@/lib/geocoding/types";
 import {
+  amenityCodeCanonicalKey,
+  normalizeGuestAmenityCodes,
+} from "@/lib/guest-amenity-codes";
+import {
   GUEST_SITE_TYPE_CODES,
   type GuestSiteTypeCode,
   campingSiteAttrsAllowed,
@@ -68,17 +72,25 @@ import {
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import type { StayKind } from "@/lib/stay-kind";
+import { translateCode } from "@/lib/translate-code";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
+export type GuestAmenityOption = {
+  code: string;
+  categoryCode?: string;
+};
+
 type Props = {
   resultCount: number;
   /** Non-geo RPC hit the SQL LIMIT — hint to refine filters. */
   resultsTruncated?: boolean;
   provinces: string[];
+  /** Admin amenity catalog minus water/sewer/dump/electricity. */
+  amenityOptions?: GuestAmenityOption[];
   /**
    * Server-resolved unit for first paint / URL-absent case (issue #42 step 2).
    * Same rule as `detailQuery.rigUnit` on the home page — do not re-derive.
@@ -163,6 +175,7 @@ function queryStateFromFilters(
     | "stayKind"
     | "siteTypes"
     | "maxPrice"
+    | "amenityCodes"
   >,
   filters: ReturnType<typeof parseCampgroundSiteFilters>,
   rigUnit: RigLengthUnit | undefined,
@@ -181,6 +194,7 @@ function queryStateFromFilters(
     stayKind: filters.stayKind,
     siteTypes: filters.siteTypes,
     maxPrice: filters.maxPrice,
+    amenityCodes: filters.amenityCodes,
   };
 }
 
@@ -195,16 +209,30 @@ function toggleSiteTypeFilter(
   return normalizeGuestSiteTypes([...set]);
 }
 
+function toggleAmenityFilter(
+  current: string[],
+  code: string,
+  checked: boolean,
+): string[] {
+  const key = amenityCodeCanonicalKey(code);
+  const set = new Set(normalizeGuestAmenityCodes(current));
+  if (checked) set.add(key);
+  else set.delete(key);
+  return normalizeGuestAmenityCodes([...set]);
+}
+
 export default function CampgroundListControls({
   resultCount,
   resultsTruncated = false,
   provinces,
+  amenityOptions = [],
   initialRigUnit,
   preferredRigUnit = null,
   defaultRigLength = null,
   initialRigLength,
 }: Props) {
   const t = useTranslations("search.controls");
+  const tAmenities = useTranslations("amenities");
   const tProvinces = useTranslations("search.provinces");
   const locale = useLocale();
   const router = useRouter();
@@ -239,6 +267,7 @@ export default function CampgroundListControls({
     stay: searchParams.get("stay") ?? undefined,
     types: searchParams.get("types") ?? undefined,
     maxPrice: searchParams.get("maxPrice") ?? undefined,
+    amenities: searchParams.get("amenities") ?? undefined,
   });
   // Same precedence as the server (`resolveGuestRigLengthUnit` / State).
   const urlRigUnit = resolveGuestRigLengthUnit(
@@ -780,6 +809,9 @@ export default function CampgroundListControls({
   const discreteControlsDisabled = geoBusy || isPending;
   const selectedAmps = new Set(localFilters.amps);
   const selectedSiteTypes = new Set(localFilters.siteTypes);
+  const selectedAmenityKeys = new Set(
+    normalizeGuestAmenityCodes(localFilters.amenityCodes),
+  );
   // Rig + driveway are camping/RV site attributes (hidden for lodging searches).
   const showCampingSiteAttrs = campingSiteAttrsAllowed(
     localFilters.stayKind,
@@ -1227,6 +1259,57 @@ export default function CampgroundListControls({
           {t("dumpStationHint")}
         </p>
       </div>
+
+      {amenityOptions.length > 0 ? (
+        <div
+          className="space-y-2"
+          role="group"
+          aria-labelledby="park-amenities-label"
+          aria-describedby="park-amenities-hint"
+        >
+          <fieldset
+            className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
+            disabled={discreteControlsDisabled}
+          >
+            <legend
+              id="park-amenities-label"
+              className="text-sm font-medium text-muted-foreground mr-1 float-left"
+            >
+              {t("amenitiesLabel")}
+            </legend>
+            {amenityOptions.map((opt) => {
+              const key = amenityCodeCanonicalKey(opt.code);
+              const id = `amenity-${key}`;
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <Checkbox
+                    id={id}
+                    checked={selectedAmenityKeys.has(key)}
+                    disabled={discreteControlsDisabled}
+                    onCheckedChange={(checked) => {
+                      replaceWithFilters({
+                        q: search,
+                        sort: latestParamsRef.current.sort,
+                        amenityCodes: toggleAmenityFilter(
+                          latestParamsRef.current.amenityCodes,
+                          opt.code,
+                          checked === true,
+                        ),
+                      });
+                    }}
+                  />
+                  <Label htmlFor={id} className="font-normal cursor-pointer">
+                    {translateCode(tAmenities, "codes", opt.code)}
+                  </Label>
+                </div>
+              );
+            })}
+          </fieldset>
+          <p id="park-amenities-hint" className="text-xs text-muted-foreground">
+            {t("amenitiesHint")}
+          </p>
+        </div>
+      ) : null}
 
       {geoError ? (
         <p className="text-sm text-destructive" role="status">

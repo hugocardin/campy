@@ -22,6 +22,7 @@ import { formatGuestMaxPriceParam } from "@/lib/campground-price";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
+import { formatGuestAmenityCodesParam } from "@/lib/guest-amenity-codes";
 import { formatGuestSiteTypesParam } from "@/lib/guest-site-types";
 import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
 import { formatStayKindParam } from "@/lib/stay-kind";
@@ -240,6 +241,8 @@ function siteFilterRpcArgs(filters: CampgroundSiteFilters) {
     require_site_types:
       filters.siteTypes.length > 0 ? filters.siteTypes : null,
     max_price: filters.maxPrice ?? null,
+    require_amenity_codes:
+      filters.amenityCodes.length > 0 ? filters.amenityCodes : null,
   };
 }
 
@@ -266,6 +269,8 @@ export function buildCampgroundSiteFiltersCacheKey(
   if (types) params.set("types", types);
   const maxPrice = formatGuestMaxPriceParam(filters.maxPrice);
   if (maxPrice) params.set("maxPrice", maxPrice);
+  const amenities = formatGuestAmenityCodesParam(filters.amenityCodes);
+  if (amenities) params.set("amenities", amenities);
   return params.toString();
 }
 
@@ -281,6 +286,7 @@ function parseSiteFiltersCacheKey(key: string): CampgroundSiteFilters {
     stay: params.get("stay") ?? undefined,
     types: params.get("types") ?? undefined,
     maxPrice: params.get("maxPrice") ?? undefined,
+    amenities: params.get("amenities") ?? undefined,
   });
 }
 

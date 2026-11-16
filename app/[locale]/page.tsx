@@ -2,6 +2,7 @@ import CampgroundCardSkeleton from "@/components/search/CampgroundCardSkeleton";
 import CampgroundList from "@/components/search/CampgroundList";
 import CampgroundsMapDynamic from "@/components/search/CampgroundsMapDynamic";
 import CampgroundListControls from "@/components/search/list/CampgroundListControls";
+import { getAllAmenities } from "@/data/amenities/get-amenities";
 import {
   buildCampgroundSiteFiltersCacheKey,
   getCampgroundProvinces,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/campground-search";
 import { campgroundSearchKey } from "@/lib/campground-search-query";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
+import { guestSearchAmenityCatalog } from "@/lib/guest-amenity-codes";
 import { campingSiteAttrsAllowed } from "@/lib/guest-site-types";
 import type { CampgroundDetailQuery } from "@/lib/routes";
 import {
@@ -61,6 +63,7 @@ export default async function Home({ searchParams }: PageProps) {
     stay: firstParam(params.stay),
     types: firstParam(params.types),
     maxPrice: firstParam(params.maxPrice),
+    amenities: firstParam(params.amenities),
   });
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
@@ -69,12 +72,19 @@ export default async function Home({ searchParams }: PageProps) {
   const rigUnitParamPresent = "rigUnit" in params;
   const rigLengthParamPresent = "rigLength" in params;
 
-  // Prefs + provinces in parallel; campgrounds need resolved length first.
-  const [prefs, provincesResult] = await Promise.all([
+  // Prefs + provinces + amenity catalog in parallel; campgrounds need length first.
+  const [prefs, provincesResult, amenitiesResult] = await Promise.all([
     getCurrentRigSearchPrefs(),
     getCampgroundProvinces(),
+    getAllAmenities(),
   ]);
   const { preferredRigUnit, defaultRigLength } = prefs;
+  const guestAmenityOptions = amenitiesResult.success
+    ? guestSearchAmenityCatalog(amenitiesResult.data).map((a) => ({
+        code: a.code,
+        categoryCode: a.category_code,
+      }))
+    : [];
 
   const campingOk = campingSiteAttrsAllowed(
     siteFiltersParsed.stayKind,
@@ -166,6 +176,7 @@ export default async function Home({ searchParams }: PageProps) {
               resultCount={campgrounds.length}
               resultsTruncated={truncated}
               provinces={provinces}
+              amenityOptions={guestAmenityOptions}
               initialRigUnit={resolvedRigUnit}
               preferredRigUnit={preferredRigUnit}
               defaultRigLength={defaultRigLength}

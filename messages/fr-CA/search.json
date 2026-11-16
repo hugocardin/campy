@@ -65,6 +65,8 @@
     "filterSewer": "Égouts",
     "filterDumpStation": "Station de vidange",
     "dumpStationHint": "Commodité du camping (distincte des égouts à l’emplacement).",
+    "amenitiesLabel": "Commodités du camping",
+    "amenitiesHint": "Affiche les campings qui offrent toutes les commodités sélectionnées (ET). Eau, égouts et station de vidange restent dans leurs propres filtres.",
     "clearFilters": "Effacer",
     "nearMe": "Près de moi",
     "nearMeLocating": "Localisation…",

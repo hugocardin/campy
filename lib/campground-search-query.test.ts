@@ -25,6 +25,7 @@ const base = {
   stayKind: "camping" as const,
   siteTypes: ["TENT" as const, "RV" as const],
   maxPrice: 80,
+  amenityCodes: ["WIFI", "PET_FRIENDLY"],
 };
 
 describe("withLatestCampgroundFilters", () => {
@@ -67,7 +68,7 @@ describe("withLatestCampgroundFilters", () => {
 });
 
 describe("buildCampgroundSearchParams / clear", () => {
-  it("emits dump, driveway, rigLength, stay, types, maxPrice", () => {
+  it("emits dump, driveway, rigLength, stay, types, maxPrice, amenities", () => {
     const params = buildCampgroundSearchParams({
       ...base,
       lat: undefined,
@@ -86,6 +87,16 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.get("stay"), "camping");
     assert.equal(params.get("types"), "tent,rv");
     assert.equal(params.get("maxPrice"), "80");
+    assert.equal(params.get("amenities"), "pet_friendly,wifi");
+  });
+
+  it("allows toggling amenity codes", () => {
+    const next = withLatestCampgroundFilters(base, {
+      q: "lake",
+      sort: "name",
+      amenityCodes: ["POOL"],
+    });
+    assert.deepEqual(next.amenityCodes, ["POOL"]);
   });
 
   it("emits rigUnit=m when metres selected (rigLength stays feet)", () => {
@@ -248,8 +259,9 @@ describe("buildCampgroundSearchParams / clear", () => {
         stayKind: "camping",
         siteTypes: ["TENT"],
         maxPrice: 60,
+        amenityCodes: ["WIFI", "POOL"],
       }),
-      "none,30|0|1|1|BACK_IN|28|camping|tent|60",
+      "none,30|0|1|1|BACK_IN|28|camping|tent|60|pool,wifi",
     );
     assert.equal(
       hookupsKey({ amps: [], water: false, sewer: false }),

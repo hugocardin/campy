@@ -14,6 +14,9 @@ import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import type { ElectricityAmpFilterOption } from "@/lib/electricity-amps";
 import { normalizeElectricityAmpFilters } from "@/lib/electricity-amps";
 import {
+  formatGuestAmenityCodesParam,
+} from "@/lib/guest-amenity-codes";
+import {
   type GuestSiteTypeCode,
   campingSiteAttrsAllowed,
   formatGuestSiteTypesParam,
@@ -62,6 +65,8 @@ export type CampgroundQueryState = {
   siteTypes: GuestSiteTypeCode[];
   /** Max nightly base price (URL `maxPrice`). */
   maxPrice?: number;
+  /** Park amenities (URL `amenities`); canonical keys. */
+  amenityCodes: string[];
 };
 
 /** Merge a partial update onto the latest query state (hookups / geo / province). */
@@ -82,6 +87,10 @@ export function withLatestCampgroundFilters(
     "drivewayType" in patch ? patch.drivewayType : latest.drivewayType;
   const maxPriceRaw =
     "maxPrice" in patch ? patch.maxPrice : latest.maxPrice;
+  const amenityCodesRaw =
+    "amenityCodes" in patch
+      ? (patch.amenityCodes ?? [])
+      : latest.amenityCodes;
   return {
     q: patch.q,
     sort: patch.sort,
@@ -106,6 +115,7 @@ export function withLatestCampgroundFilters(
     rigUnit:
       rigUnitRaw === "m" || rigUnitRaw === "ft" ? rigUnitRaw : undefined,
     maxPrice: maxPriceRaw,
+    amenityCodes: amenityCodesRaw,
   };
 }
 
@@ -131,6 +141,7 @@ export function siteFiltersFromQueryState(
     | "stayKind"
     | "siteTypes"
     | "maxPrice"
+    | "amenityCodes"
   >,
 ): CampgroundSiteFilters {
   const siteTypes = siteTypesForStayKind(state.siteTypes, state.stayKind);
@@ -146,6 +157,7 @@ export function siteFiltersFromQueryState(
     stayKind: state.stayKind,
     siteTypes,
     maxPrice: state.maxPrice,
+    amenityCodes: state.amenityCodes,
   };
 }
 
@@ -158,7 +170,7 @@ export function hookupsKey(hookups: CampgroundHookupFilters): string {
   ].join("|");
 }
 
-/** Stable key for optimistic site-filter sync (includes dump/driveway/rig/stay/types/price). */
+/** Stable key for optimistic site-filter sync (includes dump/driveway/rig/stay/types/price/amenities). */
 export function siteFiltersKey(filters: CampgroundSiteFilters): string {
   return [
     hookupsKey(filters),
@@ -168,6 +180,7 @@ export function siteFiltersKey(filters: CampgroundSiteFilters): string {
     filters.stayKind ?? "",
     formatGuestSiteTypesParam(filters.siteTypes) ?? "",
     formatGuestMaxPriceParam(filters.maxPrice) ?? "",
+    formatGuestAmenityCodesParam(filters.amenityCodes) ?? "",
   ].join("|");
 }
 
@@ -234,6 +247,8 @@ export function buildCampgroundSearchParams(
   if (typesParam) params.set("types", typesParam);
   const maxPriceParam = formatGuestMaxPriceParam(next.maxPrice);
   if (maxPriceParam) params.set("maxPrice", maxPriceParam);
+  const amenitiesParam = formatGuestAmenityCodesParam(next.amenityCodes);
+  if (amenitiesParam) params.set("amenities", amenitiesParam);
   return params;
 }
 
@@ -249,6 +264,7 @@ export function clearedCampgroundQueryState(): CampgroundQueryState {
     sewer: false,
     dumpStation: false,
     siteTypes: [],
+    amenityCodes: [],
   };
 }
 

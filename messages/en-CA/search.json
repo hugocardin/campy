@@ -65,6 +65,8 @@
     "filterSewer": "Sewer",
     "filterDumpStation": "Dump station",
     "dumpStationHint": "Park amenity (not the same as sewer at the site).",
+    "amenitiesLabel": "Park amenities",
+    "amenitiesHint": "Shows parks that have every selected amenity (AND). Water, sewer, and dump station stay in their own filters.",
     "clearFilters": "Clear",
     "nearMe": "Near me",
     "nearMeLocating": "Locating…",
