@@ -14,7 +14,10 @@
  * intentional (same-site capacity), not limited to RV / RV_AND_TENT.
  *
  * URL params (guest search):
- * - `rigLength=<feet>` — always canonical feet (same as DB / RPC `min_rig_length`)
+ * - `rigLength=<feet>` — always canonical feet (same as DB / RPC `min_rig_length`).
+ *   Omit means "use `profiles.default_rig_length` when signed in". An explicit
+ *   empty `?rigLength=` means no length filter (suppresses the profile default),
+ *   same presence rule as `rigUnit`.
  * - `rigUnit=ft|m` — display/input unit for the filter toggle. Prefer an
  *   explicit value once the guest has a choice; omit means "use profile
  *   preference / feet default". Does not change the numeric meaning of
@@ -126,6 +129,29 @@ export function resolveGuestRigLengthUnit(
   }
   if (preferred === "m" || preferred === "ft") return preferred;
   return "ft";
+}
+
+/**
+ * Resolve guest search rig length (canonical feet): explicit URL `rigLength`
+ * wins; otherwise use a saved `profiles.default_rig_length`.
+ *
+ * Pass `urlParamPresent: true` when the query key exists (even if empty) so
+ * `?rigLength=` means "no length filter" rather than "absent → profile default".
+ */
+export function resolveGuestRigLengthFeet(
+  urlValue: string | undefined | null,
+  defaultFeet?: number | null,
+  urlParamPresent = false,
+): number | undefined {
+  if (urlParamPresent) {
+    return parseGuestRigLength(urlValue);
+  }
+  if (urlValue != null && String(urlValue).trim() !== "") {
+    return parseGuestRigLength(urlValue);
+  }
+  if (defaultFeet == null) return undefined;
+  const parsed = normalizeStoredRigLengthFeet(defaultFeet);
+  return parsed.ok ? parsed.feet : undefined;
 }
 
 /**

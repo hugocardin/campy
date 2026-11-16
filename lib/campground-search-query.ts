@@ -44,8 +44,13 @@ export type CampgroundQueryState = {
   sewer: boolean;
   dumpStation: boolean;
   drivewayType?: DrivewayType;
-  /** Canonical feet (matches URL `rigLength` / RPC). */
-  rigLength?: number;
+  /**
+   * Canonical feet (matches URL `rigLength` / RPC).
+   * - `number` — filter by that length
+   * - `null` — explicit clear (`?rigLength=`), suppresses profile default
+   * - `undefined` — omit from URL (absent → profile default on resolve)
+   */
+  rigLength?: number | null;
   /**
    * Display/input unit for the guest rig-length field.
    * URL: always `rigUnit=ft|m` when set so a metres preference cannot steal
@@ -93,6 +98,7 @@ export function withLatestCampgroundFilters(
     // Drop fine types incompatible with coarse stay (#24).
     siteTypes,
     // Drop rig + driveway when lodging stay or lodging-only fine types (#27/#40).
+    // Preserve null (explicit ?rigLength= clear) through camping.
     drivewayType: campingOk ? drivewayRaw : undefined,
     rigLength: campingOk ? rigLengthRaw : undefined,
     // Keep unit through lodging so camping↔lodging restores the toggle
@@ -135,7 +141,8 @@ export function siteFiltersFromQueryState(
     sewer: state.sewer,
     dumpStation: state.dumpStation,
     drivewayType: campingOk ? state.drivewayType : undefined,
-    rigLength: campingOk ? state.rigLength : undefined,
+    // null (explicit clear) → no RPC filter.
+    rigLength: campingOk ? (state.rigLength ?? undefined) : undefined,
     stayKind: state.stayKind,
     siteTypes,
     maxPrice: state.maxPrice,
@@ -157,7 +164,7 @@ export function siteFiltersKey(filters: CampgroundSiteFilters): string {
     hookupsKey(filters),
     filters.dumpStation ? "1" : "0",
     filters.drivewayType ?? "",
-    filters.rigLength != null ? String(filters.rigLength) : "",
+    filters.rigLength == null ? "" : String(filters.rigLength),
     filters.stayKind ?? "",
     formatGuestSiteTypesParam(filters.siteTypes) ?? "",
     formatGuestMaxPriceParam(filters.maxPrice) ?? "",
@@ -201,8 +208,13 @@ export function buildCampgroundSearchParams(
   if (campingSiteAttrsAllowed(next.stayKind, next.siteTypes)) {
     const drivewayParam = formatDrivewayUrlParam(next.drivewayType);
     if (drivewayParam) params.set("driveway", drivewayParam);
-    const rigParam = formatGuestRigLengthParam(next.rigLength);
-    if (rigParam) params.set("rigLength", rigParam);
+    // null → explicit empty key so a profile default is not reapplied.
+    if (next.rigLength === null) {
+      params.set("rigLength", "");
+    } else {
+      const rigParam = formatGuestRigLengthParam(next.rigLength);
+      if (rigParam) params.set("rigLength", rigParam);
+    }
   }
   // Persist unit whenever set (ft|m), including empty length / lodging, so
   // shared links and a metres preference cannot disagree. Harmless for

@@ -20,6 +20,7 @@ import RigLengthInput from "@/components/rig-length/RigLengthInput";
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   CampgroundRadiusKm,
+  type CampgroundSiteFilters,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   HookupAmenityFilterKey,
   anySiteFilterActive,
@@ -60,6 +61,7 @@ import {
   convertRigDraftOnUnitChange,
   formatRigLengthForDisplay,
   parseGuestRigLength,
+  resolveGuestRigLengthFeet,
   resolveGuestRigLengthUnit,
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
@@ -78,7 +80,6 @@ type Props = {
   /**
    * Server-resolved unit for first paint / URL-absent case (issue #42 step 2).
    * Same rule as `detailQuery.rigUnit` on the home page — do not re-derive.
-   * Does not pre-fill rig length (step 3).
    */
   initialRigUnit: RigLengthUnit;
   /**
@@ -86,6 +87,16 @@ type Props = {
    * (Clear / back to a preference-default URL).
    */
   preferredRigUnit?: RigLengthUnit | null;
+  /**
+   * Signed-in `profiles.default_rig_length` (feet), or null. Used when the URL
+   * omits `rigLength` (issue #42 step 3) — Clear restores it like preferred unit.
+   */
+  defaultRigLength?: number | null;
+  /**
+   * Server-resolved length for first paint (URL or profile default). Same rule
+   * as the home page search RPC — do not re-derive on mount.
+   */
+  initialRigLength?: number;
 };
 
 const ALL_PROVINCES = "__all__";
@@ -186,6 +197,8 @@ export default function CampgroundListControls({
   provinces,
   initialRigUnit,
   preferredRigUnit = null,
+  defaultRigLength = null,
+  initialRigLength,
 }: Props) {
   const t = useTranslations("search.controls");
   const tProvinces = useTranslations("search.provinces");
@@ -211,7 +224,7 @@ export default function CampgroundListControls({
   );
   // Place label only meaningful with active geo.
   const placeLabel = geo ? placeParam : undefined;
-  const urlFilters = parseCampgroundSiteFilters({
+  const urlFiltersParsed = parseCampgroundSiteFilters({
     amps: searchParams.get("amps") ?? undefined,
     electricity: searchParams.get("electricity") ?? undefined,
     water: searchParams.get("water") ?? undefined,
@@ -223,15 +236,37 @@ export default function CampgroundListControls({
     types: searchParams.get("types") ?? undefined,
     maxPrice: searchParams.get("maxPrice") ?? undefined,
   });
-  // Same precedence as the server (`resolveGuestRigLengthUnit`).
+  // Same precedence as the server (`resolveGuestRigLengthUnit` / Feet).
   const urlRigUnit = resolveGuestRigLengthUnit(
     searchParams.get("rigUnit"),
     preferredRigUnit,
     searchParams.has("rigUnit"),
   );
+  const campingOk = campingSiteAttrsAllowed(
+    urlFiltersParsed.stayKind,
+    urlFiltersParsed.siteTypes,
+  );
+  const rigLengthParamPresent = searchParams.has("rigLength");
+  const urlRigLength = campingOk
+    ? resolveGuestRigLengthFeet(
+        searchParams.get("rigLength"),
+        defaultRigLength,
+        rigLengthParamPresent,
+      )
+    : undefined;
+  // Query-state form: null when ?rigLength= explicitly clears the default.
+  const urlRigLengthState: number | null | undefined = rigLengthParamPresent
+    ? (urlRigLength ?? null)
+    : urlRigLength;
+  const urlFilters = {
+    ...urlFiltersParsed,
+    rigLength: urlRigLength,
+  };
   const urlFiltersKey = siteFiltersKey(urlFilters);
-  // Include unit in external-nav sync key so back/forward restores the toggle.
-  const urlRigSyncKey = `${urlFiltersKey}|${urlRigUnit}`;
+  // Include unit + explicit-clear presence so back/forward restores toggle/length.
+  const urlRigSyncKey = `${urlFiltersKey}|${urlRigUnit}|${
+    rigLengthParamPresent ? "1" : "0"
+  }`;
   const sortParam = parseCampgroundSort(
     searchParams.get("sort") ?? undefined,
     { geoActive: Boolean(geo) },
@@ -248,7 +283,8 @@ export default function CampgroundListControls({
   const [lastPushedQ, setLastPushedQ] = useState(qParam);
   const [activePlace, setActivePlace] = useState<string | undefined>(placeLabel);
   const [prevPlaceLabel, setPrevPlaceLabel] = useState(placeLabel);
-  const [localFilters, setLocalFilters] = useState(urlFilters);
+  const [localFilters, setLocalFilters] =
+    useState<CampgroundSiteFilters>(urlFilters);
   const [rigUnit, setRigUnit] = useState<RigLengthUnit>(initialRigUnit);
   const [prevUrlRigSyncKey, setPrevUrlRigSyncKey] = useState(urlRigSyncKey);
   const [lastPushedFiltersKey, setLastPushedFiltersKey] =
@@ -256,7 +292,10 @@ export default function CampgroundListControls({
   const [lastPushedRigUnit, setLastPushedRigUnit] =
     useState<RigLengthUnit>(initialRigUnit);
   const [rigDraft, setRigDraft] = useState(
-    formatRigLengthForDisplay(urlFilters.rigLength, initialRigUnit),
+    formatRigLengthForDisplay(
+      initialRigLength ?? urlRigLength,
+      initialRigUnit,
+    ),
   );
   const [maxPriceDraft, setMaxPriceDraft] = useState(
     formatGuestMaxPriceParam(urlFilters.maxPrice) ?? "",
@@ -274,19 +313,24 @@ export default function CampgroundListControls({
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
-    queryStateFromFilters(
-      {
-        q: placeLabel ? "" : search,
-        sort: sortParam,
-        province: provinceParam,
-        lat: geo?.lat,
-        lng: geo?.lng,
-        radiusKm: geo?.radiusKm ?? preferredRadius,
-        place: placeLabel,
-      },
-      localFilters,
-      rigUnit,
-    ),
+    (() => {
+      const initial = queryStateFromFilters(
+        {
+          q: placeLabel ? "" : search,
+          sort: sortParam,
+          province: provinceParam,
+          lat: geo?.lat,
+          lng: geo?.lng,
+          radiusKm: geo?.radiusKm ?? preferredRadius,
+          place: placeLabel,
+        },
+        urlFilters,
+        rigUnit,
+      );
+      // Preserve explicit ?rigLength= clear vs profile-default seed.
+      initial.rigLength = urlRigLengthState;
+      return initial;
+    })(),
   );
 
   // Sync search input from URL only for external changes (back/forward / Clear).
@@ -320,7 +364,7 @@ export default function CampgroundListControls({
       setLastPushedRigUnit(urlRigUnit);
       // setState only during render (react-hooks/refs); effects sync refs below.
       setRigUnit(urlRigUnit);
-      setRigDraft(formatRigLengthForDisplay(urlFilters.rigLength, urlRigUnit));
+      setRigDraft(formatRigLengthForDisplay(urlRigLength, urlRigUnit));
       setMaxPriceDraft(formatGuestMaxPriceParam(urlFilters.maxPrice) ?? "");
     }
     setLocalFilters(urlFilters);
@@ -335,7 +379,7 @@ export default function CampgroundListControls({
   }
 
   useEffect(() => {
-    latestParamsRef.current = queryStateFromFilters(
+    const next = queryStateFromFilters(
       {
         // Place-centered search: keep q empty so RPC does not also ILIKE the label.
         q: activePlace ? "" : search,
@@ -349,6 +393,13 @@ export default function CampgroundListControls({
       localFilters,
       rigUnit,
     );
+    // Keep explicit ?rigLength= as null so later patches do not re-apply the default.
+    if (rigLengthParamPresent && next.rigLength == null) {
+      next.rigLength = null;
+    } else if (!rigLengthParamPresent && urlRigLength != null) {
+      next.rigLength = urlRigLength;
+    }
+    latestParamsRef.current = next;
   }, [
     search,
     activePlace,
@@ -360,6 +411,8 @@ export default function CampgroundListControls({
     preferredRadius,
     localFilters,
     rigUnit,
+    rigLengthParamPresent,
+    urlRigLength,
   ]);
 
   // Sync refs after render-time setState (external URL sync). Event handlers
@@ -414,12 +467,18 @@ export default function CampgroundListControls({
     setRigUnit(unit);
   }
 
-  /** Parse the live draft in the active unit → canonical feet. */
-  function resolveRigDraft(): number | undefined {
+  /**
+   * Parse the live draft in the active unit → canonical feet.
+   * Empty draft → `null` (explicit clear / `?rigLength=`), not `undefined`
+   * (omit → profile default).
+   */
+  function resolveRigDraft(): number | null | undefined {
     const draft = rigDraftRef.current;
+    if (draft.trim() === "") return null;
     const parsed = parseGuestRigLength(draft, rigUnitRef.current);
-    if (draft.trim() !== "" && parsed == null) {
+    if (parsed == null) {
       updateRigDraft("");
+      return null;
     }
     return parsed;
   }
@@ -429,7 +488,7 @@ export default function CampgroundListControls({
    * Always reads `rigDraftRef` so timers started on an older search render still see
    * the latest typed length.
    */
-  function takePendingRigLength(): number | undefined {
+  function takePendingRigLength(): number | null | undefined {
     if (rigDebounceRef.current != null) {
       window.clearTimeout(rigDebounceRef.current);
       rigDebounceRef.current = null;
@@ -865,7 +924,13 @@ export default function CampgroundListControls({
               cancelGeolocation();
               setSearch("");
               setActivePlace(undefined);
-              updateRigDraft("");
+              // Omit rigLength so Clear restores the profile default (like unit).
+              updateRigDraft(
+                formatRigLengthForDisplay(
+                  defaultRigLength ?? undefined,
+                  rigUnitRef.current,
+                ),
+              );
               updateMaxPriceDraft("");
               setGeoError(null);
               replaceQuery(clearedCampgroundQueryState());

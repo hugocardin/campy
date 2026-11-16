@@ -11,7 +11,7 @@
     "role": "Role",
     "joined": "Joined",
     "defaultRigLengthLabel": "Default rig length",
-    "defaultRigLengthHint": "Saved for future searches. Leave blank if you have no default.",
+    "defaultRigLengthHint": "Used as your preferred length for search. Leave blank if you have no default.",
     "rigLengthPlaceholderFt": "e.g. 35",
     "rigLengthPlaceholderM": "e.g. 11",
     "rigLengthUnitGroupLabel": "Length unit",

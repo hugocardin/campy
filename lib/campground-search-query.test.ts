@@ -149,6 +149,18 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.toString(), "");
   });
 
+  it("emits empty rigLength when explicitly cleared (suppress profile default)", () => {
+    const params = buildCampgroundSearchParams({
+      ...base,
+      rigLength: null,
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+    });
+    assert.equal(params.get("rigLength"), "");
+    assert.equal(params.has("rigLength"), true);
+  });
+
   it("emits place only with active geo", () => {
     const withGeo = buildCampgroundSearchParams({
       ...base,

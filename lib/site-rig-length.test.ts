@@ -15,6 +15,7 @@ import {
   parseRigLengthToFeet,
   parseRigLengthUnit,
   parseStoredRigLengthUnit,
+  resolveGuestRigLengthFeet,
   resolveGuestRigLengthUnit,
   siteTypeRequiresMaxRigLength,
 } from "./site-rig-length";
@@ -163,6 +164,20 @@ describe("site-rig-length", () => {
     assert.equal(resolveGuestRigLengthUnit("ft", "m"), "ft");
     assert.equal(resolveGuestRigLengthUnit(undefined, null), "ft");
     assert.equal(resolveGuestRigLengthUnit(undefined, undefined), "ft");
+  });
+
+  it("resolves guest search length: URL wins, else profile default", () => {
+    assert.equal(resolveGuestRigLengthFeet(undefined, 35), 35);
+    assert.equal(resolveGuestRigLengthFeet(null, 28), 28);
+    assert.equal(resolveGuestRigLengthFeet("40", 35), 40);
+    // Absent empty without urlParamPresent → default.
+    assert.equal(resolveGuestRigLengthFeet("", 35), 35);
+    // Explicit empty key (?rigLength=) → no filter.
+    assert.equal(resolveGuestRigLengthFeet("", 35, true), undefined);
+    assert.equal(resolveGuestRigLengthFeet("0", 35, true), undefined);
+    assert.equal(resolveGuestRigLengthFeet(undefined, null), undefined);
+    assert.equal(resolveGuestRigLengthFeet(undefined, 0), undefined);
+    assert.equal(resolveGuestRigLengthFeet(undefined, 999), undefined);
   });
 
   it("converts display values and formats drafts from feet", () => {

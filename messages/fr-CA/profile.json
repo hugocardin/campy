@@ -11,7 +11,7 @@
     "role": "Rôle",
     "joined": "Date d'inscription",
     "defaultRigLengthLabel": "Longueur de véhicule par défaut",
-    "defaultRigLengthHint": "Enregistrée pour les recherches futures. Laissez vide si vous n'avez pas de valeur par défaut.",
+    "defaultRigLengthHint": "Utilisée comme longueur préférée pour la recherche. Laissez vide si vous n'avez pas de valeur par défaut.",
     "rigLengthPlaceholderFt": "ex. 35",
     "rigLengthPlaceholderM": "ex. 11",
     "rigLengthUnitGroupLabel": "Unité de longueur",

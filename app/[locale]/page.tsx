@@ -7,7 +7,7 @@ import {
   getCampgroundProvinces,
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
-import { getCurrentPreferredRigUnit } from "@/data/profile/get-preferred-rig-unit";
+import { getCurrentRigSearchPrefs } from "@/data/profile/get-preferred-rig-unit";
 import {
   parseCampgroundGeo,
   parseCampgroundSiteFilters,
@@ -15,8 +15,12 @@ import {
 } from "@/lib/campground-search";
 import { campgroundSearchKey } from "@/lib/campground-search-query";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
+import { campingSiteAttrsAllowed } from "@/lib/guest-site-types";
 import type { CampgroundDetailQuery } from "@/lib/routes";
-import { resolveGuestRigLengthUnit } from "@/lib/site-rig-length";
+import {
+  resolveGuestRigLengthFeet,
+  resolveGuestRigLengthUnit,
+} from "@/lib/site-rig-length";
 import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -46,7 +50,7 @@ export default async function Home({ searchParams }: PageProps) {
     lng: firstParam(params.lng),
     radiusKm: firstParam(params.radiusKm),
   });
-  const siteFilters = parseCampgroundSiteFilters({
+  const siteFiltersParsed = parseCampgroundSiteFilters({
     amps: firstParam(params.amps),
     electricity: firstParam(params.electricity),
     water: firstParam(params.water),
@@ -61,27 +65,45 @@ export default async function Home({ searchParams }: PageProps) {
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
   });
-  const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
   const rigUnitParam = firstParam(params.rigUnit);
   const rigUnitParamPresent = "rigUnit" in params;
+  const rigLengthParamPresent = "rigLength" in params;
 
-  const [campgroundsResult, provincesResult, preferredRigUnit] =
-    await Promise.all([
-      getCampgrounds(
-        q,
-        sort,
-        province,
-        geo?.lat,
-        geo?.lng,
-        geo?.radiusKm,
-        siteFiltersKey,
-      ),
-      getCampgroundProvinces(),
-      getCurrentPreferredRigUnit(),
-    ]);
+  // Prefs before search so absent rigLength can apply default_rig_length.
+  const { preferredRigUnit, defaultRigLength } =
+    await getCurrentRigSearchPrefs();
 
-  // URL rigUnit wins; else signed-in preferred unit; else feet.
-  // Does not pre-fill rigLength from default_rig_length (issue #42 step 3).
+  const campingOk = campingSiteAttrsAllowed(
+    siteFiltersParsed.stayKind,
+    siteFiltersParsed.siteTypes,
+  );
+  const resolvedRigLength = campingOk
+    ? resolveGuestRigLengthFeet(
+        firstParam(params.rigLength),
+        defaultRigLength,
+        rigLengthParamPresent,
+      )
+    : undefined;
+  const siteFilters = {
+    ...siteFiltersParsed,
+    rigLength: resolvedRigLength,
+  };
+  const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
+
+  const [campgroundsResult, provincesResult] = await Promise.all([
+    getCampgrounds(
+      q,
+      sort,
+      province,
+      geo?.lat,
+      geo?.lng,
+      geo?.radiusKm,
+      siteFiltersKey,
+    ),
+    getCampgroundProvinces(),
+  ]);
+
+  // URL wins; else signed-in preference / default; else feet / no length.
   const resolvedRigUnit = resolveGuestRigLengthUnit(
     rigUnitParam,
     preferredRigUnit,
@@ -147,6 +169,8 @@ export default async function Home({ searchParams }: PageProps) {
               provinces={provinces}
               initialRigUnit={resolvedRigUnit}
               preferredRigUnit={preferredRigUnit}
+              defaultRigLength={defaultRigLength}
+              initialRigLength={resolvedRigLength}
             />
           </Suspense>
         </div>
