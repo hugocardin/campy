@@ -96,6 +96,15 @@ export default async function Home({ searchParams }: PageProps) {
   const campgrounds = campgroundsResult.data;
   const provinces = provincesResult.success ? provincesResult.data : [];
   const tControls = await getTranslations("search.controls");
+  // Stable identity for map live-region re-announcement across empty searches.
+  const mapSearchKey = [
+    q ?? "",
+    province ?? "",
+    geo ? `${geo.lat},${geo.lng},${geo.radiusKm}` : "",
+    hookups.electricity ? "e" : "",
+    hookups.water ? "w" : "",
+    hookups.sewer ? "s" : "",
+  ].join("|");
 
   return (
     <div className="flex flex-col h-full">
@@ -123,6 +132,7 @@ export default async function Home({ searchParams }: PageProps) {
                     geo ? { lat: geo.lat, lng: geo.lng } : undefined
                   }
                   radiusKm={geo?.radiusKm}
+                  searchKey={mapSearchKey}
                 />
               </div>
             </div>

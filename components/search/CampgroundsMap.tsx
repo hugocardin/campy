@@ -4,10 +4,11 @@ import { Campground } from "@/entities/campground";
 import { Link } from "@/i18n/navigation";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 import L, { type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Circle,
   CircleMarker,
@@ -22,6 +23,8 @@ type Props = {
   campgrounds: Campground[];
   searchCenter?: { lat: number; lng: number };
   radiusKm?: number;
+  /** Changes when the active search identity changes (q/filters/geo). */
+  searchKey?: string;
   className?: string;
 };
 
@@ -31,6 +34,8 @@ type LocatedCampground = Campground & {
 
 const DEFAULT_CENTER: LatLngTuple = [56.1304, -106.3468]; // Canada
 const DEFAULT_ZOOM = 4;
+/** Stable empty array so FitMarkers' effect does not re-fire every render. */
+const NO_POSITIONS: LatLngTuple[] = [];
 
 function hasValidCoords(
   campground: Campground,
@@ -44,18 +49,72 @@ function hasValidCoords(
   return Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 }
 
+/**
+ * Remember the last mappable result set across empty searches so pins are not
+ * blanked on soft navigation. Intentionally client-session only: a hard load /
+ * refresh / shared empty-search URL starts with no prior pins (passing a full
+ * catalog for that case is out of scope for #22).
+ *
+ * When the current search has results, always sync — including clearing when
+ * results exist but none are mappable — so sticky pins never lag two searches.
+ */
+function useStickyLocated(
+  locatedFromProps: LocatedCampground[],
+  isEmptySearch: boolean,
+): LocatedCampground[] {
+  const [stickyLocated, setStickyLocated] = useState(locatedFromProps);
+  if (!isEmptySearch && locatedFromProps !== stickyLocated) {
+    setStickyLocated(locatedFromProps);
+  }
+  return stickyLocated;
+}
+
+/**
+ * Persistent live region that re-announces when `announcementKey` changes even
+ * if the message string is identical (e.g. two consecutive empty searches).
+ * Clears on key change, then fills on the next render so SRs see a change.
+ */
+function MapStatusLiveRegion({
+  announcementKey,
+  message,
+}: {
+  announcementKey: string;
+  message: string;
+}) {
+  const [seenKey, setSeenKey] = useState(announcementKey);
+  const [text, setText] = useState("");
+
+  if (announcementKey !== seenKey) {
+    setSeenKey(announcementKey);
+    setText("");
+  } else if (text !== message) {
+    setText(message);
+  }
+
+  return (
+    <p role="status" className="sr-only">
+      {text}
+    </p>
+  );
+}
+
 function FitMarkers({
   positions,
   searchCenter,
   radiusKm,
+  freezeView,
 }: {
   positions: LatLngTuple[];
   searchCenter?: LatLngTuple;
   radiusKm?: number;
+  /** When true (empty non-geo search), leave the current map view alone. */
+  freezeView?: boolean;
 }) {
   const map = useMap();
 
   useEffect(() => {
+    if (freezeView) return;
+
     if (
       searchCenter &&
       radiusKm != null &&
@@ -82,7 +141,7 @@ function FitMarkers({
       return;
     }
     map.fitBounds(all, { padding: [48, 48], maxZoom: 10 });
-  }, [map, positions, searchCenter, radiusKm]);
+  }, [map, positions, searchCenter, radiusKm, freezeView]);
 
   return null;
 }
@@ -103,18 +162,27 @@ export default function CampgroundsMap({
   campgrounds,
   searchCenter,
   radiusKm,
+  searchKey = "",
   className,
 }: Props) {
   const t = useTranslations("search.controls");
 
-  const withCoords = useMemo(
+  const locatedFromProps = useMemo(
     () => campgrounds.filter(hasValidCoords),
     [campgrounds],
   );
 
+  const isEmptySearch = campgrounds.length === 0;
+  const stickyLocated = useStickyLocated(locatedFromProps, isEmptySearch);
+  const showingStalePins = isEmptySearch && stickyLocated.length > 0;
+  const displayedCampgrounds = showingStalePins
+    ? stickyLocated
+    : locatedFromProps;
+
   const positions: LatLngTuple[] = useMemo(
-    () => withCoords.map((c) => [c.location.lat, c.location.lng]),
-    [withCoords],
+    () =>
+      displayedCampgrounds.map((c) => [c.location.lat, c.location.lng]),
+    [displayedCampgrounds],
   );
 
   const centerLat = searchCenter?.lat;
@@ -132,21 +200,24 @@ export default function CampgroundsMap({
       ? radiusKm * 1000
       : undefined;
 
-  if (withCoords.length === 0 && !centerTuple) {
-    return (
-      <div
-        className={
-          className ??
-          "absolute inset-0 flex items-center justify-center bg-muted/40 text-muted-foreground"
-        }
-      >
-        <p className="text-sm p-6 text-center">{t("mapEmpty")}</p>
-      </div>
-    );
-  }
+  const showNoResultsOverlay = isEmptySearch;
+  // Use current-search located pins (not sticky) so geo + ungeocoded results
+  // still explain why the circle has no markers.
+  const showMapEmptyOverlay =
+    !isEmptySearch && locatedFromProps.length === 0;
+
+  const statusMessage = showNoResultsOverlay
+    ? t("noResults")
+    : showMapEmptyOverlay
+      ? t("mapEmpty")
+      : "";
+  // Include message kind so empty↔mapEmpty transitions also re-announce.
+  const statusAnnouncementKey = `${searchKey}|${statusMessage}`;
 
   return (
-    <div className={className ?? "absolute inset-0 h-full w-full"}>
+    <div
+      className={cn("relative", className ?? "absolute inset-0 h-full w-full")}
+    >
       <MapContainer
         center={centerTuple ?? positions[0] ?? DEFAULT_CENTER}
         zoom={positions.length === 1 && !centerTuple ? 9 : DEFAULT_ZOOM}
@@ -162,9 +233,12 @@ export default function CampgroundsMap({
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitMarkers
-          positions={positions}
+          // Empty search: don't pull the view toward leftover/stale pins;
+          // geo empty still fits the circle via searchCenter + radiusKm.
+          positions={isEmptySearch ? NO_POSITIONS : positions}
           searchCenter={centerTuple}
           radiusKm={radiusKm}
+          freezeView={isEmptySearch && !centerTuple}
         />
         {centerTuple && radiusMeters != null ? (
           <Circle
@@ -194,10 +268,11 @@ export default function CampgroundsMap({
             </Popup>
           </CircleMarker>
         ) : null}
-        {withCoords.map((campground) => (
+        {displayedCampgrounds.map((campground) => (
           <Marker
             key={campground.id}
             position={[campground.location.lat, campground.location.lng]}
+            opacity={showingStalePins ? 0.5 : 1}
           >
             <Popup>
               <div className="space-y-1 min-w-40">
@@ -221,6 +296,21 @@ export default function CampgroundsMap({
           </Marker>
         ))}
       </MapContainer>
+
+      <MapStatusLiveRegion
+        announcementKey={statusAnnouncementKey}
+        message={statusMessage}
+      />
+      {showNoResultsOverlay || showMapEmptyOverlay ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-[500] flex justify-center pl-14 pr-3 pt-3"
+        >
+          <p className="max-w-[calc(100%-0.5rem)] rounded-md border border-border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm">
+            {statusMessage}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
