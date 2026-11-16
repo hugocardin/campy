@@ -612,4 +612,3 @@ COMMENT ON FUNCTION public.search_campgrounds_near(
 
 COMMIT;
 
-COMMIT;
