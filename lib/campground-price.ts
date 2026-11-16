@@ -2,14 +2,21 @@
  * Guest max-price / currency helpers (issue #24).
  * Amounts are nightly **base** prices (`sites.price_per_night_base`) in the
  * parent `campgrounds.currency` (CAD / USD / MXN). No FX conversion — maxPrice
- * and price sort are scoped to one currency. `pricing_rules` effective prices
- * stay Phase D / later. RPC rejects ≤0 and > {@link GUEST_MAX_PRICE_CAP}.
+ * is scoped to one currency; price sort alone does **not** hide other
+ * currencies (#51). `pricing_rules` effective prices stay Phase D / later.
+ * RPC rejects ≤0 and > {@link GUEST_MAX_PRICE_CAP}.
+ *
+ * Keep {@link GUEST_PRICE_CURRENCIES} in sync with SQL
+ * `public.normalize_listing_currency` (asserted in tests).
  */
 
 /** Default listing / filter currency (Canada-first catalog). */
 export const GUEST_PRICE_CURRENCY = "CAD";
 
-/** Guest-supported listing currencies (matches DB CHECK). */
+/**
+ * Guest-supported listing currencies.
+ * Must match `normalize_listing_currency` / `campgrounds_currency_check`.
+ */
 export const GUEST_PRICE_CURRENCIES = ["CAD", "USD", "MXN"] as const;
 
 export type GuestPriceCurrency = (typeof GUEST_PRICE_CURRENCIES)[number];
@@ -20,7 +27,7 @@ export const GUEST_MAX_PRICE_CAP = 100_000;
 const GUEST_PRICE_CURRENCY_SET = new Set<string>(GUEST_PRICE_CURRENCIES);
 
 /**
- * Parse URL `currency` — CAD / USD / MXN (case-insensitive), else undefined.
+ * Parse URL / form `currency` — CAD / USD / MXN (case-insensitive), else undefined.
  */
 export function parseGuestPriceCurrency(
   value: string | undefined | null,
@@ -47,20 +54,15 @@ export function resolveCampgroundPriceCurrency(
 }
 
 /**
- * Currency to send to search RPCs when comparing amounts.
- * Passed when maxPrice is set and/or sort is price / price-desc; defaults CAD.
- * Otherwise omit (NULL) so mixed-currency catalogs still list.
+ * Currency to send to search RPCs when filtering by maxPrice.
+ * Price sort alone must not scope (would hide other-currency parks) — #51.
+ * Defaults to CAD when maxPrice is set without an explicit currency.
  */
 export function resolveGuestPriceCurrencyFilter(options: {
   currency?: GuestPriceCurrency;
   maxPrice?: number;
-  sort?: string;
 }): GuestPriceCurrency | undefined {
-  const needsScope =
-    options.maxPrice != null ||
-    options.sort === "price" ||
-    options.sort === "price-desc";
-  if (!needsScope) return undefined;
+  if (options.maxPrice == null) return undefined;
   return options.currency ?? GUEST_PRICE_CURRENCY;
 }
 
@@ -88,6 +90,11 @@ export function formatGuestMaxPriceParam(
   return Number.isInteger(parsed) ? String(parsed) : parsed.toFixed(2);
 }
 
+export type FormatCampgroundPriceOptions = {
+  /** Force fraction digits (e.g. 2 for aligned tables). Default: 0 for whole amounts. */
+  fractionDigits?: number;
+};
+
 /**
  * Format a nightly **base** price for cards / controls.
  * Pass the park's listing currency when known.
@@ -96,10 +103,12 @@ export function formatCampgroundPricePerNight(
   amount: number | null | undefined,
   locale: string,
   currency: string = GUEST_PRICE_CURRENCY,
+  options?: FormatCampgroundPriceOptions,
 ): string | null {
   if (amount == null || !Number.isFinite(amount)) return null;
   const code = resolveCampgroundPriceCurrency(currency);
-  const fractionDigits = amount % 1 === 0 ? 0 : 2;
+  const fractionDigits =
+    options?.fractionDigits ?? (amount % 1 === 0 ? 0 : 2);
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: code,

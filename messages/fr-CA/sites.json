@@ -26,6 +26,7 @@
     "siteTypePlaceholder": "Sélectionnez un type",
     "pricePerNightLabel": "Prix par nuit",
     "pricePerNightPlaceholder": "ex. 45",
+    "priceCurrencyHint": "Montants en {currency} (devise des tarifs du camping; pas de conversion).",
     "minStayNightLabel": "Nombre minimal de nuits",
     "minStayNightPlaceholder": "ex. 2",
     "electricityAmpsLabel": "Ampères d’électricité",

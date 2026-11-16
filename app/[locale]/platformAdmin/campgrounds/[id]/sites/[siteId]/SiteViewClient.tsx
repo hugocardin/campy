@@ -16,7 +16,11 @@ type Props = {
   amenities: Amenity[];
 };
 
-export default function SiteViewClient({ site, amenities }: Props) {
+export default function SiteViewClient({
+  campground,
+  site,
+  amenities,
+}: Props) {
   const tc = useTranslations("common");
   const t_sites = useTranslations("sites");
   const t_amenities = useTranslations("amenities");
@@ -88,7 +92,14 @@ export default function SiteViewClient({ site, amenities }: Props) {
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">
                     {t_sites("form.pricePerNightLabel")}
                   </h3>
-                  <p>{site.price_per_night}</p>
+                  <p>
+                    {site.price_per_night} {campground.currency}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t_sites("form.priceCurrencyHint", {
+                      currency: campground.currency,
+                    })}
+                  </p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">

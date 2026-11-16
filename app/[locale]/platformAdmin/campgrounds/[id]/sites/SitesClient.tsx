@@ -35,7 +35,9 @@ export default function SitesClient({ campground, sites }: Props) {
               <TableHead>{t_sites("form.descriptionLabel")}</TableHead>
               <TableHead>{t_sites("form.siteTypeLabel")}</TableHead>
               <TableHead>{t_sites("form.maxRigLengthLabel")}</TableHead>
-              <TableHead>{t_sites("form.pricePerNightLabel")}</TableHead>
+              <TableHead>
+                {t_sites("form.pricePerNightLabel")} ({campground.currency})
+              </TableHead>
               <TableHead>{t_sites("form.minStayNightLabel")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -57,7 +59,9 @@ export default function SitesClient({ campground, sites }: Props) {
                 <TableCell>
                   <FormattedRigLength feet={site.max_rig_length} />
                 </TableCell>
-                <TableCell>{site.price_per_night}</TableCell>
+                <TableCell>
+                  {site.price_per_night} {campground.currency}
+                </TableCell>
                 <TableCell>{site.min_stay_nights}</TableCell>
               </TableRow>
             ))}

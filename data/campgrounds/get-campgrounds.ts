@@ -21,7 +21,6 @@ import {
   formatGuestPriceCurrencyParam,
   resolveCampgroundPriceCurrency,
   resolveGuestPriceCurrencyFilter,
-  type GuestPriceCurrency,
 } from "@/lib/campground-price";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
@@ -182,14 +181,10 @@ export const getCampgroundProvinces = cache(
   },
 );
 
-function siteFilterRpcArgs(
-  filters: CampgroundSiteFilters,
-  options?: { sort?: string },
-) {
+function siteFilterRpcArgs(filters: CampgroundSiteFilters) {
   const priceCurrency = resolveGuestPriceCurrencyFilter({
     currency: filters.priceCurrency,
     maxPrice: filters.maxPrice,
-    sort: options?.sort,
   });
   return {
     require_amps: electricityAmpsToRpcArg(filters.amps),
@@ -231,9 +226,7 @@ export function buildCampgroundSiteFiltersCacheKey(
   if (types) params.set("types", types);
   const maxPrice = formatGuestMaxPriceParam(filters.maxPrice);
   if (maxPrice) params.set("maxPrice", maxPrice);
-  const currency = formatGuestPriceCurrencyParam(
-    filters.priceCurrency as GuestPriceCurrency | undefined,
-  );
+  const currency = formatGuestPriceCurrencyParam(filters.priceCurrency);
   if (currency) params.set("currency", currency);
   const amenities = formatGuestAmenityCodesParam(filters.amenityCodes);
   if (amenities) params.set("amenities", amenities);
@@ -313,7 +306,7 @@ export const getCampgrounds = cache(
             q: term || null,
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
-            ...siteFilterRpcArgs(siteFilters, { sort: resolvedSort }),
+            ...siteFilterRpcArgs(siteFilters),
             sort_key: resolvedSort,
             result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
@@ -344,7 +337,7 @@ export const getCampgrounds = cache(
           q: term || null,
           province_aliases:
             provinceAliases.length > 0 ? provinceAliases : null,
-          ...siteFilterRpcArgs(siteFilters, { sort: nonGeoSort }),
+          ...siteFilterRpcArgs(siteFilters),
           sort_key: nonGeoSort,
           result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
         }),

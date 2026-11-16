@@ -59,6 +59,7 @@ export default async function SiteCreatePage({
       >
         <SiteFormClient
           campgroundId={campground.id}
+          listingCurrency={campground.currency}
           siteTypes={siteTypes}
           onSubmit={createSiteAction}
         />

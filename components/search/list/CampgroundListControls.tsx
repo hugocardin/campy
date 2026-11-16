@@ -36,7 +36,7 @@ import {
   GUEST_PRICE_CURRENCY,
   formatGuestMaxPriceParam,
   parseGuestMaxPrice,
-  type GuestPriceCurrency,
+  parseGuestPriceCurrency,
 } from "@/lib/campground-price";
 import {
   CampgroundQueryState,
@@ -1245,11 +1245,8 @@ export default function CampgroundListControls({
                 value={urlFilters.priceCurrency ?? GUEST_PRICE_CURRENCY}
                 disabled={geoBusy || discreteControlsDisabled}
                 onValueChange={(value) => {
-                  const priceCurrency = (
-                    GUEST_PRICE_CURRENCIES as readonly string[]
-                  ).includes(value)
-                    ? (value as GuestPriceCurrency)
-                    : GUEST_PRICE_CURRENCY;
+                  const priceCurrency =
+                    parseGuestPriceCurrency(value) ?? GUEST_PRICE_CURRENCY;
                   replaceWithFilters({
                     q: search,
                     sort: latestParamsRef.current.sort,
@@ -1273,8 +1270,20 @@ export default function CampgroundListControls({
                 </SelectContent>
               </Select>
             </div>
-            <p id="max-price-hint" className="sr-only">
-              {t("maxPriceHint")}
+            <p
+              id="max-price-hint"
+              className={
+                urlFilters.maxPrice != null
+                  ? "mt-1 text-xs text-muted-foreground"
+                  : "sr-only"
+              }
+            >
+              {urlFilters.maxPrice != null
+                ? t("priceCurrencyScopeNote", {
+                    currency:
+                      urlFilters.priceCurrency ?? GUEST_PRICE_CURRENCY,
+                  })
+                : t("maxPriceHint")}
             </p>
           </div>
         </div>

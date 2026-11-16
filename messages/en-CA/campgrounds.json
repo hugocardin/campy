@@ -24,6 +24,7 @@
     "countryPlaceholder": "e.g. Canada, United States...",
     "currencyLabel": "Listing currency",
     "currencyHint": "Currency for site nightly base prices (no conversion).",
+    "currencyChangeConfirm": "Change listing currency from {from} to {to}? Existing site prices will be read as {to} with no conversion.",
     "latitudeLabel": "Latitude",
     "latitudePlaceholder": "e.g. 45.4215",
     "latitudeRange": "Range: -90° to +90°",
@@ -40,7 +41,8 @@
     "ownerRequired": "Campground owner is required",
     "latitudeInvalid": "Latitude must be between -90 and +90",
     "longitudeInvalid": "Longitude must be between -180 and +180",
-    "websiteInvalid": "Enter a valid website URL (http or https)."
+    "websiteInvalid": "Enter a valid website URL (http or https).",
+    "currencyInvalid": "Choose a valid listing currency (CAD, USD, or MXN)."
   },
 
   "actions": {

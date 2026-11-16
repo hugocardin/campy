@@ -22,8 +22,9 @@
     "provincePlaceholder": "ex. Québec, Ontario, Colombie-Britannique...",
     "countryLabel": "Pays",
     "countryPlaceholder": "ex. Canada, États-Unis...",
-    "currencyLabel": "Devise affichée",
+    "currencyLabel": "Devise des tarifs",
     "currencyHint": "Devise des tarifs de nuitée de base (pas de conversion).",
+    "currencyChangeConfirm": "Changer la devise des tarifs de {from} à {to} ? Les prix des emplacements existants seront lus en {to}, sans conversion.",
     "latitudeLabel": "Latitude",
     "latitudePlaceholder": "ex. 45.4215",
     "latitudeRange": "Intervalle\u00A0: -90° à +90°",
@@ -40,7 +41,8 @@
     "ownerRequired": "Le propriétaire du camping est requis",
     "latitudeInvalid": "La latitude doit être entre -90 et +90",
     "longitudeInvalid": "La longitude doit être entre -180 et +180",
-    "websiteInvalid": "Entrez une URL de site web valide (http ou https)."
+    "websiteInvalid": "Entrez une URL de site web valide (http ou https).",
+    "currencyInvalid": "Choisissez une devise de tarifs valide (CAD, USD ou MXN)."
   },
 
   "actions": {

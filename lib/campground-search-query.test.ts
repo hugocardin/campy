@@ -92,7 +92,7 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.get("amenities"), "pet_friendly,wifi");
   });
 
-  it("emits non-default currency and scopes price sort", () => {
+  it("emits currency with maxPrice; price sort alone does not scope", () => {
     const usd = buildCampgroundSearchParams({
       ...base,
       maxPrice: 60,
@@ -115,7 +115,7 @@ describe("buildCampgroundSearchParams / clear", () => {
       siteTypes: [],
       amenityCodes: [],
     });
-    assert.equal(priceSort.get("currency"), "CAD");
+    assert.equal(priceSort.get("currency"), null);
     assert.equal(priceSort.get("sort"), "price");
   });
 

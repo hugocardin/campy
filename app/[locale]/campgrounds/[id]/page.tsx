@@ -381,7 +381,8 @@ export default async function CampgroundDetailsPage({
                             {formatCampgroundPricePerNight(
                               Number(site.price_per_night),
                               locale,
-                              campground.priceCurrency ?? undefined,
+                              campground.priceCurrency,
+                              { fractionDigits: 2 },
                             )}
                           </TableCell>
                           <TableCell>{site.min_stay_nights}</TableCell>

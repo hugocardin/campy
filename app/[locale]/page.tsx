@@ -201,9 +201,14 @@ export default async function Home({ searchParams }: PageProps) {
             searchQuery={q}
             detailQuery={detailQuery}
             emptyMessage={
-              q?.trim()
-                ? tControls("noResultsFor", { query: q.trim() })
-                : tControls("noResults")
+              siteFiltersParsed.maxPrice != null
+                ? tControls("noResultsCurrencyScope", {
+                    currency:
+                      siteFiltersParsed.priceCurrency ?? "CAD",
+                  })
+                : q?.trim()
+                  ? tControls("noResultsFor", { query: q.trim() })
+                  : tControls("noResults")
             }
           />
         </div>

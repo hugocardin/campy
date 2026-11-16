@@ -21,7 +21,7 @@ import { UserProfileNoRole } from "@/entities/user-profile";
 import {
   GUEST_PRICE_CURRENCIES,
   GUEST_PRICE_CURRENCY,
-  type GuestPriceCurrency,
+  parseGuestPriceCurrency,
 } from "@/lib/campground-price";
 import {
   ActionResult,
@@ -58,7 +58,7 @@ export default function CampgroundFormClient({
     city: initialData?.city ?? "",
     province: initialData?.province ?? "",
     country: initialData?.country ?? "",
-    currency: initialData?.currency ?? "CAD",
+    currency: initialData?.currency ?? GUEST_PRICE_CURRENCY,
     website: initialData?.website ?? "",
     phone: initialData?.phone ?? "",
     location: {
@@ -92,6 +92,23 @@ export default function CampgroundFormClient({
       return setError(t_campgrounds("errors.longitudeInvalid"));
     if (form.website.trim() && !toSafeHttpUrl(form.website))
       return setError(t_campgrounds("errors.websiteInvalid"));
+    if (!parseGuestPriceCurrency(form.currency))
+      return setError(t_campgrounds("errors.currencyInvalid"));
+
+    // Changing currency reinterprets existing site base prices (no FX) — #51.
+    if (
+      initialData?.id &&
+      initialData.currency &&
+      form.currency !== initialData.currency
+    ) {
+      const confirmed = window.confirm(
+        t_campgrounds("form.currencyChangeConfirm", {
+          from: initialData.currency,
+          to: form.currency,
+        }),
+      );
+      if (!confirmed) return;
+    }
 
     const payload: CampgroundCreateUpdateInput = {
       id: initialData?.id,
@@ -125,6 +142,7 @@ export default function CampgroundFormClient({
               {
                 fieldMessages: {
                   "campground.website": t_campgrounds("errors.websiteInvalid"),
+                  "campground.currency": t_campgrounds("errors.currencyInvalid"),
                 },
               },
             ),
@@ -324,11 +342,8 @@ export default function CampgroundFormClient({
                 <Select
                   value={form.currency || GUEST_PRICE_CURRENCY}
                   onValueChange={(value) => {
-                    const currency = (
-                      GUEST_PRICE_CURRENCIES as readonly string[]
-                    ).includes(value)
-                      ? (value as GuestPriceCurrency)
-                      : GUEST_PRICE_CURRENCY;
+                    const currency =
+                      parseGuestPriceCurrency(value) ?? GUEST_PRICE_CURRENCY;
                     setForm((prev) => ({ ...prev, currency }));
                   }}
                 >

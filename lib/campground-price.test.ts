@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   GUEST_MAX_PRICE_CAP,
+  GUEST_PRICE_CURRENCIES,
   GUEST_PRICE_CURRENCY,
   formatCampgroundPricePerNight,
   formatGuestMaxPriceParam,
@@ -64,11 +65,8 @@ describe("guest price currency", () => {
     assert.equal(resolveCampgroundPriceCurrency("usd"), "USD");
   });
 
-  it("scopes filter currency only when comparing amounts", () => {
-    assert.equal(
-      resolveGuestPriceCurrencyFilter({ sort: "name" }),
-      undefined,
-    );
+  it("scopes filter currency only when maxPrice is set (not price sort)", () => {
+    assert.equal(resolveGuestPriceCurrencyFilter({}), undefined);
     assert.equal(
       resolveGuestPriceCurrencyFilter({ maxPrice: 50 }),
       "CAD",
@@ -80,16 +78,10 @@ describe("guest price currency", () => {
       }),
       "USD",
     );
-    assert.equal(
-      resolveGuestPriceCurrencyFilter({ sort: "price" }),
-      "CAD",
-    );
-    assert.equal(
-      resolveGuestPriceCurrencyFilter({
-        sort: "price-desc",
-        currency: "MXN",
-      }),
-      "MXN",
-    );
+  });
+
+  it("lists the same currencies as SQL normalize_listing_currency", () => {
+    // Keep in sync with public.normalize_listing_currency / CHECK.
+    assert.deepEqual([...GUEST_PRICE_CURRENCIES], ["CAD", "USD", "MXN"]);
   });
 });
