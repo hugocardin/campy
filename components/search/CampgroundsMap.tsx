@@ -15,6 +15,7 @@ import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import {
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -33,6 +34,14 @@ import {
   useMapEvents,
 } from "react-leaflet";
 
+/**
+ * Search-center / accent colours (circle + marker highlight).
+ * Keep the CSS drop-shadow in globals.css (`.campground-marker--highlighted`)
+ * aligned with MAP_ACCENT_STROKE.
+ */
+const MAP_ACCENT_STROKE = "#0f766e";
+const MAP_ACCENT_FILL = "#14b8a6";
+
 type Props = {
   campgrounds: Campground[];
   searchCenter?: { lat: number; lng: number };
@@ -43,6 +52,9 @@ type Props = {
   searchQuery?: string;
   /** Carry guest rig prefs into detail popup links (#34). */
   detailQuery?: CampgroundDetailQuery;
+  /** Shared list ↔ map hover highlight (#24 §4). */
+  highlightedId?: string | null;
+  onHoverCampground?: (id: string | null) => void;
   className?: string;
 };
 
@@ -277,6 +289,94 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const MARKER_HIGHLIGHT_CLASS = "campground-marker--highlighted";
+
+type CampgroundMarkerProps = {
+  campground: LocatedCampground;
+  isHighlighted: boolean;
+  faded: boolean;
+  detailQuery?: CampgroundDetailQuery;
+  viewLabel: string;
+  onHover?: (id: string | null) => void;
+};
+
+/**
+ * Memoized pin so hover only re-renders the two markers involved, and
+ * `eventHandlers` stay stable (avoids rebinding every Leaflet listener).
+ */
+const CampgroundMarker = memo(function CampgroundMarker({
+  campground,
+  isHighlighted,
+  faded,
+  detailQuery,
+  viewLabel,
+  onHover,
+}: CampgroundMarkerProps) {
+  const markerRef = useRef<L.Marker | null>(null);
+
+  const eventHandlers = useMemo(
+    () => ({
+      mouseover: () => {
+        if (faded) return;
+        onHover?.(campground.id);
+      },
+      mouseout: () => {
+        if (faded) return;
+        onHover?.(null);
+      },
+    }),
+    [campground.id, faded, onHover],
+  );
+
+  // CSS class on the pin body — no icon swap, no tip-centered CircleMarker.
+  useEffect(() => {
+    const el = markerRef.current?.getElement();
+    if (!el) return;
+    el.classList.toggle(MARKER_HIGHLIGHT_CLASS, isHighlighted);
+  }, [isHighlighted]);
+
+  // Keyboard parity: Leaflet markers are focusable by default.
+  useEffect(() => {
+    if (faded || !onHover) return;
+    const el = markerRef.current?.getElement();
+    if (!el) return;
+    const onFocus = () => onHover(campground.id);
+    const onBlur = () => onHover(null);
+    el.addEventListener("focus", onFocus);
+    el.addEventListener("blur", onBlur);
+    return () => {
+      el.removeEventListener("focus", onFocus);
+      el.removeEventListener("blur", onBlur);
+    };
+  }, [campground.id, faded, onHover]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[campground.location.lat, campground.location.lng]}
+      opacity={faded ? 0.5 : 1}
+      icon={DefaultIcon}
+      zIndexOffset={isHighlighted ? 1000 : 0}
+      eventHandlers={eventHandlers}
+    >
+      <Popup>
+        <div className="space-y-1 min-w-40">
+          <p className="font-medium text-sm leading-tight">{campground.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatCampgroundLocation(campground.city, campground.province)}
+          </p>
+          <Link
+            href={routes.campgroundDetail(campground.id, detailQuery)}
+            className="text-xs text-primary hover:underline"
+          >
+            {viewLabel}
+          </Link>
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
+
 export default function CampgroundsMap({
   campgrounds,
   searchCenter,
@@ -284,6 +384,8 @@ export default function CampgroundsMap({
   searchKey = "",
   searchQuery,
   detailQuery,
+  highlightedId = null,
+  onHoverCampground,
   className,
 }: Props) {
   const t = useTranslations("search.controls");
@@ -380,8 +482,8 @@ export default function CampgroundsMap({
             center={centerTuple}
             radius={radiusMeters}
             pathOptions={{
-              color: "#0f766e",
-              fillColor: "#14b8a6",
+              color: MAP_ACCENT_STROKE,
+              fillColor: MAP_ACCENT_FILL,
               fillOpacity: 0.08,
               weight: 1.5,
             }}
@@ -392,8 +494,8 @@ export default function CampgroundsMap({
             center={centerTuple}
             radius={8}
             pathOptions={{
-              color: "#0f766e",
-              fillColor: "#14b8a6",
+              color: MAP_ACCENT_STROKE,
+              fillColor: MAP_ACCENT_FILL,
               fillOpacity: 0.85,
               weight: 2,
             }}
@@ -404,31 +506,15 @@ export default function CampgroundsMap({
           </CircleMarker>
         ) : null}
         {displayedCampgrounds.map((campground) => (
-          <Marker
+          <CampgroundMarker
             key={campground.id}
-            position={[campground.location.lat, campground.location.lng]}
-            opacity={showingStalePins ? 0.5 : 1}
-          >
-            <Popup>
-              <div className="space-y-1 min-w-40">
-                <p className="font-medium text-sm leading-tight">
-                  {campground.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatCampgroundLocation(
-                    campground.city,
-                    campground.province,
-                  )}
-                </p>
-                <Link
-                  href={routes.campgroundDetail(campground.id, detailQuery)}
-                  className="text-xs text-primary hover:underline"
-                >
-                  {t("viewCampground")}
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
+            campground={campground}
+            isHighlighted={highlightedId === campground.id}
+            faded={showingStalePins}
+            detailQuery={detailQuery}
+            viewLabel={t("viewCampground")}
+            onHover={onHoverCampground}
+          />
         ))}
         <MapHandle onReady={setMapInstance} />
         <MapUserMoveWatcher

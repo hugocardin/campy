@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { ELECTRICITY_AMP_VALUES } from "./electricity-amps";
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
+  CAMPGROUND_SORT_KEYS,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   HOOKUP_AMENITY_CODES,
   SEARCH_CAMPGROUNDS_LIMIT,
@@ -61,6 +62,15 @@ describe("parseCampgroundSort", () => {
     assert.equal(parseCampgroundSort("distance", { geoActive: false }), "name");
     assert.equal(parseCampgroundSort("name", { geoActive: true }), "name");
   });
+
+  it("keeps price sorts with or without geo (near RPC sort_key)", () => {
+    assert.equal(parseCampgroundSort("price", { geoActive: true }), "price");
+    assert.equal(
+      parseCampgroundSort("price-desc", { geoActive: true }),
+      "price-desc",
+    );
+    assert.equal(parseCampgroundSort("price", { geoActive: false }), "price");
+  });
 });
 
 describe("campgroundSortQueryValue", () => {
@@ -70,6 +80,8 @@ describe("campgroundSortQueryValue", () => {
     assert.equal(campgroundSortQueryValue("name", false), undefined);
     assert.equal(campgroundSortQueryValue("distance", false), "distance");
     assert.equal(campgroundSortQueryValue("city", true), "city");
+    assert.equal(campgroundSortQueryValue("price", true), "price");
+    assert.equal(campgroundSortQueryValue("price-desc", false), "price-desc");
 
     assert.equal(
       parseCampgroundSort(campgroundSortQueryValue("name", true), {
@@ -83,6 +95,28 @@ describe("campgroundSortQueryValue", () => {
       }),
       "distance",
     );
+  });
+});
+
+describe("CAMPGROUND_SORT_KEYS", () => {
+  it("lists every CampgroundSort the near SQL whitelist accepts", () => {
+    // Keep in sync with search_campgrounds_near v_sort IN (...).
+    assert.deepEqual([...CAMPGROUND_SORT_KEYS].sort(), [
+      "city",
+      "distance",
+      "name",
+      "name-desc",
+      "price",
+      "price-desc",
+      "province",
+    ]);
+    for (const key of CAMPGROUND_SORT_KEYS) {
+      assert.equal(parseCampgroundSort(key, { geoActive: true }), key);
+      assert.equal(
+        parseCampgroundSort(key, { geoActive: false }),
+        key === "distance" ? "name" : key,
+      );
+    }
   });
 });
 
@@ -227,7 +261,17 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         stayKind: "camping",
         siteTypes: [],
         maxPrice: undefined,
+        amenityCodes: [],
       },
+    );
+  });
+
+  it("parses amenities URL param (AND park amenities)", () => {
+    assert.deepEqual(
+      parseCampgroundSiteFilters({
+        amenities: "wifi,pet_friendly,water",
+      }).amenityCodes,
+      ["PET_FRIENDLY", "WIFI"],
     );
   });
 
@@ -276,6 +320,7 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         sewer: false,
         dumpStation: false,
         siteTypes: [],
+        amenityCodes: [],
       }),
       false,
     );
@@ -286,6 +331,7 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         sewer: false,
         dumpStation: true,
         siteTypes: [],
+        amenityCodes: [],
       }),
       true,
     );
@@ -296,6 +342,7 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         sewer: false,
         dumpStation: false,
         siteTypes: ["TENT"],
+        amenityCodes: [],
       }),
       true,
     );
@@ -307,6 +354,18 @@ describe("site filters (dump / driveway / rig / stay / types / price)", () => {
         dumpStation: false,
         siteTypes: [],
         maxPrice: 40,
+        amenityCodes: [],
+      }),
+      true,
+    );
+    assert.equal(
+      anySiteFilterActive({
+        amps: [],
+        water: false,
+        sewer: false,
+        dumpStation: false,
+        siteTypes: [],
+        amenityCodes: ["WIFI"],
       }),
       true,
     );

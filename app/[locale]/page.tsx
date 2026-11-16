@@ -1,7 +1,6 @@
-import CampgroundCardSkeleton from "@/components/search/CampgroundCardSkeleton";
-import CampgroundList from "@/components/search/CampgroundList";
-import CampgroundsMapDynamic from "@/components/search/CampgroundsMapDynamic";
 import CampgroundListControls from "@/components/search/list/CampgroundListControls";
+import SearchResultsPanel from "@/components/search/SearchResultsPanel";
+import { getAllAmenities } from "@/data/amenities/get-amenities";
 import {
   buildCampgroundSiteFiltersCacheKey,
   getCampgroundProvinces,
@@ -15,6 +14,7 @@ import {
 } from "@/lib/campground-search";
 import { campgroundSearchKey } from "@/lib/campground-search-query";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
+import { guestAmenityOptionsFromCatalogAndSelection } from "@/lib/guest-amenity-codes";
 import { campingSiteAttrsAllowed } from "@/lib/guest-site-types";
 import type { CampgroundDetailQuery } from "@/lib/routes";
 import {
@@ -61,6 +61,7 @@ export default async function Home({ searchParams }: PageProps) {
     stay: firstParam(params.stay),
     types: firstParam(params.types),
     maxPrice: firstParam(params.maxPrice),
+    amenities: firstParam(params.amenities),
   });
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
@@ -69,12 +70,25 @@ export default async function Home({ searchParams }: PageProps) {
   const rigUnitParamPresent = "rigUnit" in params;
   const rigLengthParamPresent = "rigLength" in params;
 
-  // Prefs + provinces in parallel; campgrounds need resolved length first.
-  const [prefs, provincesResult] = await Promise.all([
+  // Prefs + provinces + amenity catalog in parallel; campgrounds need length first.
+  const [prefs, provincesResult, amenitiesResult] = await Promise.all([
     getCurrentRigSearchPrefs(),
     getCampgroundProvinces(),
+    getAllAmenities(),
   ]);
   const { preferredRigUnit, defaultRigLength } = prefs;
+  if (!amenitiesResult.success) {
+    console.warn(
+      "[Home] getAllAmenities failed; amenity checkboxes fall back to URL codes",
+      amenitiesResult.errorCode,
+    );
+  }
+  // Catalog checkboxes + URL-only (stale) codes so the guest can uncheck.
+  // RPC fail-closes unknown codes so results stay honest.
+  const guestAmenityOptions = guestAmenityOptionsFromCatalogAndSelection(
+    amenitiesResult.success ? amenitiesResult.data : [],
+    siteFiltersParsed.amenityCodes,
+  );
 
   const campingOk = campingSiteAttrsAllowed(
     siteFiltersParsed.stayKind,
@@ -166,6 +180,7 @@ export default async function Home({ searchParams }: PageProps) {
               resultCount={campgrounds.length}
               resultsTruncated={truncated}
               provinces={provinces}
+              amenityOptions={guestAmenityOptions}
               initialRigUnit={resolvedRigUnit}
               preferredRigUnit={preferredRigUnit}
               defaultRigLength={defaultRigLength}
@@ -175,59 +190,21 @@ export default async function Home({ searchParams }: PageProps) {
         </div>
 
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 flex-1 min-h-0">
-            <div className="flex flex-col min-h-75 lg:min-h-0 rounded-xl border border-border overflow-hidden">
-              <div className="flex-1 relative min-h-75">
-                <Suspense
-                  fallback={
-                    <div className="absolute inset-0 flex items-center justify-center bg-muted/40 text-muted-foreground">
-                      <p className="text-sm">{tControls("mapLoading")}</p>
-                    </div>
-                  }
-                >
-                  <CampgroundsMapDynamic
-                    campgrounds={campgrounds}
-                    searchCenter={
-                      geo ? { lat: geo.lat, lng: geo.lng } : undefined
-                    }
-                    radiusKm={geo?.radiusKm}
-                    searchKey={mapSearchKey}
-                    searchQuery={q}
-                    detailQuery={detailQuery}
-                  />
-                </Suspense>
-              </div>
-            </div>
-
-            <div className="flex flex-col min-h-0 rounded-xl border border-border">
-              <div className="flex-1">
-                <Suspense
-                  fallback={
-                    <div className="grid gap-6 p-6 sm:grid-cols-1 md:grid-cols-2">
-                      {Array.from({ length: 8 }).map((_, i) => (
-                        <CampgroundCardSkeleton key={i} />
-                      ))}
-                    </div>
-                  }
-                >
-                  <div className="p-6">
-                    {campgrounds.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-12">
-                        {q?.trim()
-                          ? tControls("noResultsFor", { query: q.trim() })
-                          : tControls("noResults")}
-                      </p>
-                    ) : (
-                      <CampgroundList
-                        campgrounds={campgrounds}
-                        detailQuery={detailQuery}
-                      />
-                    )}
-                  </div>
-                </Suspense>
-              </div>
-            </div>
-          </div>
+          <SearchResultsPanel
+            campgrounds={campgrounds}
+            searchCenter={
+              geo ? { lat: geo.lat, lng: geo.lng } : undefined
+            }
+            radiusKm={geo?.radiusKm}
+            searchKey={mapSearchKey}
+            searchQuery={q}
+            detailQuery={detailQuery}
+            emptyMessage={
+              q?.trim()
+                ? tControls("noResultsFor", { query: q.trim() })
+                : tControls("noResults")
+            }
+          />
         </div>
       </div>
     </div>

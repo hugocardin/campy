@@ -12,6 +12,9 @@ import {
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
 import {
+  parseGuestAmenityCodes,
+} from "@/lib/guest-amenity-codes";
+import {
   type GuestSiteTypeCode,
   campingSiteAttrsAllowed,
   parseGuestSiteTypes,
@@ -23,14 +26,22 @@ import {
   parseStayKind,
 } from "@/lib/stay-kind";
 
-export type CampgroundSort =
-  | "name"
-  | "name-desc"
-  | "city"
-  | "province"
-  | "distance"
-  | "price"
-  | "price-desc";
+/**
+ * Guest sort keys. Must stay in sync with `search_campgrounds` /
+ * `search_campgrounds_near` `sort_key` whitelists (near accepts all;
+ * list omits `distance` — the app maps that to `name` when geo is off).
+ */
+export const CAMPGROUND_SORT_KEYS = [
+  "name",
+  "name-desc",
+  "city",
+  "province",
+  "distance",
+  "price",
+  "price-desc",
+] as const;
+
+export type CampgroundSort = (typeof CAMPGROUND_SORT_KEYS)[number];
 
 /**
  * Guest list/near page size. SQL RPCs must allow at least this + 1 so the app
@@ -74,6 +85,11 @@ export type CampgroundSiteFilters = CampgroundHookupFilters & {
   siteTypes: GuestSiteTypeCode[];
   /** Max nightly base price on a matching site (CAD). */
   maxPrice?: number;
+  /**
+   * Park amenities (canonical keys, e.g. PET_FRIENDLY). AND on
+   * `campground_amenities` — every selected code must be present.
+   */
+  amenityCodes: string[];
 };
 
 export type CampgroundListFilters = {
@@ -92,6 +108,7 @@ export type CampgroundListFilters = {
   stayKind?: StayKind;
   siteTypes?: GuestSiteTypeCode[];
   maxPrice?: number;
+  amenityCodes?: string[];
 };
 
 export type CampgroundGeo = {
@@ -100,26 +117,7 @@ export type CampgroundGeo = {
   radiusKm: CampgroundRadiusKm;
 };
 
-/** Name/city/province sorts that map to a column on Campground / v_campgrounds. */
-export const CAMPGROUND_COLUMN_SORT_CONFIG: Record<
-  "name" | "name-desc" | "city" | "province",
-  { column: "name" | "city" | "province"; ascending: boolean }
-> = {
-  name: { column: "name", ascending: true },
-  "name-desc": { column: "name", ascending: false },
-  city: { column: "city", ascending: true },
-  province: { column: "province", ascending: true },
-};
-
-const CAMPGROUND_SORT_VALUES = new Set<string>([
-  "name",
-  "name-desc",
-  "city",
-  "province",
-  "distance",
-  "price",
-  "price-desc",
-]);
+const CAMPGROUND_SORT_VALUES = new Set<string>(CAMPGROUND_SORT_KEYS);
 
 export function parseCampgroundSort(
   value: string | undefined,
@@ -133,11 +131,6 @@ export function parseCampgroundSort(
   }
   // Geo default: closest first. Non-geo default: name A–Z.
   return options?.geoActive ? "distance" : "name";
-}
-
-/** True when sort needs min_price_per_night from search RPCs. */
-export function isCampgroundPriceSort(sort: CampgroundSort): boolean {
-  return sort === "price" || sort === "price-desc";
 }
 
 /** Default sort for the current mode — omit from the URL when active. */
@@ -307,7 +300,7 @@ export function parseCampgroundHookups(params: {
 }
 
 /**
- * Parse dump / driveway / rig / stay / types / maxPrice URL params
+ * Parse dump / driveway / rig / stay / types / maxPrice / amenities URL params
  * (issues #27 / #24). Rig length and driveway are ignored when stay=lodging.
  * Fine site types incompatible with stay are dropped.
  */
@@ -322,6 +315,7 @@ export function parseCampgroundSiteFilters(params: {
   stay?: string;
   types?: string;
   maxPrice?: string;
+  amenities?: string;
 }): CampgroundSiteFilters {
   const stayKind = parseStayKind(params.stay);
   const siteTypes = siteTypesForStayKind(
@@ -341,6 +335,7 @@ export function parseCampgroundSiteFilters(params: {
     stayKind,
     siteTypes,
     maxPrice: parseGuestMaxPrice(params.maxPrice),
+    amenityCodes: parseGuestAmenityCodes(params.amenities),
   };
 }
 
@@ -358,7 +353,8 @@ export function anySiteFilterActive(filters: CampgroundSiteFilters): boolean {
     filters.rigLength != null ||
     filters.stayKind != null ||
     filters.siteTypes.length > 0 ||
-    filters.maxPrice != null
+    filters.maxPrice != null ||
+    filters.amenityCodes.length > 0
   );
 }
 
