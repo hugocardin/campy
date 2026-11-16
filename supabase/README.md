@@ -2,6 +2,8 @@
 
 Schema and RLS currently live primarily in the hosted Supabase project. This folder starts committing reviewable SQL so policies do not drift from git.
 
+**Guest search geocoder (#24):** Photon (Komoot) — see `probes/search-v2-place-unaccent.md`. Optional `PHOTON_API_URL`; no API key.
+
 ## Layout
 
 | Path | Purpose |

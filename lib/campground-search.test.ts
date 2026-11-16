@@ -14,6 +14,7 @@ import {
   parseCampgroundAmps,
   parseCampgroundGeo,
   parseCampgroundHookups,
+  parseCampgroundPlaceLabel,
   parseCampgroundRadiusKm,
   parseCampgroundSiteFilters,
   parseCampgroundSort,
@@ -22,6 +23,16 @@ import {
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
 } from "./campground-search";
+
+describe("parseCampgroundPlaceLabel", () => {
+  it("trims, strips controls, and caps length", () => {
+    assert.equal(parseCampgroundPlaceLabel("  Québec  "), "Québec");
+    assert.equal(parseCampgroundPlaceLabel("a\u0000b"), "ab");
+    assert.equal(parseCampgroundPlaceLabel(""), undefined);
+    assert.equal(parseCampgroundPlaceLabel(undefined), undefined);
+    assert.equal(parseCampgroundPlaceLabel("x".repeat(200))?.length, 120);
+  });
+});
 
 describe("parseCampgroundSort", () => {
   it("accepts known sorts and defaults otherwise", () => {

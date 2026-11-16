@@ -12,6 +12,7 @@ import {
   parseCampgroundSiteFilters,
   parseCampgroundSort,
 } from "@/lib/campground-search";
+import { campgroundSearchKey } from "@/lib/campground-search-query";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
 import type { CampgroundDetailQuery } from "@/lib/routes";
 import { parseRigLengthUnit } from "@/lib/site-rig-length";
@@ -106,13 +107,15 @@ export default async function Home({ searchParams }: PageProps) {
   const campgrounds = campgroundsResult.data;
   const provinces = provincesResult.success ? provincesResult.data : [];
   const tControls = await getTranslations("search.controls");
-  // Stable identity for map live-region re-announcement across empty searches.
-  const mapSearchKey = [
-    q ?? "",
-    province ?? "",
-    geo ? `${geo.lat},${geo.lng},${geo.radiusKm}` : "",
+  // Same axes as getCampgrounds; sort omitted — see campgroundSearchKey.
+  const mapSearchKey = campgroundSearchKey({
+    q,
+    province,
+    lat: geo?.lat,
+    lng: geo?.lng,
+    radiusKm: geo?.radiusKm,
     siteFiltersKey,
-  ].join("|");
+  });
 
   return (
     <div className="flex flex-col h-full">

@@ -261,9 +261,10 @@ export const getCampgrounds = cache(
       const nonGeoSort =
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
 
-      // Province and/or site filters use search_campgrounds RPC (guest-safe; no
-      // PostgREST amenity filter injection). RPC has no LIMIT / ORDER BY — sort in JS.
-      if (provinceAliases.length > 0 || siteFiltersActive) {
+      // Text / province / site filters use search_campgrounds (unaccent + trigram
+      // via campground_text_matches; guest-safe). RPC has no LIMIT / ORDER BY —
+      // sort in JS. TODO(#24): pass sort + LIMIT into the RPC (also parked from #25).
+      if (term || provinceAliases.length > 0 || siteFiltersActive) {
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds", {
             q: term || null,
@@ -286,15 +287,6 @@ export const getCampgrounds = cache(
       let query = supabase
         .from("v_campgrounds")
         .select(GUEST_CAMPGROUND_COLUMNS);
-
-      if (term) {
-        // Quote values so spaces / apostrophes stay inside one PostgREST filter.
-        // Empty-state hint for mismatched province+q is parked as a follow-up.
-        const pattern = `"%${term}%"`;
-        query = query.or(
-          `name.ilike.${pattern},city.ilike.${pattern},province.ilike.${pattern}`,
-        );
-      }
 
       query = query.order(column, { ascending });
       if (column !== "name") {

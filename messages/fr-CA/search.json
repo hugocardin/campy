@@ -10,7 +10,15 @@
     }
   },
   "controls": {
-    "searchPlaceholder": "Rechercher par nom, ville ou province…",
+    "searchPlaceholder": "Rechercher des lieux ou des campings…",
+    "suggestionsLabel": "Suggestions de recherche",
+    "suggestionsLoading": "Recherche…",
+    "suggestionsEmpty": "Aucun lieu ni camping correspondant.",
+    "suggestionsPlacesUnavailable": "Les suggestions de lieux sont temporairement indisponibles. Essayez un nom de camping.",
+    "suggestionsCampgroundsUnavailable": "Les suggestions de campings sont temporairement indisponibles. Essayez un nom de lieu.",
+    "suggestionsError": "Les suggestions sont temporairement indisponibles. Réessayez.",
+    "suggestionPlace": "Lieu",
+    "suggestionCampground": "Camping",
     "sortLabel": "Trier par",
     "sortDistance": "Distance (plus proche)",
     "sortNameAsc": "Nom (A à Z)",

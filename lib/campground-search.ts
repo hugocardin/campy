@@ -120,10 +120,10 @@ export function campgroundSortQueryValue(
 }
 
 /**
- * Sanitize a free-text search term for PostgREST `.or(...ilike...)`.
+ * Sanitize a free-text search term for PostgREST / RPC text filters.
  * Strips filter-grammar breakers and PostgREST/ilike wildcards (`*`, `%`, `_`).
  * Keeps apostrophes and dots so terms like `St. John's` / `L'Anse` still match.
- * Accent-insensitive match (`unaccent`) is deferred to a later RPC.
+ * Accent-insensitive match is applied in SQL via `immutable_unaccent` (#24).
  */
 export function sanitizeCampgroundSearchTerm(raw: string): string {
   return raw
@@ -214,6 +214,18 @@ export function formatDistanceKm(distanceM: number | null | undefined): string |
   const km = distanceM / 1000;
   if (km < 1) return "<1";
   return String(Math.round(km));
+}
+
+/** Sanitize URL `place` display label (not used for RPC text match). */
+export function parseCampgroundPlaceLabel(
+  value: string | undefined,
+): string | undefined {
+  if (value == null) return undefined;
+  const cleaned = value
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim()
+    .slice(0, 120);
+  return cleaned || undefined;
 }
 
 /**

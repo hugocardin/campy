@@ -10,7 +10,15 @@
     }
   },
   "controls": {
-    "searchPlaceholder": "Search by name, city, or province…",
+    "searchPlaceholder": "Search places or campgrounds…",
+    "suggestionsLabel": "Search suggestions",
+    "suggestionsLoading": "Searching…",
+    "suggestionsEmpty": "No matching places or campgrounds.",
+    "suggestionsPlacesUnavailable": "Place suggestions are temporarily unavailable. Try a campground name.",
+    "suggestionsCampgroundsUnavailable": "Campground suggestions are temporarily unavailable. Try a place name.",
+    "suggestionsError": "Suggestions are temporarily unavailable. Try again.",
+    "suggestionPlace": "Place",
+    "suggestionCampground": "Campground",
     "sortLabel": "Sort by",
     "sortDistance": "Distance (nearest)",
     "sortNameAsc": "Name (A–Z)",

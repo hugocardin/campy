@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   buildCampgroundSearchParams,
+  campgroundSearchKey,
   clearedCampgroundQueryState,
   hookupsKey,
   siteFiltersKey,
@@ -130,6 +131,38 @@ describe("buildCampgroundSearchParams / clear", () => {
   it("Clear removes filters and geo", () => {
     const params = buildCampgroundSearchParams(clearedCampgroundQueryState());
     assert.equal(params.toString(), "");
+  });
+
+  it("emits place only with active geo", () => {
+    const withGeo = buildCampgroundSearchParams({
+      ...base,
+      q: "",
+      place: "Québec, Canada",
+    });
+    assert.equal(withGeo.get("place"), "Québec, Canada");
+    assert.equal(withGeo.get("lat"), "49.28");
+    const withoutGeo = buildCampgroundSearchParams({
+      ...base,
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+      place: "Québec, Canada",
+    });
+    assert.equal(withoutGeo.get("place"), null);
+  });
+
+  it("campgroundSearchKey ignores sort and place label", () => {
+    assert.equal(
+      campgroundSearchKey({
+        q: "lake",
+        province: "BC",
+        lat: 49.28,
+        lng: -123.12,
+        radiusKm: 50,
+        siteFiltersKey: "water=1",
+      }),
+      "lake|BC|49.28,-123.12,50|water=1",
+    );
   });
 
   it("siteFiltersKey is stable for comparisons", () => {

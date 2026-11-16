@@ -15,6 +15,8 @@ import {
   isCanadianProvinceCode,
   provinceFilterKey,
 } from "@/lib/canadian-provinces";
+import SearchSuggestInput from "@/components/search/SearchSuggestInput";
+import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   CampgroundRadiusKm,
@@ -22,6 +24,7 @@ import {
   HookupAmenityFilterKey,
   anySiteFilterActive,
   parseCampgroundGeo,
+  parseCampgroundPlaceLabel,
   parseCampgroundSiteFilters,
   parseCampgroundSort,
   roundCampgroundCoord,
@@ -39,7 +42,8 @@ import {
   type ElectricityAmpFilterOption,
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
-import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
+import type { SearchSuggestion } from "@/lib/geocoding/types";
+import { routes } from "@/lib/routes";
 import {
   convertRigLengthDisplay,
   formatRigLengthForDisplay,
@@ -51,7 +55,7 @@ import {
 import type { StayKind } from "@/lib/stay-kind";
 import { stayKindAllowsRigLength } from "@/lib/stay-kind";
 import { usePathname, useRouter } from "@/i18n/navigation";
-import { LocateFixed, Search } from "lucide-react";
+import { LocateFixed } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -151,6 +155,11 @@ export default function CampgroundListControls({
     lng: searchParams.get("lng") ?? undefined,
     radiusKm: searchParams.get("radiusKm") ?? undefined,
   });
+  const placeParam = parseCampgroundPlaceLabel(
+    searchParams.get("place") ?? undefined,
+  );
+  // Place label only meaningful with active geo.
+  const placeLabel = geo ? placeParam : undefined;
   const urlFilters = parseCampgroundSiteFilters({
     amps: searchParams.get("amps") ?? undefined,
     electricity: searchParams.get("electricity") ?? undefined,
@@ -174,9 +183,13 @@ export default function CampgroundListControls({
     geo?.radiusKm ?? DEFAULT_CAMPGROUND_RADIUS_KM,
   );
   const [prevGeoRadius, setPrevGeoRadius] = useState(geo?.radiusKm);
-  const [search, setSearch] = useState(qParam);
-  const [prevQParam, setPrevQParam] = useState(qParam);
+  // Input shows place label when a place centers the map; otherwise free-text q.
+  const displayFromUrl = placeLabel ?? qParam;
+  const [search, setSearch] = useState(displayFromUrl);
+  const [prevDisplayFromUrl, setPrevDisplayFromUrl] = useState(displayFromUrl);
   const [lastPushedQ, setLastPushedQ] = useState(qParam);
+  const [activePlace, setActivePlace] = useState<string | undefined>(placeLabel);
+  const [prevPlaceLabel, setPrevPlaceLabel] = useState(placeLabel);
   const [localFilters, setLocalFilters] = useState(urlFilters);
   const [rigUnit, setRigUnit] = useState<RigLengthUnit>(urlRigUnit);
   const [prevUrlRigSyncKey, setPrevUrlRigSyncKey] = useState(urlRigSyncKey);
@@ -193,17 +206,20 @@ export default function CampgroundListControls({
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const rigDebounceRef = useRef<number | null>(null);
+  /** True after editing away from a place label until the leave navigation lands. */
+  const [leavePlacePending, setLeavePlacePending] = useState(false);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
     queryStateFromFilters(
       {
-        q: search,
+        q: placeLabel ? "" : search,
         sort: sortParam,
         province: provinceParam,
         lat: geo?.lat,
         lng: geo?.lng,
         radiusKm: geo?.radiusKm ?? preferredRadius,
+        place: placeLabel,
       },
       localFilters,
       rigUnit,
@@ -211,14 +227,21 @@ export default function CampgroundListControls({
   );
 
   // Sync search input from URL only for external changes (back/forward / Clear).
-  // Ref writes for latestParams happen in an effect (react-hooks/refs).
-  if (qParam !== prevQParam) {
-    setPrevQParam(qParam);
-    if (qParam !== lastPushedQ) {
+  if (displayFromUrl !== prevDisplayFromUrl) {
+    setPrevDisplayFromUrl(displayFromUrl);
+    const externalQ = qParam !== lastPushedQ;
+    const externalPlace = placeLabel !== prevPlaceLabel;
+    if (externalQ || externalPlace) {
       setLastPushedQ(qParam);
-      if (search.trim() !== qParam) {
-        setSearch(qParam);
+      setPrevPlaceLabel(placeLabel);
+      setActivePlace(placeLabel);
+      // URL owns navigation — drop a stale leave-place push (setState-during-render).
+      setLeavePlacePending(false);
+      if (search !== displayFromUrl) {
+        setSearch(displayFromUrl);
       }
+    } else {
+      setPrevPlaceLabel(placeLabel);
     }
   }
 
@@ -250,18 +273,21 @@ export default function CampgroundListControls({
   useEffect(() => {
     latestParamsRef.current = queryStateFromFilters(
       {
-        q: search,
+        // Place-centered search: keep q empty so RPC does not also ILIKE the label.
+        q: activePlace ? "" : search,
         sort: sortParam,
         province: provinceParam,
         lat: geo?.lat,
         lng: geo?.lng,
         radiusKm: geo?.radiusKm ?? preferredRadius,
+        place: activePlace,
       },
       localFilters,
       rigUnit,
     );
   }, [
     search,
+    activePlace,
     sortParam,
     provinceParam,
     geo?.lat,
@@ -295,6 +321,19 @@ export default function CampgroundListControls({
       window.clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
     }
+  }
+
+  /** Clear geo + remap distance sort when finishing a leave-place navigation. */
+  function leavePlaceUrlPatch(
+    latest: CampgroundQueryState,
+  ): Partial<CampgroundQueryState> & Pick<CampgroundQueryState, "sort"> {
+    return {
+      place: undefined,
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+      sort: latest.sort === "distance" ? "name" : latest.sort,
+    };
   }
 
   function updateRigDraft(value: string) {
@@ -339,6 +378,8 @@ export default function CampgroundListControls({
   function replaceQuery(next: CampgroundQueryState) {
     const trimmedQ = next.q.trim();
     setLastPushedQ(trimmedQ);
+    setActivePlace(next.place);
+    setPrevPlaceLabel(next.place);
     const nextKey = siteFiltersKey(next);
     const nextUnit: RigLengthUnit = next.rigUnit === "m" ? "m" : "ft";
     setLastPushedFiltersKey(nextKey);
@@ -366,6 +407,55 @@ export default function CampgroundListControls({
     });
   }
 
+  function onSearchInputChange(nextValue: string) {
+    setSearch(nextValue);
+    // Leaving place mode: clear local place flag only. The sync effect rebuilds
+    // latestParamsRef from the still-geo URL, so geo/sort are fixed in the
+    // debounced replaceQuery below (single navigation; no catalog flash).
+    if (activePlace && nextValue !== activePlace) {
+      setActivePlace(undefined);
+      setLeavePlacePending(true);
+    }
+  }
+
+  function onSelectPlace(
+    place: Extract<SearchSuggestion, { kind: "place" }>,
+  ) {
+    clearSearchDebounce();
+    setLeavePlacePending(false);
+    const label = place.subtitle
+      ? `${place.label}, ${place.subtitle}`
+      : place.label;
+    setSearch(label);
+    setGeoError(null);
+    const radiusKm =
+      latestParamsRef.current.radiusKm ?? preferredRadius;
+    replaceQuery(
+      withLatestCampgroundFilters(latestParamsRef.current, {
+        q: "",
+        sort: "distance",
+        place: label,
+        lat: roundCampgroundCoord(place.lat),
+        lng: roundCampgroundCoord(place.lng),
+        radiusKm,
+      }),
+    );
+  }
+
+  function onSelectCampground(
+    campground: Extract<SearchSuggestion, { kind: "campground" }>,
+  ) {
+    clearSearchDebounce();
+    setLeavePlacePending(false);
+    startTransition(() => {
+      router.push(
+        routes.campgroundDetail(campground.id, {
+          rigUnit: rigUnitRef.current === "m" ? "m" : undefined,
+        }),
+      );
+    });
+  }
+
   function onRigUnitChange(nextUnit: RigLengthUnit) {
     const fromUnit = rigUnitRef.current;
     if (nextUnit === fromUnit) return;
@@ -381,10 +471,16 @@ export default function CampgroundListControls({
         : undefined;
     updateRigUnit(nextUnit);
     updateRigDraft(converted != null ? String(converted) : "");
+    const latest = latestParamsRef.current;
+    const leavePatch = leavePlacePending
+      ? leavePlaceUrlPatch(latest)
+      : undefined;
+    if (leavePlacePending) setLeavePlacePending(false);
     replaceQuery(
-      withLatestCampgroundFilters(latestParamsRef.current, {
-        q: latestParamsRef.current.q,
-        sort: latestParamsRef.current.sort,
+      withLatestCampgroundFilters(latest, {
+        ...leavePatch,
+        q: latest.q,
+        sort: leavePatch?.sort ?? latest.sort,
         rigLength: feet,
         rigUnit: nextUnit === "m" ? "m" : undefined,
       }),
@@ -396,12 +492,22 @@ export default function CampgroundListControls({
     patch: Parameters<typeof withLatestCampgroundFilters>[1],
   ) {
     clearSearchDebounce();
+    const latest = latestParamsRef.current;
+    const patchSetsGeo = "lat" in patch || "lng" in patch;
+    // Finish leave-place in the same navigation unless the patch sets its own geo
+    // (e.g. near-me). Never keep old place radius after the user left the label.
+    const leavePatch =
+      leavePlacePending && !patchSetsGeo
+        ? leavePlaceUrlPatch(latest)
+        : undefined;
+    if (leavePlacePending) setLeavePlacePending(false);
     const rigLength = takePendingRigLength();
     replaceQuery(
-      withLatestCampgroundFilters(latestParamsRef.current, {
+      withLatestCampgroundFilters(latest, {
+        ...leavePatch,
         ...patch,
-        q: patch.q ?? latestParamsRef.current.q,
-        sort: patch.sort ?? latestParamsRef.current.sort,
+        q: patch.q ?? latest.q,
+        sort: patch.sort ?? leavePatch?.sort ?? latest.sort,
         // Flush only when camping stays allowed; lodging clears via withLatest.
         ...("rigLength" in patch ? {} : { rigLength }),
       }),
@@ -409,17 +515,33 @@ export default function CampgroundListControls({
   }
 
   useEffect(() => {
+    // Place mode owns the URL via lat/lng/place — do not debounce q.
+    if (activePlace) return;
     const trimmed = search.trim();
-    if (trimmed === qParam || trimmed === lastPushedQ) return;
+    // When leaving place mode, always push once (even if q stays empty) so geo
+    // clears in the same navigation as the typed text.
+    if (
+      !leavePlacePending &&
+      (trimmed === qParam || trimmed === lastPushedQ)
+    ) {
+      return;
+    }
 
     clearSearchDebounce();
+    const leavingPlace = leavePlacePending;
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
+      setLeavePlacePending(false);
       const latest = latestParamsRef.current;
       const rigLength = takePendingRigLength();
+      // Sync effect may have restored URL geo + distance sort into the ref;
+      // when leaving place, clear those here in the same navigation as typed q.
+      const leavePatch = leavingPlace ? leavePlaceUrlPatch(latest) : {};
       replaceQuery({
         ...latest,
         q: search,
+        ...leavePatch,
+        place: undefined,
         rigLength: stayKindAllowsRigLength(latest.stayKind)
           ? rigLength
           : undefined,
@@ -427,8 +549,8 @@ export default function CampgroundListControls({
     }, 300);
 
     return clearSearchDebounce;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search`
-  }, [search, qParam, lastPushedQ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search` / leavePlacePending
+  }, [search, qParam, lastPushedQ, activePlace, leavePlacePending]);
 
   function onNearMe() {
     setGeoError(null);
@@ -444,9 +566,11 @@ export default function CampgroundListControls({
           return;
         }
         setGeoBusy(false);
+        setSearch("");
         replaceWithFilters({
-          q: latestParamsRef.current.q,
+          q: "",
           sort: "distance",
+          place: undefined,
           lat: roundCampgroundCoord(pos.coords.latitude),
           lng: roundCampgroundCoord(pos.coords.longitude),
           radiusKm:
@@ -487,6 +611,7 @@ export default function CampgroundListControls({
 
   const hasFilters = Boolean(
     search ||
+      placeLabel ||
       provinceParam ||
       geo ||
       anySiteFilterActive(localFilters),
@@ -503,17 +628,13 @@ export default function CampgroundListControls({
       className={`space-y-4 ${isPending || geoBusy ? "opacity-80" : ""}`}
     >
       <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={t("searchPlaceholder")}
-            className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label={t("searchPlaceholder")}
-            disabled={geoBusy}
-          />
-        </div>
+        <SearchSuggestInput
+          value={search}
+          onChange={onSearchInputChange}
+          onSelectPlace={onSelectPlace}
+          onSelectCampground={onSelectCampground}
+          disabled={geoBusy}
+        />
 
         <Select
           value={sortParam}
@@ -635,12 +756,14 @@ export default function CampgroundListControls({
             disabled={discreteControlsDisabled}
             onClick={() => {
               clearSearchDebounce();
+              setLeavePlacePending(false);
               if (rigDebounceRef.current != null) {
                 window.clearTimeout(rigDebounceRef.current);
                 rigDebounceRef.current = null;
               }
               cancelGeolocation();
               setSearch("");
+              setActivePlace(undefined);
               updateRigDraft("");
               setGeoError(null);
               replaceQuery(clearedCampgroundQueryState());
