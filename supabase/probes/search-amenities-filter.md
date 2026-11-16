@@ -33,7 +33,17 @@ SELECT public.normalize_guest_amenity_ids(ARRAY['POOL']);
 SELECT public.normalize_guest_amenity_ids(
   ARRAY(SELECT 'WIFI'::text FROM generate_series(1, 17))
 );
--- NULL (oversized after DISTINCT still fails closed; raw >64 also NULL)
+-- {<wifi id>} — duplicates collapse; distinct-key cap not hit
+
+SELECT public.normalize_guest_amenity_ids(
+  ARRAY(SELECT 'X' || g FROM generate_series(1, 17) g)
+);
+-- NULL (>16 distinct keys after exclusion)
+
+SELECT public.normalize_guest_amenity_ids(
+  ARRAY(SELECT 'WIFI'::text FROM generate_series(1, 65))
+);
+-- NULL (raw cardinality >64 DoS guard)
 
 SELECT name
 FROM search_campgrounds(
