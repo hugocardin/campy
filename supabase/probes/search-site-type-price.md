@@ -4,6 +4,7 @@ Migrations:
 
 - `20261116053654_search_site_type_price_filters`
 - `20261116054943_search_site_type_price_review_fix` (#40 review: single match predicate, post-LIMIT min_price, site_types table allow-list, CAD base-price comment)
+- `20261116055709_search_rpc_single_path` (#40: one query path per RPC; conditional min_price only)
 
 ## Design
 
