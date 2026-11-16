@@ -67,10 +67,10 @@ Also compare anon vs authenticated `SELECT` column grants on `campgrounds.curren
 Migrations:
 
 - `20261116222604_campground_currency_lock` (initial trigger)
-- `20261116223109_campground_currency_lock_review` (shared
-  `campground_currency_lock_reason` SECURITY DEFINER RPC; bookings-first;
-  `bookings.site_id` ON DELETE RESTRICT; EXCEPTION DETAIL; site-insert
-  serialization)
+- `20261116223109_campground_currency_lock_review` (bookings-first;
+  `bookings.site_id` ON DELETE RESTRICT; EXCEPTION DETAIL; site-insert lock)
+- `20261116223419_campground_currency_lock_admin_rpc` (private DEFINER
+  rule; public RPC requires `is_platform_admin`; site `campground_id` moves)
 
 Admin edit calls the RPC; update action maps trigger `23514` + DETAIL only
 (no TS pre-check).

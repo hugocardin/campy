@@ -4,41 +4,7 @@ import { describe, it } from "node:test";
 import {
   CAMPGROUND_CURRENCY_LOCK_SQL_MESSAGES,
   parseCampgroundCurrencyLockError,
-  resolveCampgroundCurrencyLockReason,
 } from "./campground-currency-lock";
-
-describe("resolveCampgroundCurrencyLockReason", () => {
-  it("prefers bookings over sites", () => {
-    assert.equal(
-      resolveCampgroundCurrencyLockReason({
-        hasSites: true,
-        hasAmountBookings: true,
-      }),
-      "bookings",
-    );
-    assert.equal(
-      resolveCampgroundCurrencyLockReason({
-        hasSites: true,
-        hasAmountBookings: false,
-      }),
-      "sites",
-    );
-    assert.equal(
-      resolveCampgroundCurrencyLockReason({
-        hasSites: false,
-        hasAmountBookings: true,
-      }),
-      "bookings",
-    );
-    assert.equal(
-      resolveCampgroundCurrencyLockReason({
-        hasSites: false,
-        hasAmountBookings: false,
-      }),
-      null,
-    );
-  });
-});
 
 describe("parseCampgroundCurrencyLockError", () => {
   it("reads EXCEPTION DETAIL first", () => {

@@ -9,8 +9,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 /**
- * Lock reason from shared SQL `campground_currency_lock_reason` (same rule as
- * the currency UPDATE trigger). Used by admin edit UI only.
+ * Lock reason via admin-gated RPC `campground_currency_lock_reason`
+ * (requires platform_admin; core rule lives in private schema for the trigger).
  */
 export async function getCampgroundCurrencyLockReasonForClient(
   supabase: SupabaseClient,
