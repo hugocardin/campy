@@ -6,7 +6,9 @@ Migrations:
 - `20261115191846_search_hookups_harden` (cleanup demo links, per-site AND, drop `province text` overload, protect codes)
 - `20261116014604_sites_electricity_amps` (site `electricity_amps`; `require_amps`; WATER/SEWER only)
 - `20261116015837_sites_electricity_amps_harden` (amp values helper; compat boolean overloads; retire ELECTRICITY amenity)
-- `20261116021437_dump_driveway_rig_search` (DUMP_STATION; `driveway_type`; `min_rig_length`; `stay_kind`; protect DUMP_STATION)
+- `20261116022329_dump_driveway_rig_search` (DUMP_STATION; `driveway_type`; max_rig rules; protect DUMP_STATION)
+- `20261116022503_dump_driveway_rig_search_rpcs` / `20261116022628_*` (`min_rig_length`; `stay_kind`; near+compat)
+- follow-up hardens CHECK→trigger + shared site-filter helper
 
 ## Filters
 

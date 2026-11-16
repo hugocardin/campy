@@ -40,4 +40,9 @@ describe("driveway-type", () => {
     assert.equal(formatDrivewayUrlParam("PULL_THROUGH"), "pull_through");
     assert.equal(formatDrivewayUrlParam(null), undefined);
   });
+
+  it("rejects prototype keys", () => {
+    assert.equal(parseDrivewayUrlParam("constructor"), undefined);
+    assert.equal(parseDrivewayUrlParam("__proto__"), undefined);
+  });
 });

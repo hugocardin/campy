@@ -1,7 +1,8 @@
 /**
  * Guest stay kind: camping (non-lodging sites) vs lodging.
  * Keep in sync with search RPC `stay_kind` param
- * (`supabase/migrations/20261116021437_dump_driveway_rig_search.sql`).
+ * (`supabase/migrations/20261116022503_dump_driveway_rig_search_rpcs.sql`
+ * + near/compat follow-ups).
  */
 export const STAY_KINDS = ["camping", "lodging"] as const;
 

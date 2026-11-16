@@ -5,17 +5,16 @@ import {
   CampgroundSort,
   campgroundSortQueryValue,
   formatCampgroundAmpsParam,
-  formatDrivewayUrlParam,
-  formatGuestRigLengthParam,
-  formatStayKindParam,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
 import { provinceFilterKey } from "@/lib/canadian-provinces";
 import type { DrivewayType } from "@/lib/driveway-type";
+import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import type { ElectricityAmpFilterOption } from "@/lib/electricity-amps";
 import { normalizeElectricityAmpFilters } from "@/lib/electricity-amps";
+import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
 import type { StayKind } from "@/lib/stay-kind";
-import { stayKindAllowsRigLength } from "@/lib/stay-kind";
+import { formatStayKindParam, stayKindAllowsRigLength } from "@/lib/stay-kind";
 
 export type CampgroundQueryState = {
   q: string;
@@ -40,8 +39,11 @@ export function withLatestCampgroundFilters(
 ): CampgroundQueryState {
   const stayKind =
     "stayKind" in patch ? patch.stayKind : latest.stayKind;
+  const campingOk = stayKindAllowsRigLength(stayKind);
   const rigLengthRaw =
     "rigLength" in patch ? patch.rigLength : latest.rigLength;
+  const drivewayRaw =
+    "drivewayType" in patch ? patch.drivewayType : latest.drivewayType;
   return {
     q: patch.q,
     sort: patch.sort,
@@ -53,11 +55,10 @@ export function withLatestCampgroundFilters(
     water: patch.water ?? latest.water,
     sewer: patch.sewer ?? latest.sewer,
     dumpStation: patch.dumpStation ?? latest.dumpStation,
-    drivewayType:
-      "drivewayType" in patch ? patch.drivewayType : latest.drivewayType,
     stayKind,
-    // Drop rig when lodging (issue #27).
-    rigLength: stayKindAllowsRigLength(stayKind) ? rigLengthRaw : undefined,
+    // Drop rig + driveway when lodging (cabins; issue #27).
+    drivewayType: campingOk ? drivewayRaw : undefined,
+    rigLength: campingOk ? rigLengthRaw : undefined,
   };
 }
 
@@ -83,15 +84,14 @@ export function siteFiltersFromQueryState(
     | "stayKind"
   >,
 ): CampgroundSiteFilters {
+  const campingOk = stayKindAllowsRigLength(state.stayKind);
   return {
     amps: state.amps,
     water: state.water,
     sewer: state.sewer,
     dumpStation: state.dumpStation,
-    drivewayType: state.drivewayType,
-    rigLength: stayKindAllowsRigLength(state.stayKind)
-      ? state.rigLength
-      : undefined,
+    drivewayType: campingOk ? state.drivewayType : undefined,
+    rigLength: campingOk ? state.rigLength : undefined,
     stayKind: state.stayKind,
   };
 }

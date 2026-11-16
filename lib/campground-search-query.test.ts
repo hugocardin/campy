@@ -41,7 +41,7 @@ describe("withLatestCampgroundFilters", () => {
     assert.equal(next.province, "BC");
   });
 
-  it("clears rig length when switching to lodging", () => {
+  it("clears rig length and driveway when switching to lodging", () => {
     const next = withLatestCampgroundFilters(base, {
       q: "lake",
       sort: "name",
@@ -49,6 +49,7 @@ describe("withLatestCampgroundFilters", () => {
     });
     assert.equal(next.stayKind, "lodging");
     assert.equal(next.rigLength, undefined);
+    assert.equal(next.drivewayType, undefined);
   });
 
   it("allows toggling dump station", () => {

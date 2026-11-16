@@ -3,14 +3,11 @@ import CampgroundList from "@/components/search/CampgroundList";
 import CampgroundsMapDynamic from "@/components/search/CampgroundsMapDynamic";
 import CampgroundListControls from "@/components/search/list/CampgroundListControls";
 import {
+  buildCampgroundSiteFiltersCacheKey,
   getCampgroundProvinces,
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
 import {
-  formatCampgroundAmpsParam,
-  formatDrivewayUrlParam,
-  formatGuestRigLengthParam,
-  formatStayKindParam,
   parseCampgroundGeo,
   parseCampgroundSiteFilters,
   parseCampgroundSort,
@@ -58,10 +55,7 @@ export default async function Home({ searchParams }: PageProps) {
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
   });
-  const ampsKey = formatCampgroundAmpsParam(siteFilters.amps) ?? "";
-  const drivewayKey = formatDrivewayUrlParam(siteFilters.drivewayType) ?? "";
-  const rigLengthKey = formatGuestRigLengthParam(siteFilters.rigLength) ?? "";
-  const stayKey = formatStayKindParam(siteFilters.stayKind) ?? "";
+  const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
 
   const [campgroundsResult, provincesResult] = await Promise.all([
     getCampgrounds(
@@ -71,13 +65,7 @@ export default async function Home({ searchParams }: PageProps) {
       geo?.lat,
       geo?.lng,
       geo?.radiusKm,
-      ampsKey,
-      siteFilters.water,
-      siteFilters.sewer,
-      siteFilters.dumpStation,
-      drivewayKey,
-      rigLengthKey,
-      stayKey,
+      siteFiltersKey,
     ),
     getCampgroundProvinces(),
   ]);
@@ -118,13 +106,7 @@ export default async function Home({ searchParams }: PageProps) {
     q ?? "",
     province ?? "",
     geo ? `${geo.lat},${geo.lng},${geo.radiusKm}` : "",
-    ampsKey,
-    siteFilters.water ? "w" : "",
-    siteFilters.sewer ? "s" : "",
-    siteFilters.dumpStation ? "d" : "",
-    drivewayKey,
-    rigLengthKey,
-    stayKey,
+    siteFiltersKey,
   ].join("|");
 
   return (

@@ -205,13 +205,15 @@ describe("site filters (dump / driveway / rig / stay)", () => {
     );
   });
 
-  it("ignores rig length when stay is lodging", () => {
+  it("ignores rig length and driveway when stay is lodging", () => {
     const filters = parseCampgroundSiteFilters({
       rigLength: "40",
+      driveway: "pull_through",
       stay: "lodging",
     });
     assert.equal(filters.stayKind, "lodging");
     assert.equal(filters.rigLength, undefined);
+    assert.equal(filters.drivewayType, undefined);
   });
 
   it("detects any site filter active", () => {

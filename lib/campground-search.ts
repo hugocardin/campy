@@ -1,21 +1,18 @@
-import { SITE_HOOKUP_AMENITY_CODES } from "@/lib/amenities/hookup-codes";
+import {
+  type SiteHookupAmenityCode,
+} from "@/lib/amenities/hookup-codes";
 import {
   type DrivewayType,
   parseDrivewayUrlParam,
-  formatDrivewayUrlParam,
 } from "@/lib/driveway-type";
 import {
   ELECTRICITY_AMP_VALUES,
   type ElectricityAmpFilterOption,
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
-import {
-  formatGuestRigLengthParam,
-  parseGuestRigLength,
-} from "@/lib/site-rig-length";
+import { parseGuestRigLength } from "@/lib/site-rig-length";
 import {
   type StayKind,
-  formatStayKindParam,
   parseStayKind,
   stayKindAllowsRigLength,
 } from "@/lib/stay-kind";
@@ -37,9 +34,9 @@ export const CAMPGROUND_GEO_COORD_DECIMALS = 2;
 
 /** Stable amenity `code` values mapped to guest water/sewer filters. */
 export const HOOKUP_AMENITY_CODES = {
-  water: SITE_HOOKUP_AMENITY_CODES[0],
-  sewer: SITE_HOOKUP_AMENITY_CODES[1],
-} as const;
+  water: "WATER",
+  sewer: "SEWER",
+} as const satisfies Record<string, SiteHookupAmenityCode>;
 
 export type HookupAmenityFilterKey = keyof typeof HOOKUP_AMENITY_CODES;
 
@@ -261,7 +258,7 @@ export function parseCampgroundHookups(params: {
 
 /**
  * Parse dump / driveway / rig / stay URL params (issue #27).
- * Rig length is ignored when stay=lodging.
+ * Rig length and driveway are ignored when stay=lodging (cabin sites).
  */
 export function parseCampgroundSiteFilters(params: {
   amps?: string;
@@ -274,12 +271,16 @@ export function parseCampgroundSiteFilters(params: {
   stay?: string;
 }): CampgroundSiteFilters {
   const stayKind = parseStayKind(params.stay);
-  const rigRaw = parseGuestRigLength(params.rigLength);
+  const campingFilters = stayKindAllowsRigLength(stayKind);
   return {
     ...parseCampgroundHookups(params),
     dumpStation: parseHookupFlag(params.dump),
-    drivewayType: parseDrivewayUrlParam(params.driveway),
-    rigLength: stayKindAllowsRigLength(stayKind) ? rigRaw : undefined,
+    drivewayType: campingFilters
+      ? parseDrivewayUrlParam(params.driveway)
+      : undefined,
+    rigLength: campingFilters
+      ? parseGuestRigLength(params.rigLength)
+      : undefined,
     stayKind,
   };
 }
@@ -309,8 +310,3 @@ export function formatCampgroundAmpsParam(
   return normalized.join(",");
 }
 
-export {
-  formatDrivewayUrlParam,
-  formatGuestRigLengthParam,
-  formatStayKindParam,
-};

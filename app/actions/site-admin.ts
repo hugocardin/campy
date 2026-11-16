@@ -2,7 +2,10 @@
 
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { redirect } from "@/i18n/navigation";
-import { parseDrivewayTypeInput } from "@/lib/driveway-type";
+import {
+  type DrivewayType,
+  parseDrivewayTypeInput,
+} from "@/lib/driveway-type";
 import { parseElectricityAmpsInput } from "@/lib/electricity-amps";
 import {
   ActionResult,
@@ -13,6 +16,10 @@ import {
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
+  isLodgingSiteType,
+  siteTypeRequiresMaxRigLength,
+} from "@/lib/site-rig-length";
+import {
   handleDbNoData,
   handleDbResponse,
   handleDbSingle,
@@ -21,6 +28,7 @@ import {
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "next-intl/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function revalidateSitePages(campgroundId: string, siteId: string) {
   revalidateLocalizedPath(routes.platformAdmin.campgroundSites(campgroundId));
@@ -33,6 +41,62 @@ function revalidateSitePages(campgroundId: string, siteId: string) {
   revalidateLocalizedPath(routes.platformAdmin.campgroundView(campgroundId));
   revalidateLocalizedPath(routes.platformAdmin.campgroundEdit(campgroundId));
   revalidateLocalizedPath(routes.campgroundDetail(campgroundId));
+}
+
+async function resolveSiteTypeCode(
+  supabase: SupabaseClient,
+  siteTypeId: number,
+): Promise<ActionResult<string>> {
+  const result = await handleDbSingle(
+    supabase
+      .from("site_types")
+      .select("code")
+      .eq("id", siteTypeId)
+      .single(),
+  );
+  if (!result.success) {
+    return result;
+  }
+  return { success: true, data: String(result.data.code) };
+}
+
+/** Apply lodging/RV max_rig + driveway rules before write (issue #27). */
+function normalizeSiteWriteFields(
+  siteTypeCode: string,
+  maxRigLength: number | undefined,
+  drivewayType: DrivewayType | null,
+):
+  | {
+      ok: true;
+      max_rig_length: number | null;
+      driveway_type: DrivewayType | null;
+    }
+  | { ok: false; error: ActionResult } {
+  if (isLodgingSiteType(siteTypeCode)) {
+    return { ok: true, max_rig_length: null, driveway_type: null };
+  }
+  if (siteTypeRequiresMaxRigLength(siteTypeCode)) {
+    if (maxRigLength == null || !(maxRigLength > 0)) {
+      return {
+        ok: false,
+        error: resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
+          field: "max_rig_length",
+        }),
+      };
+    }
+  } else if (maxRigLength != null && !(maxRigLength > 0)) {
+    return {
+      ok: false,
+      error: resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+        field: "max_rig_length",
+      }),
+    };
+  }
+  return {
+    ok: true,
+    max_rig_length: maxRigLength ?? null,
+    driveway_type: drivewayType,
+  };
 }
 
 export async function updateSiteAction(
@@ -68,6 +132,19 @@ export async function updateSiteAction(
   try {
     const supabase = await createClient();
 
+    const typeResult = await resolveSiteTypeCode(supabase, input.site_type_id);
+    if (!typeResult.success) {
+      return typeResult;
+    }
+    const normalized = normalizeSiteWriteFields(
+      typeResult.data,
+      input.max_rig_length,
+      drivewayParsed.drivewayType,
+    );
+    if (!normalized.ok) {
+      return normalized.error;
+    }
+
     // .select().single() so RLS-filtered 0-row updates surface as errors
     // instead of handleDbNoData fake-success + redirect.
     const result = await handleDbSingle(
@@ -76,12 +153,12 @@ export async function updateSiteAction(
         .update({
           name: input.name,
           site_type_id: input.site_type_id,
-          max_rig_length: input.max_rig_length ?? null,
+          max_rig_length: normalized.max_rig_length,
           price_per_night_base: input.price_per_night,
           min_stay_nights: input.min_stay_nights,
           description: input.description,
           electricity_amps: ampsParsed.amps,
-          driveway_type: drivewayParsed.drivewayType,
+          driveway_type: normalized.driveway_type,
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id)
@@ -135,6 +212,19 @@ export async function createSiteAction(
   try {
     const supabase = await createClient();
 
+    const typeResult = await resolveSiteTypeCode(supabase, input.site_type_id);
+    if (!typeResult.success) {
+      return typeResult;
+    }
+    const normalized = normalizeSiteWriteFields(
+      typeResult.data,
+      input.max_rig_length,
+      drivewayParsed.drivewayType,
+    );
+    if (!normalized.ok) {
+      return normalized.error;
+    }
+
     const result = await handleDbSingle(
       supabase
         .from("sites")
@@ -142,12 +232,12 @@ export async function createSiteAction(
           campground_id: campgroundId,
           name: input.name,
           site_type_id: input.site_type_id,
-          max_rig_length: input.max_rig_length ?? null,
+          max_rig_length: normalized.max_rig_length,
           price_per_night_base: input.price_per_night,
           min_stay_nights: input.min_stay_nights,
           description: input.description,
           electricity_amps: ampsParsed.amps,
-          driveway_type: drivewayParsed.drivewayType,
+          driveway_type: normalized.driveway_type,
         })
 
         .select("id")

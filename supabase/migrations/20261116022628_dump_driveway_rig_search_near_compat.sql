@@ -1,3 +1,13 @@
+-- Near search expand/contract (paired with 20261116022503 list expand).
+DROP FUNCTION IF EXISTS public.search_campgrounds_near(
+  double precision, double precision, double precision, text, text[],
+  smallint[], boolean, boolean
+);
+DROP FUNCTION IF EXISTS public.search_campgrounds_near(
+  double precision, double precision, double precision, text, text[],
+  boolean, boolean, boolean
+);
+
 CREATE OR REPLACE FUNCTION public.search_campgrounds_near(
   lat double precision,
   lng double precision,
@@ -238,55 +248,7 @@ COMMENT ON FUNCTION public.search_campgrounds_near(
 ) IS
   'Guest near-me search: park dump + per-site amps/WATER/SEWER/driveway/rig/stay; SECURITY INVOKER.';
 
--- Compat wrappers (no DEFAULTs) → new main with dump/driveway/rig/stay defaults.
-CREATE FUNCTION public.search_campgrounds(
-  q text,
-  province_aliases text[],
-  require_electricity boolean,
-  require_water boolean,
-  require_sewer boolean
-)
-RETURNS TABLE (
-  id uuid,
-  name text,
-  description text,
-  address text,
-  city text,
-  province text,
-  country text,
-  website text,
-  phone text,
-  latitude double precision,
-  longitude double precision
-)
-LANGUAGE sql
-STABLE
-SECURITY INVOKER
-SET search_path = ''
-AS $$
-  SELECT *
-  FROM public.search_campgrounds(
-    q,
-    province_aliases,
-    CASE
-      WHEN coalesce(require_electricity, false)
-        THEN public.electricity_amp_values()
-      ELSE NULL::smallint[]
-    END,
-    require_water,
-    require_sewer,
-    false,
-    NULL::text,
-    NULL::numeric,
-    NULL::text
-  );
-$$;
-
-COMMENT ON FUNCTION public.search_campgrounds(
-  text, text[], boolean, boolean, boolean
-) IS
-  'COMPAT: maps require_electricity → require_amps. Drop after amps app deploys — #30.';
-
+-- Near boolean compat (list compat lives in 20261116022503).
 CREATE FUNCTION public.search_campgrounds_near(
   lat double precision,
   lng double precision,
@@ -342,20 +304,6 @@ COMMENT ON FUNCTION public.search_campgrounds_near(
   boolean, boolean, boolean
 ) IS
   'COMPAT: maps require_electricity → require_amps. Drop after amps app deploys — #30.';
-
-REVOKE ALL ON FUNCTION public.search_campgrounds(
-  text, text[], smallint[], boolean, boolean, boolean, text, numeric, text
-) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.search_campgrounds(
-  text, text[], smallint[], boolean, boolean, boolean, text, numeric, text
-) TO anon, authenticated;
-
-REVOKE ALL ON FUNCTION public.search_campgrounds(
-  text, text[], boolean, boolean, boolean
-) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.search_campgrounds(
-  text, text[], boolean, boolean, boolean
-) TO anon, authenticated;
 
 REVOKE ALL ON FUNCTION public.search_campgrounds_near(
   double precision, double precision, double precision, text, text[],

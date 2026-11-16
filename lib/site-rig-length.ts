@@ -1,7 +1,9 @@
 /**
  * Site-type rules for `max_rig_length` (issue #27).
  * Keep in sync with SQL `site_max_rig_length_valid`
- * (`supabase/migrations/20261116021437_dump_driveway_rig_search.sql`).
+ * (`supabase/migrations/20261116022329_dump_driveway_rig_search.sql`
+ * + trigger follow-up). Codes are duplicated in SQL/TS intentionally for now;
+ * a `site_types` flag column can centralize later.
  */
 export const SITE_TYPE_CODES = [
   "TENT",

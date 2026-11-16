@@ -1,7 +1,7 @@
 /**
  * Site driveway type (pull-through vs back-in).
  * Keep in sync with SQL CHECK on `sites.driveway_type`
- * (`supabase/migrations/20261116021437_dump_driveway_rig_search.sql`).
+ * (`supabase/migrations/20261116022329_dump_driveway_rig_search.sql`).
  */
 export const DRIVEWAY_TYPES = ["PULL_THROUGH", "BACK_IN"] as const;
 
@@ -53,8 +53,10 @@ export function parseDrivewayUrlParam(
   value: string | undefined,
 ): DrivewayType | undefined {
   if (value == null || value.trim() === "") return undefined;
-  const key = value.trim().toLowerCase() as DrivewayUrlValue;
-  return DRIVEWAY_URL_VALUES[key];
+  const key = value.trim().toLowerCase();
+  // Own-property only — avoid prototype keys (`constructor`, `__proto__`).
+  if (!Object.hasOwn(DRIVEWAY_URL_VALUES, key)) return undefined;
+  return DRIVEWAY_URL_VALUES[key as DrivewayUrlValue];
 }
 
 export function formatDrivewayUrlParam(

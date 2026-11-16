@@ -70,6 +70,10 @@ COMMENT ON COLUMN public.sites.driveway_type IS
 -- ---------------------------------------------------------------------------
 -- max_rig_length by site type (issue #27)
 -- LODGING → must be null; RV / RV_AND_TENT → required (> 0); TENT optional.
+--
+-- Intentional one-way cleanup: lodging sites must not carry a rig length
+-- (demo had Gold Creek A1 = 29). Real catalogs with lodging max_rig values
+-- lose those values here — preferred over leaving invalid rows.
 -- ---------------------------------------------------------------------------
 UPDATE public.sites AS s
 SET max_rig_length = NULL,
@@ -78,6 +82,26 @@ FROM public.site_types AS st
 WHERE s.site_type_id = st.id
   AND st.code = 'LODGING'
   AND s.max_rig_length IS NOT NULL;
+
+-- Fail loudly before VALIDATE if any RV/RV_AND_TENT row still lacks max_rig.
+DO $$
+DECLARE
+  bad text;
+BEGIN
+  SELECT string_agg(s.id::text || ' (' || s.name || ')', ', ' ORDER BY s.name)
+  INTO bad
+  FROM public.sites AS s
+  JOIN public.site_types AS st ON st.id = s.site_type_id
+  WHERE st.code IN ('RV', 'RV_AND_TENT')
+    AND (s.max_rig_length IS NULL OR s.max_rig_length <= 0);
+
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION
+      'sites_max_rig_length_by_type: RV/RV_AND_TENT sites need max_rig_length > 0 before VALIDATE: %',
+      bad;
+  END IF;
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.site_max_rig_length_valid(
   p_site_type_id integer,
@@ -108,10 +132,11 @@ $$;
 COMMENT ON FUNCTION public.site_max_rig_length_valid(integer, numeric) IS
   'LODGING → null max_rig_length; RV/RV_AND_TENT → required > 0; TENT optional.';
 
+-- Not granted to anon/authenticated (constraint/trigger only; avoid /rpc exposure).
 REVOKE ALL ON FUNCTION public.site_max_rig_length_valid(integer, numeric) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.site_max_rig_length_valid(integer, numeric)
-  TO anon, authenticated;
 
+-- CHECK that reads site_types is unsupported long-term (restore/restore issues).
+-- Kept briefly for the initial apply; 20261116023721 replaces with a trigger.
 ALTER TABLE public.sites
   DROP CONSTRAINT IF EXISTS sites_max_rig_length_by_type;
 

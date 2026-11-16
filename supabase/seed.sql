@@ -4,7 +4,7 @@
 --   * Amenity codes WATER / SEWER (from
 --     20261115191024_search_campgrounds_hookup_filters)
 --   * DUMP_STATION amenity + sites.driveway_type
---     (20261116021437_dump_driveway_rig_search)
+--     (20261116022329_dump_driveway_rig_search + RPC follow-ups)
 --   * sites.electricity_amps (20261116014604 + harden 20261116015837)
 --   * ELECTRICITY amenity retired (amps column only)
 --   * The named campgrounds and sites below (Campy demo catalog). On a fresh

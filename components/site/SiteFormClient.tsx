@@ -120,7 +120,7 @@ export default function SiteFormClient({
       if (isNaN(maxRigLengthNum) || maxRigLengthNum <= 0) {
         return setError(t_sites("errors.maxRigLengthRequired"));
       }
-    } else if (!isNaN(maxRigLengthNum) && maxRigLengthNum < 0) {
+    } else if (!isNaN(maxRigLengthNum) && maxRigLengthNum <= 0) {
       return setError(t_sites("errors.invalidMaxLength"));
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
@@ -133,8 +133,11 @@ export default function SiteFormClient({
       return setError(t_sites("errors.typeRequired"));
     }
 
-    const driveway: DrivewayType | null =
-      form.driveway_type === "" ? null : form.driveway_type;
+    const driveway: DrivewayType | null = isLodging
+      ? null
+      : form.driveway_type === ""
+        ? null
+        : form.driveway_type;
 
     const payload: SiteCreateUpdateInput = {
       id: initialData?.id,
@@ -192,8 +195,9 @@ export default function SiteFormClient({
     setForm((prev) => ({
       ...prev,
       site_type_id: value,
-      // Clear rig length when switching to lodging.
+      // Clear rig length + driveway when switching to lodging.
       max_rig_length: isLodgingSiteType(nextCode) ? "" : prev.max_rig_length,
+      driveway_type: isLodgingSiteType(nextCode) ? "" : prev.driveway_type,
     }));
     setError(null);
   };
@@ -267,7 +271,7 @@ export default function SiteFormClient({
                   id="max_rig_length"
                   name="max_rig_length"
                   type="number"
-                  min={0}
+                  min={1}
                   value={form.max_rig_length}
                   onChange={handleChange}
                   className="mt-1.5"
@@ -343,45 +347,47 @@ export default function SiteFormClient({
               />
             </div>
 
-            <div>
-              <Label htmlFor="driveway_type">
-                {t_sites("form.drivewayLabel")}
-              </Label>
-              <Select
-                value={form.driveway_type || DRIVEWAY_NONE}
-                onValueChange={(value) => {
-                  setForm((prev) => ({
-                    ...prev,
-                    driveway_type:
-                      value === DRIVEWAY_NONE
-                        ? ""
-                        : (value as DrivewayType),
-                  }));
-                  setError(null);
-                }}
-              >
-                <SelectTrigger id="driveway_type" className="mt-1.5">
-                  <SelectValue
-                    placeholder={t_sites("form.drivewayPlaceholder")}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={DRIVEWAY_NONE}>
-                    {t_sites("form.drivewayPlaceholder")}
-                  </SelectItem>
-                  {DRIVEWAY_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type === "PULL_THROUGH"
-                        ? t_sites("form.drivewayPullThrough")
-                        : t_sites("form.drivewayBackIn")}
+            {!isLodging ? (
+              <div>
+                <Label htmlFor="driveway_type">
+                  {t_sites("form.drivewayLabel")}
+                </Label>
+                <Select
+                  value={form.driveway_type || DRIVEWAY_NONE}
+                  onValueChange={(value) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      driveway_type:
+                        value === DRIVEWAY_NONE
+                          ? ""
+                          : (value as DrivewayType),
+                    }));
+                    setError(null);
+                  }}
+                >
+                  <SelectTrigger id="driveway_type" className="mt-1.5">
+                    <SelectValue
+                      placeholder={t_sites("form.drivewayPlaceholder")}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DRIVEWAY_NONE}>
+                      {t_sites("form.drivewayPlaceholder")}
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {t_sites("form.drivewayHint")}
-              </p>
-            </div>
+                    {DRIVEWAY_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type === "PULL_THROUGH"
+                          ? t_sites("form.drivewayPullThrough")
+                          : t_sites("form.drivewayBackIn")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t_sites("form.drivewayHint")}
+                </p>
+              </div>
+            ) : null}
 
             <fieldset className="space-y-2 border-0 p-0 m-0">
               <legend className="text-sm font-medium leading-none">

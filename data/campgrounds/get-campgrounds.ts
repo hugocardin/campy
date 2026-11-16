@@ -11,13 +11,17 @@ import {
   CampgroundSort,
   anySiteFilterActive,
   campgroundRadiusMeters,
+  formatCampgroundAmpsParam,
   parseCampgroundSiteFilters,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
+import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
+import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
+import { formatStayKindParam } from "@/lib/stay-kind";
 import {
   handleDbResponse,
   handleUnexpectedError,
@@ -159,8 +163,44 @@ function siteFilterRpcArgs(filters: CampgroundSiteFilters) {
 }
 
 /**
+ * Canonical primitive for React `cache` — URL-shaped site/park filter string.
+ * Built by {@link buildCampgroundSiteFiltersCacheKey}.
+ */
+export function buildCampgroundSiteFiltersCacheKey(
+  filters: CampgroundSiteFilters,
+): string {
+  const params = new URLSearchParams();
+  const amps = formatCampgroundAmpsParam(filters.amps);
+  if (amps) params.set("amps", amps);
+  if (filters.water) params.set("water", "1");
+  if (filters.sewer) params.set("sewer", "1");
+  if (filters.dumpStation) params.set("dump", "1");
+  const driveway = formatDrivewayUrlParam(filters.drivewayType);
+  if (driveway) params.set("driveway", driveway);
+  const stay = formatStayKindParam(filters.stayKind);
+  if (stay) params.set("stay", stay);
+  const rig = formatGuestRigLengthParam(filters.rigLength);
+  if (rig) params.set("rigLength", rig);
+  return params.toString();
+}
+
+function parseSiteFiltersCacheKey(key: string): CampgroundSiteFilters {
+  const params = new URLSearchParams(key);
+  return parseCampgroundSiteFilters({
+    amps: params.get("amps") ?? undefined,
+    water: params.get("water") ?? undefined,
+    sewer: params.get("sewer") ?? undefined,
+    dump: params.get("dump") ?? undefined,
+    driveway: params.get("driveway") ?? undefined,
+    rigLength: params.get("rigLength") ?? undefined,
+    stay: params.get("stay") ?? undefined,
+  });
+}
+
+/**
  * Primitives (not an object) so React `cache` can dedupe by argument identity.
- * `ampsKey` is a stable serialized filter (`none,15,30` or "").
+ * `siteFiltersKey` is one canonical URL-shaped filter string (avoids a growing
+ * list of adjacent booleans/strings that can be swapped at call sites).
  */
 export const getCampgrounds = cache(
   async (
@@ -170,13 +210,7 @@ export const getCampgrounds = cache(
     lat?: number,
     lng?: number,
     radiusKm?: number,
-    ampsKey = "",
-    water = false,
-    sewer = false,
-    dumpStation = false,
-    driveway = "",
-    rigLengthKey = "",
-    stay = "",
+    siteFiltersKey = "",
   ): Promise<ActionResult<Campground[]>> => {
     try {
       const supabase = await createClient();
@@ -187,15 +221,7 @@ export const getCampgrounds = cache(
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       // Unknown / malicious ?province= is ignored (All provinces).
       const provinceCode = resolveProvinceCode(province);
-      const siteFilters = parseCampgroundSiteFilters({
-        amps: ampsKey || undefined,
-        water: water ? "1" : undefined,
-        sewer: sewer ? "1" : undefined,
-        dump: dumpStation ? "1" : undefined,
-        driveway: driveway || undefined,
-        rigLength: rigLengthKey || undefined,
-        stay: stay || undefined,
-      });
+      const siteFilters = parseSiteFiltersCacheKey(siteFiltersKey);
       const siteFiltersActive = anySiteFilterActive(siteFilters);
 
       let provinceAliases: string[] = [];
