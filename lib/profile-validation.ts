@@ -6,6 +6,8 @@
  * (tightened in `20261116064530_profiles_full_name_check_tighten.sql`).
  * Keep rig max in sync with {@link RIG_LENGTH_MAX_FT} /
  * `profiles_default_rig_length_chk` in that same migration.
+ * `preferred_rig_unit` CHECK (`ft`/`m`/NULL) lives in
+ * `supabase/migrations/20261116135025_preferred_rig_unit.sql`.
  */
 export const FULL_NAME_MAX_LENGTH = 120;
 

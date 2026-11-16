@@ -54,8 +54,6 @@
     "rigLengthPlaceholderFt": "ex. 35",
     "rigLengthPlaceholderM": "ex. 11",
     "rigLengthUnitGroupLabel": "Unité de longueur",
-    "rigLengthUnitFt": "pi",
-    "rigLengthUnitM": "m",
 
     "siteFiltersHint": "Affiche les campings ayant au moins un emplacement qui correspond aux types choisis, à l’un des ampérages (ou Aucun), à tous les branchements eau/égouts, à l’allée, à la longueur de véhicule et au prix max (si indiqués).",
     "filterAmpNone": "Aucun",

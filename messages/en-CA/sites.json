@@ -20,8 +20,6 @@
     "maxRigLengthPlaceholderM": "e.g. 11",
     "maxRigLengthRequiredHint": "Required for RV and RV-and-tent sites.",
     "rigLengthUnitGroupLabel": "Length unit",
-    "rigLengthUnitFt": "ft",
-    "rigLengthUnitM": "m",
     "maxRigLengthStoredHint": "Saved in feet.",
 
     "siteTypeLabel": "Site type",

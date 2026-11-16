@@ -11,19 +11,18 @@
     "role": "Role",
     "joined": "Joined",
     "defaultRigLengthLabel": "Default rig length",
-    "defaultRigLengthHint": "Saved for future searches. Leave blank if you have no default.",
+    "defaultRigLengthHint": "Used as your preferred length for search. Leave blank if you have no default.",
     "rigLengthPlaceholderFt": "e.g. 35",
     "rigLengthPlaceholderM": "e.g. 11",
     "rigLengthUnitGroupLabel": "Length unit",
-    "rigLengthUnitFt": "ft",
-    "rigLengthUnitM": "m",
     "rigLengthStoredHint": "Saved in feet."
   },
 
   "errors": {
     "nameRequired": "Please enter your name",
     "nameTooLong": "Name is too long ({max, number} characters max)",
-    "invalidRigLength": "Enter a positive length up to {max, number} {unit}, or leave blank"
+    "invalidRigLength": "Enter a positive length up to {max, number} {unit}, or leave blank",
+    "invalidRigUnit": "Choose a valid length unit (ft or m)"
   },
 
   "ProfilePage": {

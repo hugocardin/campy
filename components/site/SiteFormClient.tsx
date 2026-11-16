@@ -26,14 +26,11 @@ import {
   type ElectricityAmp,
   normalizeElectricityAmps,
 } from "@/lib/electricity-amps";
-import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
+import RigLengthInput from "@/components/rig-length/RigLengthInput";
+import { useRigLengthInput } from "@/components/rig-length/useRigLengthInput";
 import {
-  convertRigLengthDisplay,
   isLodgingSiteType,
-  maxRigLengthInUnit,
-  parseRigLengthToFeet,
   siteTypeRequiresMaxRigLength,
-  type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
@@ -88,7 +85,21 @@ export default function SiteFormClient({
     ),
     driveway_type: initialData?.driveway_type ?? "",
   }));
-  const [rigUnit, setRigUnit] = useState<RigLengthUnit>("ft");
+
+  const {
+    unit: rigUnit,
+    setDraft: setRigDraft,
+    onUnitChange: handleRigUnitChange,
+    parse: parseRigDraft,
+    invalidLengthParams,
+  } = useRigLengthInput({
+    initialUnit: "ft",
+    draft: form.max_rig_length,
+    onDraftChange: (value) => {
+      setForm((prev) => ({ ...prev, max_rig_length: value }));
+      setError(null);
+    },
+  });
 
   const selectedTypeCode = useMemo(() => {
     if (!form.site_type_id) return undefined;
@@ -97,8 +108,12 @@ export default function SiteFormClient({
 
   const isLodging = isLodgingSiteType(selectedTypeCode);
   const requiresMaxRig = siteTypeRequiresMaxRigLength(selectedTypeCode);
+  const invalidMaxLengthMessage = t_sites(
+    "errors.invalidMaxLength",
+    invalidLengthParams,
+  );
 
-  const maxRigParsed = parseRigLengthToFeet(form.max_rig_length, rigUnit);
+  const maxRigParsed = parseRigDraft();
   const isFormValid = Boolean(
     form.name.trim() &&
     form.site_type_id &&
@@ -112,10 +127,7 @@ export default function SiteFormClient({
     e.preventDefault();
     setError(null);
 
-    const maxRigParsedSubmit = parseRigLengthToFeet(
-      form.max_rig_length,
-      rigUnit,
-    );
+    const maxRigParsedSubmit = parseRigDraft();
     const pricePerNightNum = parseFloat(form.price_per_night);
     const minStayNightsNum = parseFloat(form.min_stay_nights);
     const siteTypeIdNum = parseInt(form.site_type_id, 10);
@@ -130,26 +142,10 @@ export default function SiteFormClient({
         return setError(t_sites("errors.maxRigLengthRequired"));
       }
       if (!maxRigParsedSubmit.ok) {
-        return setError(
-          t_sites("errors.invalidMaxLength", {
-            max: maxRigLengthInUnit(rigUnit),
-            unit:
-              rigUnit === "m"
-                ? t_sites("form.rigLengthUnitM")
-                : t_sites("form.rigLengthUnitFt"),
-          }),
-        );
+        return setError(invalidMaxLengthMessage);
       }
     } else if (form.max_rig_length.trim() !== "" && !maxRigParsedSubmit.ok) {
-      return setError(
-        t_sites("errors.invalidMaxLength", {
-          max: maxRigLengthInUnit(rigUnit),
-          unit:
-            rigUnit === "m"
-              ? t_sites("form.rigLengthUnitM")
-              : t_sites("form.rigLengthUnitFt"),
-        }),
-      );
+      return setError(invalidMaxLengthMessage);
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
       return setError(t_sites("errors.invalidPricePerNight"));
@@ -230,24 +226,6 @@ export default function SiteFormClient({
     setError(null);
   };
 
-  const handleRigUnitChange = (nextUnit: RigLengthUnit) => {
-    if (nextUnit === rigUnit) return;
-    setForm((prev) => {
-      const trimmed = prev.max_rig_length.trim();
-      if (trimmed === "") return prev;
-      const n = Number(trimmed);
-      if (!Number.isFinite(n) || n <= 0) return prev;
-      const converted = convertRigLengthDisplay(n, rigUnit, nextUnit);
-      return {
-        ...prev,
-        max_rig_length:
-          converted != null ? String(converted) : prev.max_rig_length,
-      };
-    });
-    setRigUnit(nextUnit);
-    setError(null);
-  };
-
   const handleAmpToggle = (amp: ElectricityAmp, checked: boolean) => {
     setForm((prev) => {
       const set = new Set(prev.electricity_amps);
@@ -313,39 +291,28 @@ export default function SiteFormClient({
                     <span className="text-red-500"> *</span>
                   ) : null}
                 </Label>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <Input
-                    id="max_rig_length"
-                    name="max_rig_length"
-                    type="number"
-                    min={1}
-                    max={maxRigLengthInUnit(rigUnit)}
-                    step="any"
-                    value={form.max_rig_length}
-                    onChange={handleChange}
-                    className="flex-1"
-                    placeholder={
-                      rigUnit === "m"
-                        ? t_sites("form.maxRigLengthPlaceholderM")
-                        : t_sites("form.maxRigLengthPlaceholderFt")
-                    }
-                    required={requiresMaxRig}
-                  />
-                  <RigLengthUnitToggle
-                    value={rigUnit}
-                    onChange={handleRigUnitChange}
-                    groupLabel={t_sites("form.rigLengthUnitGroupLabel")}
-                    ftLabel={t_sites("form.rigLengthUnitFt")}
-                    mLabel={t_sites("form.rigLengthUnitM")}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {requiresMaxRig
-                    ? t_sites("form.maxRigLengthRequiredHint")
-                    : null}
-                  {requiresMaxRig ? " " : null}
-                  {t_sites("form.maxRigLengthStoredHint")}
-                </p>
+                <RigLengthInput
+                  id="max_rig_length"
+                  name="max_rig_length"
+                  className="mt-1.5"
+                  value={form.max_rig_length}
+                  onChange={setRigDraft}
+                  unit={rigUnit}
+                  onUnitChange={handleRigUnitChange}
+                  groupLabel={t_sites("form.rigLengthUnitGroupLabel")}
+                  placeholderFt={t_sites("form.maxRigLengthPlaceholderFt")}
+                  placeholderM={t_sites("form.maxRigLengthPlaceholderM")}
+                  required={requiresMaxRig}
+                  hint={
+                    <>
+                      {requiresMaxRig
+                        ? t_sites("form.maxRigLengthRequiredHint")
+                        : null}
+                      {requiresMaxRig ? " " : null}
+                      {t_sites("form.maxRigLengthStoredHint")}
+                    </>
+                  }
+                />
               </div>
             ) : null}
           </div>

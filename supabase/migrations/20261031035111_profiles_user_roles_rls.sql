@@ -24,6 +24,12 @@
 -- Unexpected live columns (not in allow-list and not known server-owned) → RAISE
 -- so the applier must classify them (fail closed; not a deny-list grant).
 --
+-- Applied migration — leave this allow-list immutable. Later editable columns
+-- (e.g. preferred_rig_unit in 20261116135025 / grant helper in
+-- 20261116140131_profiles_update_allowlist_helper) extend grants in forward
+-- migrations; re-applying *this* script after those land will RAISE until the
+-- new cols are classified via the helper / a dedicated forward migration.
+--
 -- Depends on public.is_platform_admin() from 20261031030842_admin_catalog_rls.sql.
 --
 -- Apply as one script in the SQL Editor (or `supabase db push` after link).

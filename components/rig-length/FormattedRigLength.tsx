@@ -17,19 +17,20 @@ type Props = {
 /**
  * Dual ft/m site-card display (issue #34). Owns labels, locale decimals, and
  * the empty placeholder so call sites stay one-liners.
+ * Unit labels come from `common.units` (issue #42).
  */
 export default function FormattedRigLength({
   feet,
   primaryUnit,
   empty = "—",
 }: Props) {
-  const t = useTranslations("sites");
+  const tUnits = useTranslations("common.units");
   const locale = useLocale();
   return (
     formatRigLength(feet, {
       labels: {
-        ft: t("form.rigLengthUnitFt"),
-        m: t("form.rigLengthUnitM"),
+        ft: tUnits("ft"),
+        m: tUnits("m"),
       },
       locale,
       primaryUnit,

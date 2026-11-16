@@ -7,6 +7,7 @@ import {
   getCampgroundProvinces,
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
+import { getCurrentRigSearchPrefs } from "@/data/profile/get-rig-search-prefs";
 import {
   parseCampgroundGeo,
   parseCampgroundSiteFilters,
@@ -14,8 +15,12 @@ import {
 } from "@/lib/campground-search";
 import { campgroundSearchKey } from "@/lib/campground-search-query";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
+import { campingSiteAttrsAllowed } from "@/lib/guest-site-types";
 import type { CampgroundDetailQuery } from "@/lib/routes";
-import { parseRigLengthUnit } from "@/lib/site-rig-length";
+import {
+  resolveGuestRigLengthState,
+  resolveGuestRigLengthUnit,
+} from "@/lib/site-rig-length";
 import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -45,7 +50,7 @@ export default async function Home({ searchParams }: PageProps) {
     lng: firstParam(params.lng),
     radiusKm: firstParam(params.radiusKm),
   });
-  const siteFilters = parseCampgroundSiteFilters({
+  const siteFiltersParsed = parseCampgroundSiteFilters({
     amps: firstParam(params.amps),
     electricity: firstParam(params.electricity),
     water: firstParam(params.water),
@@ -60,23 +65,52 @@ export default async function Home({ searchParams }: PageProps) {
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
   });
-  const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
-  const detailQuery: CampgroundDetailQuery = {
-    rigUnit: parseRigLengthUnit(firstParam(params.rigUnit)),
-  };
+  const rigUnitParam = firstParam(params.rigUnit);
+  const rigUnitParamPresent = "rigUnit" in params;
+  const rigLengthParamPresent = "rigLength" in params;
 
-  const [campgroundsResult, provincesResult] = await Promise.all([
-    getCampgrounds(
-      q,
-      sort,
-      province,
-      geo?.lat,
-      geo?.lng,
-      geo?.radiusKm,
-      siteFiltersKey,
-    ),
+  // Prefs + provinces in parallel; campgrounds need resolved length first.
+  const [prefs, provincesResult] = await Promise.all([
+    getCurrentRigSearchPrefs(),
     getCampgroundProvinces(),
   ]);
+  const { preferredRigUnit, defaultRigLength } = prefs;
+
+  const campingOk = campingSiteAttrsAllowed(
+    siteFiltersParsed.stayKind,
+    siteFiltersParsed.siteTypes,
+  );
+  const resolvedRig = resolveGuestRigLengthState({
+    raw: firstParam(params.rigLength),
+    present: rigLengthParamPresent,
+    defaultFeet: defaultRigLength,
+    campingOk,
+  });
+  const siteFilters = {
+    ...siteFiltersParsed,
+    rigLength: resolvedRig.feet,
+  };
+  const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
+
+  const campgroundsResult = await getCampgrounds(
+    q,
+    sort,
+    province,
+    geo?.lat,
+    geo?.lng,
+    geo?.radiusKm,
+    siteFiltersKey,
+  );
+
+  // URL wins; else signed-in preference / default; else feet / no length.
+  const resolvedRigUnit = resolveGuestRigLengthUnit(
+    rigUnitParam,
+    preferredRigUnit,
+    rigUnitParamPresent,
+  );
+  const detailQuery: CampgroundDetailQuery = {
+    rigUnit: resolvedRigUnit,
+  };
 
   if (!campgroundsResult.success) {
     const tc = await getTranslations("common");
@@ -132,6 +166,10 @@ export default async function Home({ searchParams }: PageProps) {
               resultCount={campgrounds.length}
               resultsTruncated={truncated}
               provinces={provinces}
+              initialRigUnit={resolvedRigUnit}
+              preferredRigUnit={preferredRigUnit}
+              defaultRigLength={defaultRigLength}
+              initialRigLength={resolvedRig.feet}
             />
           </Suspense>
         </div>

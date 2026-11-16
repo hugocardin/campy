@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   RIG_LENGTH_MAX_FT,
   RIG_LENGTH_MAX_M,
+  convertRigDraftOnUnitChange,
   convertRigLengthDisplay,
   formatGuestRigLengthParam,
   formatRigLength,
@@ -13,6 +14,12 @@ import {
   parseGuestRigLength,
   parseRigLengthToFeet,
   parseRigLengthUnit,
+  parseStoredRigLengthUnit,
+  feetFromRigLengthUrlState,
+  guestRigLengthToUrlState,
+  resolveGuestRigLengthFeet,
+  resolveGuestRigLengthState,
+  resolveGuestRigLengthUnit,
   siteTypeRequiresMaxRigLength,
 } from "./site-rig-length";
 
@@ -132,9 +139,98 @@ describe("site-rig-length", () => {
     assert.equal(parseRigLengthUnit("m"), "m");
     assert.equal(parseRigLengthUnit("metre"), "m");
     assert.equal(parseRigLengthUnit("METERS"), "m");
-    assert.equal(formatRigLengthUnitParam("ft"), undefined);
+    assert.equal(formatRigLengthUnitParam("ft"), "ft");
     assert.equal(formatRigLengthUnitParam(undefined), undefined);
     assert.equal(formatRigLengthUnitParam("m"), "m");
+  });
+
+  it("parses stored preferred_rig_unit (exact ft|m only)", () => {
+    assert.equal(parseStoredRigLengthUnit(null), null);
+    assert.equal(parseStoredRigLengthUnit(undefined), null);
+    assert.equal(parseStoredRigLengthUnit(""), null);
+    assert.equal(parseStoredRigLengthUnit("yards"), null);
+    assert.equal(parseStoredRigLengthUnit("metre"), null);
+    assert.equal(parseStoredRigLengthUnit("ft"), "ft");
+    assert.equal(parseStoredRigLengthUnit("FT"), "ft");
+    assert.equal(parseStoredRigLengthUnit("m"), "m");
+    assert.equal(parseStoredRigLengthUnit(" M "), "m");
+  });
+
+  it("resolves guest search unit: URL wins, else preferred, else ft", () => {
+    assert.equal(resolveGuestRigLengthUnit(undefined, "m"), "m");
+    assert.equal(resolveGuestRigLengthUnit(null, "ft"), "ft");
+    // Absent empty string without urlParamPresent → preference (legacy omit).
+    assert.equal(resolveGuestRigLengthUnit("", "m"), "m");
+    // Explicit empty key (?rigUnit=) → feet, not preference.
+    assert.equal(resolveGuestRigLengthUnit("", "m", true), "ft");
+    assert.equal(resolveGuestRigLengthUnit("m", "ft"), "m");
+    assert.equal(resolveGuestRigLengthUnit("ft", "m"), "ft");
+    assert.equal(resolveGuestRigLengthUnit(undefined, null), "ft");
+    assert.equal(resolveGuestRigLengthUnit(undefined, undefined), "ft");
+  });
+
+  it("resolves guest search length: URL wins, else profile default", () => {
+    assert.equal(resolveGuestRigLengthFeet(undefined, 35), 35);
+    assert.equal(resolveGuestRigLengthFeet(null, 28), 28);
+    assert.equal(resolveGuestRigLengthFeet("40", 35), 40);
+    // Absent empty without urlParamPresent → default.
+    assert.equal(resolveGuestRigLengthFeet("", 35), 35);
+    // Explicit empty key (?rigLength=) → no filter.
+    assert.equal(resolveGuestRigLengthFeet("", 35, true), undefined);
+    assert.equal(resolveGuestRigLengthFeet("0", 35, true), undefined);
+    assert.equal(resolveGuestRigLengthFeet(undefined, null), undefined);
+    assert.equal(resolveGuestRigLengthFeet(undefined, 0), undefined);
+    assert.equal(resolveGuestRigLengthFeet(undefined, 999), undefined);
+  });
+
+  it("resolveGuestRigLengthState keeps omit for profile default", () => {
+    const omitted = resolveGuestRigLengthState({
+      present: false,
+      defaultFeet: 35,
+      campingOk: true,
+    });
+    assert.equal(omitted.feet, 35);
+    assert.equal(omitted.urlState, undefined);
+
+    const cleared = resolveGuestRigLengthState({
+      raw: "",
+      present: true,
+      defaultFeet: 35,
+      campingOk: true,
+    });
+    assert.equal(cleared.feet, undefined);
+    assert.equal(cleared.urlState, null);
+
+    const lodgingClear = resolveGuestRigLengthState({
+      raw: "",
+      present: true,
+      defaultFeet: 35,
+      campingOk: false,
+    });
+    assert.equal(lodgingClear.feet, undefined);
+    assert.equal(lodgingClear.urlState, null);
+  });
+
+  it("guestRigLengthToUrlState collapses default to omit", () => {
+    assert.equal(guestRigLengthToUrlState(35, 35), undefined);
+    assert.equal(guestRigLengthToUrlState(40, 35), 40);
+    assert.equal(guestRigLengthToUrlState(null, 35), null);
+    assert.equal(guestRigLengthToUrlState(null, null), undefined);
+    assert.equal(guestRigLengthToUrlState(undefined, 35), undefined);
+    // Compare against normalized default (round/cap), not the raw store value.
+    assert.equal(guestRigLengthToUrlState(35, 35.004), undefined);
+    // Metres draft that round-trips to the same normalized feet stays omit.
+    const fromMetres = parseGuestRigLength("10,67", "m");
+    assert.equal(fromMetres, 35);
+    assert.equal(guestRigLengthToUrlState(fromMetres, 35), undefined);
+  });
+
+  it("feetFromRigLengthUrlState mirrors resolve for omit / clear / value", () => {
+    assert.equal(feetFromRigLengthUrlState(undefined, 35, true), 35);
+    assert.equal(feetFromRigLengthUrlState(null, 35, true), undefined);
+    assert.equal(feetFromRigLengthUrlState(40, 35, true), 40);
+    assert.equal(feetFromRigLengthUrlState(undefined, 35, false), undefined);
+    assert.equal(feetFromRigLengthUrlState(40, 35, false), undefined);
   });
 
   it("converts display values and formats drafts from feet", () => {
@@ -145,6 +241,20 @@ describe("site-rig-length", () => {
     assert.equal(formatRigLengthForDisplay(undefined, "m"), "");
     assert.equal(formatGuestRigLengthParam(35), "35");
     assert.equal(formatGuestRigLengthParam(35.12), "35.1");
+  });
+
+  it("converts typed drafts on unit toggle (strict parse + locale)", () => {
+    assert.equal(convertRigDraftOnUnitChange("35", "ft", "m"), "10.67");
+    assert.equal(convertRigDraftOnUnitChange("10,67", "m", "ft", "fr-CA"), "35");
+    assert.equal(
+      convertRigDraftOnUnitChange("35", "ft", "m", "fr-CA"),
+      "10,67",
+    );
+    assert.equal(convertRigDraftOnUnitChange("", "ft", "m"), "");
+    assert.equal(convertRigDraftOnUnitChange("  ", "ft", "m"), "  ");
+    assert.equal(convertRigDraftOnUnitChange("abc", "ft", "m"), "abc");
+    assert.equal(convertRigDraftOnUnitChange("1e2", "ft", "m"), "1e2");
+    assert.equal(convertRigDraftOnUnitChange("35", "ft", "ft"), "35");
   });
 
   it("formats dual ft/m for site cards (locale + 2-decimal metres)", () => {

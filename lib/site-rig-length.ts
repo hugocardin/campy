@@ -14,9 +14,14 @@
  * intentional (same-site capacity), not limited to RV / RV_AND_TENT.
  *
  * URL params (guest search):
- * - `rigLength=<feet>` — always canonical feet (same as DB / RPC `min_rig_length`)
- * - `rigUnit=m` — optional; omit or `ft` means feet. Controls the filter toggle
- *   and how the input is shown; does not change the numeric meaning of `rigLength`.
+ * - `rigLength=<feet>` — always canonical feet (same as DB / RPC `min_rig_length`).
+ *   Omit means "use `profiles.default_rig_length` when signed in". An explicit
+ *   empty `?rigLength=` means no length filter (suppresses the profile default),
+ *   same presence rule as `rigUnit`.
+ * - `rigUnit=ft|m` — display/input unit for the filter toggle. Prefer an
+ *   explicit value once the guest has a choice; omit means "use profile
+ *   preference / feet default". Does not change the numeric meaning of
+ *   `rigLength`.
  */
 export const SITE_TYPE_CODES = [
   "TENT",
@@ -91,11 +96,183 @@ export function parseRigLengthUnit(
   return "ft";
 }
 
-/** Emit `rigUnit` only when metres (feet is the default / omitted). */
+/**
+ * Parse a stored `profiles.preferred_rig_unit` value.
+ * Only exact `ft` / `m` (case-insensitive); anything else → null (unset).
+ */
+export function parseStoredRigLengthUnit(
+  value: string | undefined | null,
+): RigLengthUnit | null {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw === "m") return "m";
+  if (raw === "ft") return "ft";
+  return null;
+}
+
+/**
+ * Resolve display unit for guest search: explicit URL `rigUnit` wins;
+ * otherwise use a saved preference; otherwise feet.
+ *
+ * Pass `urlParamPresent: true` when the query key exists (even if empty /
+ * whitespace) so `?rigUnit=` is treated as an explicit feet choice rather
+ * than "absent → preference".
+ */
+export function resolveGuestRigLengthUnit(
+  urlValue: string | undefined | null,
+  preferred?: RigLengthUnit | null,
+  urlParamPresent = false,
+): RigLengthUnit {
+  if (urlParamPresent || (urlValue != null && String(urlValue).trim() !== "")) {
+    return parseRigLengthUnit(urlValue);
+  }
+  if (preferred === "m" || preferred === "ft") return preferred;
+  return "ft";
+}
+
+/**
+ * Guest search rig-length resolution (issue #42 step 3).
+ *
+ * - `feet` — value for the RPC / input draft (`undefined` = no filter)
+ * - `urlState` — what belongs in the URL / query tri-state:
+ *   - `number` → `rigLength=<feet>`
+ *   - `null` → explicit `?rigLength=` (suppress profile default)
+ *   - `undefined` → omit (absent → apply `defaultFeet` to `feet`)
+ *
+ * Lodging (`campingOk: false`) still tracks `urlState` so camping↔lodging
+ * round-trips keep an explicit clear / typed length, but `feet` is always
+ * undefined (RPC ignores length for lodging).
+ */
+export type GuestRigLengthResolution = {
+  feet: number | undefined;
+  urlState: number | null | undefined;
+};
+
+export function resolveGuestRigLengthState(options: {
+  raw?: string | null;
+  present: boolean;
+  defaultFeet?: number | null;
+  campingOk: boolean;
+}): GuestRigLengthResolution {
+  const { raw, present, defaultFeet, campingOk } = options;
+
+  let urlState: number | null | undefined;
+  if (present) {
+    const parsed = parseGuestRigLength(raw);
+    urlState = parsed ?? null;
+  } else if (raw != null && String(raw).trim() !== "") {
+    urlState = parseGuestRigLength(raw);
+  } else {
+    urlState = undefined;
+  }
+
+  if (!campingOk) {
+    return { feet: undefined, urlState };
+  }
+  if (urlState === null) {
+    return { feet: undefined, urlState: null };
+  }
+  if (typeof urlState === "number") {
+    return { feet: urlState, urlState };
+  }
+  if (defaultFeet == null) {
+    return { feet: undefined, urlState: undefined };
+  }
+  const parsed = normalizeStoredRigLengthFeet(defaultFeet);
+  return {
+    feet: parsed.ok ? parsed.feet : undefined,
+    // Keep omit so shared links do not materialize a personal default.
+    urlState: undefined,
+  };
+}
+
+/**
+ * Resolve guest search rig length (canonical feet): explicit URL `rigLength`
+ * wins; otherwise use a saved `profiles.default_rig_length`.
+ *
+ * Prefer {@link resolveGuestRigLengthState} when callers also need URL state.
+ */
+export function resolveGuestRigLengthFeet(
+  urlValue: string | undefined | null,
+  defaultFeet?: number | null,
+  urlParamPresent = false,
+): number | undefined {
+  return resolveGuestRigLengthState({
+    raw: urlValue,
+    present: urlParamPresent,
+    defaultFeet,
+    campingOk: true,
+  }).feet;
+}
+
+/**
+ * Normalized feet from a stored profile default, or null when unset / invalid.
+ */
+export function normalizedDefaultRigLengthFeet(
+  defaultFeet?: number | null,
+): number | null {
+  if (defaultFeet == null) return null;
+  const parsed = normalizeStoredRigLengthFeet(defaultFeet);
+  return parsed.ok ? parsed.feet : null;
+}
+
+/**
+ * Map a draft / pending feet value to URL tri-state.
+ * Keeps omit when the value equals the *normalized* profile default so
+ * unrelated filter changes do not materialize a personal default into shared
+ * links. Emits `null` (→ `?rigLength=`) only when a default would otherwise
+ * reapply.
+ */
+export function guestRigLengthToUrlState(
+  feet: number | null | undefined,
+  defaultFeet?: number | null,
+): number | null | undefined {
+  const normalizedDefault = normalizedDefaultRigLengthFeet(defaultFeet);
+  if (feet === null) {
+    return normalizedDefault != null ? null : undefined;
+  }
+  if (feet == null) return undefined;
+  if (normalizedDefault != null && feet === normalizedDefault) {
+    return undefined;
+  }
+  return feet;
+}
+
+/**
+ * Resolve display/RPC feet from URL tri-state + profile default.
+ * Inverse of {@link guestRigLengthToUrlState} for a known camping context.
+ */
+export function feetFromRigLengthUrlState(
+  urlState: number | null | undefined,
+  defaultFeet?: number | null,
+  campingOk = true,
+): number | undefined {
+  return resolveGuestRigLengthState({
+    raw:
+      urlState === null
+        ? ""
+        : typeof urlState === "number"
+          ? String(urlState)
+          : undefined,
+    present: urlState !== undefined,
+    defaultFeet,
+    campingOk,
+  }).feet;
+}
+
+/**
+ * Emit `rigUnit` for guest URLs.
+ * Always writes `ft` or `m` when a unit is known so a metres preference
+ * cannot steal an omitted URL (omit is reserved for "use preference /
+ * default", not "feet").
+ */
 export function formatRigLengthUnitParam(
   unit: RigLengthUnit | undefined,
 ): string | undefined {
-  return unit === "m" ? "m" : undefined;
+  if (unit === "m") return "m";
+  if (unit === "ft") return "ft";
+  return undefined;
 }
 
 export function feetToMetres(feet: number): number {
@@ -156,6 +333,33 @@ export function parseDecimalInput(
   const normalized = commaCount === 1 ? trimmed.replace(",", ".") : trimmed;
   const n = Number(normalized);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Convert a typed draft string when the ft/m toggle flips.
+ * Empty / unparsable drafts are left unchanged (strict decimal parse).
+ * Pass `locale` so fr-CA keeps a decimal comma after conversion.
+ */
+export function convertRigDraftOnUnitChange(
+  draft: string,
+  from: RigLengthUnit,
+  to: RigLengthUnit,
+  locale?: string,
+): string {
+  if (from === to) return draft;
+  const trimmed = draft.trim();
+  if (trimmed === "") return draft;
+  const n = parseDecimalInput(trimmed);
+  if (n == null || n <= 0) return draft;
+  const converted = convertRigLengthDisplay(n, from, to);
+  if (converted == null) return draft;
+  if (locale) {
+    return new Intl.NumberFormat(locale, {
+      maximumFractionDigits: to === "m" ? 2 : 1,
+      useGrouping: false,
+    }).format(converted);
+  }
+  return String(converted);
 }
 
 /**

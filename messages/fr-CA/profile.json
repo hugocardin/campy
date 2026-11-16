@@ -11,19 +11,18 @@
     "role": "Rôle",
     "joined": "Date d'inscription",
     "defaultRigLengthLabel": "Longueur de véhicule par défaut",
-    "defaultRigLengthHint": "Enregistrée pour les recherches futures. Laissez vide si vous n'avez pas de valeur par défaut.",
+    "defaultRigLengthHint": "Utilisée comme longueur préférée pour la recherche. Laissez vide si vous n'avez pas de valeur par défaut.",
     "rigLengthPlaceholderFt": "ex. 35",
     "rigLengthPlaceholderM": "ex. 11",
     "rigLengthUnitGroupLabel": "Unité de longueur",
-    "rigLengthUnitFt": "pi",
-    "rigLengthUnitM": "m",
     "rigLengthStoredHint": "Enregistrée en pieds."
   },
 
   "errors": {
     "nameRequired": "Veuillez entrer votre nom",
     "nameTooLong": "Le nom est trop long ({max, number} caractères maximum)",
-    "invalidRigLength": "Entrez une longueur positive jusqu'à {max, number} {unit}, ou laissez vide"
+    "invalidRigLength": "Entrez une longueur positive jusqu'à {max, number} {unit}, ou laissez vide",
+    "invalidRigUnit": "Choisissez une unité de longueur valide (pi ou m)"
   },
 
   "ProfilePage": {
