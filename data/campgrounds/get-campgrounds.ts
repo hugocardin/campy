@@ -103,7 +103,10 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
   };
 }
 
-/** Stable name+id tie-break (matches SQL `lower(name), id`). */
+/**
+ * Stable name then id tie-break for JS re-sorts (near-me / price).
+ * Locale accent-insensitive; may differ from SQL `lower(name)` collation.
+ */
 function compareCampgroundNameId(a: Campground, b: Campground): number {
   const byName = a.name.localeCompare(b.name, "en", { sensitivity: "base" });
   if (byName !== 0) return byName;
