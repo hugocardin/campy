@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  PHOTON_INVALID_CLIENT_KEY,
   ipv6Network64,
   photonClientBucketKey,
 } from "./photon-client-key";
@@ -8,6 +9,17 @@ import {
 describe("photonClientBucketKey", () => {
   it("keys IPv4 as-is", () => {
     assert.equal(photonClientBucketKey("1.2.3.4"), "photon:ip:1.2.3.4");
+  });
+
+  it("strips IPv4 :port before keying", () => {
+    assert.equal(photonClientBucketKey("1.2.3.4:8080"), "photon:ip:1.2.3.4");
+  });
+
+  it("maps garbage / malformed values to a shared invalid bucket", () => {
+    assert.equal(photonClientBucketKey("not-an-ip"), PHOTON_INVALID_CLIENT_KEY);
+    assert.equal(photonClientBucketKey("1.2.3.4:99999"), PHOTON_INVALID_CLIENT_KEY);
+    assert.equal(photonClientBucketKey("gggg::1"), PHOTON_INVALID_CLIENT_KEY);
+    assert.equal(photonClientBucketKey("2001:db8:xyz::1"), PHOTON_INVALID_CLIENT_KEY);
   });
 
   it("expands compressed IPv6 before taking /64", () => {
