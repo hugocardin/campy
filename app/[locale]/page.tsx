@@ -13,6 +13,8 @@ import {
   parseCampgroundSort,
 } from "@/lib/campground-search";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
+import type { CampgroundDetailQuery } from "@/lib/routes";
+import { parseRigLengthUnit } from "@/lib/site-rig-length";
 import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -56,6 +58,9 @@ export default async function Home({ searchParams }: PageProps) {
     geoActive: Boolean(geo),
   });
   const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
+  const detailQuery: CampgroundDetailQuery = {
+    rigUnit: parseRigLengthUnit(firstParam(params.rigUnit)),
+  };
 
   const [campgroundsResult, provincesResult] = await Promise.all([
     getCampgrounds(
@@ -136,6 +141,7 @@ export default async function Home({ searchParams }: PageProps) {
                   }
                   radiusKm={geo?.radiusKm}
                   searchKey={mapSearchKey}
+                  detailQuery={detailQuery}
                 />
               </div>
             </div>
@@ -157,7 +163,10 @@ export default async function Home({ searchParams }: PageProps) {
                         {tControls("noResults")}
                       </p>
                     ) : (
-                      <CampgroundList campgrounds={campgrounds} />
+                      <CampgroundList
+                        campgrounds={campgrounds}
+                        detailQuery={detailQuery}
+                      />
                     )}
                   </div>
                 </Suspense>

@@ -1,4 +1,5 @@
 import { BackHeader } from "@/components/layout/back-header";
+import FormattedRigLength from "@/components/rig-length/FormattedRigLength";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,6 +23,7 @@ import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { isUuid } from "@/lib/is-uuid";
 import { routes } from "@/lib/routes";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
+import { parseRigLengthUnit } from "@/lib/site-rig-length";
 import { translateCode } from "@/lib/translate-code";
 import { MapPin } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -31,6 +33,7 @@ const PAGE_NAMESPACE = "campgrounds.CampgroundDetailsPage" as const;
 
 type PageProps = {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 type Translator = {
@@ -93,8 +96,16 @@ function groupAmenitiesForLocale(
     .sort((a, b) => a.categoryLabel.localeCompare(b.categoryLabel, locale));
 }
 
-export default async function CampgroundDetailsPage({ params }: PageProps) {
+export default async function CampgroundDetailsPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { locale, id } = await params;
+  const query = await searchParams;
+  const rawRigUnit = query.rigUnit;
+  const primaryRigUnit = parseRigLengthUnit(
+    Array.isArray(rawRigUnit) ? rawRigUnit[0] : rawRigUnit,
+  );
 
   if (!isUuid(id)) {
     notFound();
@@ -365,11 +376,10 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                             })()}
                           </TableCell>
                           <TableCell>
-                            {site.max_rig_length != null
-                              ? tSites("rigLengthFeet", {
-                                  length: Number(site.max_rig_length),
-                                })
-                              : "—"}
+                            <FormattedRigLength
+                              feet={site.max_rig_length}
+                              primaryUnit={primaryRigUnit}
+                            />
                           </TableCell>
                           <TableCell>
                             {priceFormatter.format(

@@ -3,7 +3,7 @@
 import { Campground } from "@/entities/campground";
 import { Link } from "@/i18n/navigation";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
-import { routes } from "@/lib/routes";
+import { routes, type CampgroundDetailQuery } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import L, { type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -25,6 +25,8 @@ type Props = {
   radiusKm?: number;
   /** Changes when the active search identity changes (q/filters/geo). */
   searchKey?: string;
+  /** Carry guest rig prefs into detail popup links (#34). */
+  detailQuery?: CampgroundDetailQuery;
   className?: string;
 };
 
@@ -163,6 +165,7 @@ export default function CampgroundsMap({
   searchCenter,
   radiusKm,
   searchKey = "",
+  detailQuery,
   className,
 }: Props) {
   const t = useTranslations("search.controls");
@@ -286,7 +289,7 @@ export default function CampgroundsMap({
                   )}
                 </p>
                 <Link
-                  href={routes.campgroundDetail(campground.id)}
+                  href={routes.campgroundDetail(campground.id, detailQuery)}
                   className="text-xs text-primary hover:underline"
                 >
                   {t("viewCampground")}

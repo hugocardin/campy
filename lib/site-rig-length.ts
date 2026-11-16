@@ -3,6 +3,7 @@
  *
  * Canonical storage is **feet** on `sites.max_rig_length` (and guest URL
  * `rigLength`). Metres are a display / input unit only; convert at the edge.
+ * Site-card / admin read views use {@link formatRigLength} (dual ft + m).
  *
  * Keep site-type rules in sync with SQL `sites_enforce_type_attributes`
  * (`supabase/migrations/20261116024448_*` / `20261116024947_*`).
@@ -141,6 +142,59 @@ export function formatRigLengthForDisplay(
   if (feet == null || !Number.isFinite(feet) || feet <= 0) return "";
   if (unit === "ft") return String(roundRigLength(feet, 1));
   return String(roundRigLength(feetToMetres(feet), 2));
+}
+
+export type FormatRigLengthLabels = {
+  /** Localized feet label (`ft` / `pi`). */
+  ft: string;
+  /** Localized metres label (`m`). */
+  m: string;
+};
+
+export type FormatRigLengthOptions = {
+  labels: FormatRigLengthLabels;
+  /**
+   * BCP 47 locale for decimal separators (e.g. `en-CA` / `fr-CA`).
+   * When omitted, uses JS default `.` (fine for unit tests).
+   */
+  locale?: string;
+  /**
+   * Leading unit; the other is shown in parentheses.
+   * Default `"ft"` (canonical storage). Guest pages may pass `rigUnit`.
+   */
+  primaryUnit?: RigLengthUnit;
+};
+
+/**
+ * Format canonical feet for site cards / admin read views (issue #34).
+ * Always shows both units:
+ * - feet to **1** decimal (storage / parse precision)
+ * - metres to **2** decimals (same as {@link formatRigLengthForDisplay} /
+ *   {@link convertRigLengthDisplay}) so a max-length label never overstates
+ *   capacity vs the guest filter (e.g. 36 ft → `10.97 m`, not `11 m`)
+ *
+ * Numbers are locale-formatted when `locale` is set (`36,1` in fr-CA).
+ * Returns `null` when feet is missing / non-finite / rounds to ≤ 0.
+ */
+export function formatRigLength(
+  feet: number | undefined | null,
+  options: FormatRigLengthOptions,
+): string | null {
+  if (feet == null || !Number.isFinite(feet)) return null;
+  const ft = roundRigLength(feet, 1);
+  // Match parseRigLengthToFeet: reject values that round to 0.
+  if (ft <= 0) return null;
+  const m = roundRigLength(feetToMetres(feet), 2);
+  const { labels, primaryUnit = "ft", locale } = options;
+  const formatNumber = (value: number, maxFractionDigits: number) =>
+    locale
+      ? new Intl.NumberFormat(locale, {
+          maximumFractionDigits: maxFractionDigits,
+        }).format(value)
+      : String(value);
+  const ftPart = `${formatNumber(ft, 1)} ${labels.ft}`;
+  const mPart = `${formatNumber(m, 2)} ${labels.m}`;
+  return primaryUnit === "m" ? `${mPart} (${ftPart})` : `${ftPart} (${mPart})`;
 }
 
 /**
