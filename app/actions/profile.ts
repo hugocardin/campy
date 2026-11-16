@@ -27,8 +27,9 @@ import { getLocale } from "next-intl/server";
 
 /**
  * Update the signed-in user's own profile (`full_name`, `default_rig_length`,
- * `preferred_rig_unit`). Rig length is stored in feet; metres conversion
- * happens at the form edge. Preferred unit is `ft`/`m` for display defaults.
+ * optional `preferred_rig_unit`). Rig length is stored in feet; metres
+ * conversion happens at the form edge. Preferred unit is `ft`/`m` when
+ * provided; omitted → leave unchanged (compat with older clients).
  * Email / role_id stay server-owned (RLS + BEFORE UPDATE trigger).
  * `updated_at` is set by `trg_profiles_set_updated_at` (not client-writable).
  */
@@ -67,11 +68,18 @@ export async function updateProfileAction(
       });
     }
 
-    const preferredRigUnit = parseStoredRigLengthUnit(input.preferred_rig_unit);
-    if (!preferredRigUnit) {
-      return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
-        field: "preferred_rig_unit",
-      });
+    let preferredRigUnit: "ft" | "m" | undefined;
+    if (
+      "preferred_rig_unit" in input &&
+      input.preferred_rig_unit !== undefined
+    ) {
+      const parsed = parseStoredRigLengthUnit(input.preferred_rig_unit);
+      if (!parsed) {
+        return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+          field: "preferred_rig_unit",
+        });
+      }
+      preferredRigUnit = parsed;
     }
 
     const fullName = normalizePersonName(input.full_name);
@@ -99,14 +107,22 @@ export async function updateProfileAction(
 
     // Column UPDATE grant is allow-listed (full_name, default_rig_length,
     // preferred_rig_unit, …). Do not set updated_at — trigger owns it.
+    const updateRow: {
+      full_name: string;
+      default_rig_length: number | null;
+      preferred_rig_unit?: "ft" | "m";
+    } = {
+      full_name: fullName,
+      default_rig_length: defaultRigLength,
+    };
+    if (preferredRigUnit !== undefined) {
+      updateRow.preferred_rig_unit = preferredRigUnit;
+    }
+
     const result = await handleDbSingle(
       supabase
         .from("profiles")
-        .update({
-          full_name: fullName,
-          default_rig_length: defaultRigLength,
-          preferred_rig_unit: preferredRigUnit,
-        })
+        .update(updateRow)
         .eq("id", user.id)
         .select("id")
         .single(),

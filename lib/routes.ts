@@ -6,8 +6,8 @@ import {
 export type CampgroundDetailQuery = {
   /**
    * Guest display unit for dual rig-length labels on the detail page.
-   * Omitted / feet → no query param. (`rigLength` is not carried here —
-   * detail does not filter/highlight by length yet.)
+   * Written as `rigUnit=ft|m` when set (`rigLength` is not carried here —
+   * detail does not filter/highlight by length yet).
    */
   rigUnit?: RigLengthUnit;
 };

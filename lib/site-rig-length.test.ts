@@ -135,7 +135,7 @@ describe("site-rig-length", () => {
     assert.equal(parseRigLengthUnit("m"), "m");
     assert.equal(parseRigLengthUnit("metre"), "m");
     assert.equal(parseRigLengthUnit("METERS"), "m");
-    assert.equal(formatRigLengthUnitParam("ft"), undefined);
+    assert.equal(formatRigLengthUnitParam("ft"), "ft");
     assert.equal(formatRigLengthUnitParam(undefined), undefined);
     assert.equal(formatRigLengthUnitParam("m"), "m");
   });
@@ -155,7 +155,10 @@ describe("site-rig-length", () => {
   it("resolves guest search unit: URL wins, else preferred, else ft", () => {
     assert.equal(resolveGuestRigLengthUnit(undefined, "m"), "m");
     assert.equal(resolveGuestRigLengthUnit(null, "ft"), "ft");
+    // Absent empty string without urlParamPresent → preference (legacy omit).
     assert.equal(resolveGuestRigLengthUnit("", "m"), "m");
+    // Explicit empty key (?rigUnit=) → feet, not preference.
+    assert.equal(resolveGuestRigLengthUnit("", "m", true), "ft");
     assert.equal(resolveGuestRigLengthUnit("m", "ft"), "m");
     assert.equal(resolveGuestRigLengthUnit("ft", "m"), "ft");
     assert.equal(resolveGuestRigLengthUnit(undefined, null), "ft");

@@ -5,9 +5,11 @@
 --
 -- Also extends the authenticated UPDATE allow-list so PostgREST can PATCH the
 -- new column (defense in depth with profiles_update_own RLS).
--- Keep expected_editable in sync with
---   20261031035111_profiles_user_roles_rls.sql
--- so re-applying that migration still classifies this column.
+-- The DO $$ grant block below is the one-shot apply for this column.
+-- Canonical helper for later columns:
+--   private.grant_profiles_authenticated_update_allowlist(text[])
+--   (see 20261116140131_profiles_update_allowlist_helper.sql).
+-- Do not edit already-applied 20261031035111 for new editable cols.
 
 BEGIN;
 

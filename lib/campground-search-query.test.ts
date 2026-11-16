@@ -80,6 +80,7 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.get("dump"), "1");
     assert.equal(params.get("driveway"), "pull_through");
     assert.equal(params.get("rigLength"), "35");
+    // base fixture has no rigUnit → omitted until the guest sets a unit.
     assert.equal(params.get("rigUnit"), null);
     assert.equal(params.get("stay"), "camping");
     assert.equal(params.get("types"), "tent,rv");
@@ -96,6 +97,17 @@ describe("buildCampgroundSearchParams / clear", () => {
     });
     assert.equal(params.get("rigLength"), "35");
     assert.equal(params.get("rigUnit"), "m");
+  });
+
+  it("emits rigUnit=ft when feet selected (explicit, not omit)", () => {
+    const params = buildCampgroundSearchParams({
+      ...base,
+      rigUnit: "ft",
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+    });
+    assert.equal(params.get("rigUnit"), "ft");
   });
 
   it("omits rigLength when lodging but keeps rigUnit", () => {

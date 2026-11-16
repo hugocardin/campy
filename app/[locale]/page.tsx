@@ -63,6 +63,7 @@ export default async function Home({ searchParams }: PageProps) {
   });
   const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
   const rigUnitParam = firstParam(params.rigUnit);
+  const rigUnitParamPresent = "rigUnit" in params;
 
   const [campgroundsResult, provincesResult, preferredRigUnit] =
     await Promise.all([
@@ -81,8 +82,13 @@ export default async function Home({ searchParams }: PageProps) {
 
   // URL rigUnit wins; else signed-in preferred unit; else feet.
   // Does not pre-fill rigLength from default_rig_length (issue #42 step 3).
+  const resolvedRigUnit = resolveGuestRigLengthUnit(
+    rigUnitParam,
+    preferredRigUnit,
+    rigUnitParamPresent,
+  );
   const detailQuery: CampgroundDetailQuery = {
-    rigUnit: resolveGuestRigLengthUnit(rigUnitParam, preferredRigUnit),
+    rigUnit: resolvedRigUnit,
   };
 
   if (!campgroundsResult.success) {
@@ -139,6 +145,7 @@ export default async function Home({ searchParams }: PageProps) {
               resultCount={campgrounds.length}
               resultsTruncated={truncated}
               provinces={provinces}
+              initialRigUnit={resolvedRigUnit}
               preferredRigUnit={preferredRigUnit}
             />
           </Suspense>

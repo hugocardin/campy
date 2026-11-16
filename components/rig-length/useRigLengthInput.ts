@@ -58,6 +58,7 @@ export function useRigLengthInput(
   const isControlled = options.onDraftChange !== undefined;
 
   const [unit, setUnit] = useState<RigLengthUnit>(startingUnit);
+  const [unitTouched, setUnitTouched] = useState(false);
   const [internalDraft, setInternalDraft] = useState(() =>
     isControlled
       ? ""
@@ -79,6 +80,7 @@ export function useRigLengthInput(
     if (nextUnit === unit) return;
     setDraft(convertRigDraftOnUnitChange(draft, unit, nextUnit, locale));
     setUnit(nextUnit);
+    setUnitTouched(true);
   };
 
   const parse = (): ParseRigLengthResult =>
@@ -88,6 +90,8 @@ export function useRigLengthInput(
     draft,
     setDraft,
     unit,
+    /** True after the guest changes the unit toggle (not the locale default). */
+    unitTouched,
     onUnitChange,
     parse,
     unitLabel,

@@ -60,7 +60,7 @@ import {
   convertRigDraftOnUnitChange,
   formatRigLengthForDisplay,
   parseGuestRigLength,
-  parseRigLengthUnit,
+  resolveGuestRigLengthUnit,
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import type { StayKind } from "@/lib/stay-kind";
@@ -76,9 +76,14 @@ type Props = {
   resultsTruncated?: boolean;
   provinces: string[];
   /**
-   * Signed-in `profiles.preferred_rig_unit` when set. Seeds the unit toggle
-   * only when the URL has no `rigUnit` (issue #42 step 2). Does not pre-fill
-   * rig length (step 3).
+   * Server-resolved unit for first paint / URL-absent case (issue #42 step 2).
+   * Same rule as `detailQuery.rigUnit` on the home page — do not re-derive.
+   * Does not pre-fill rig length (step 3).
+   */
+  initialRigUnit: RigLengthUnit;
+  /**
+   * Signed-in preference used only to re-resolve when the URL omits `rigUnit`
+   * (Clear / back to a preference-default URL).
    */
   preferredRigUnit?: RigLengthUnit | null;
 };
@@ -157,7 +162,7 @@ function queryStateFromFilters(
     dumpStation: filters.dumpStation,
     drivewayType: filters.drivewayType,
     rigLength: filters.rigLength,
-    rigUnit: rigUnit === "m" ? "m" : undefined,
+    rigUnit,
     stayKind: filters.stayKind,
     siteTypes: filters.siteTypes,
     maxPrice: filters.maxPrice,
@@ -179,6 +184,7 @@ export default function CampgroundListControls({
   resultCount,
   resultsTruncated = false,
   provinces,
+  initialRigUnit,
   preferredRigUnit = null,
 }: Props) {
   const t = useTranslations("search.controls");
@@ -217,14 +223,12 @@ export default function CampgroundListControls({
     types: searchParams.get("types") ?? undefined,
     maxPrice: searchParams.get("maxPrice") ?? undefined,
   });
-  const urlHasRigUnit = searchParams.has("rigUnit");
-  const urlRigUnit = parseRigLengthUnit(searchParams.get("rigUnit"));
-  // Preference seeds first paint only; once URL carries rigUnit, URL wins.
-  const initialRigUnit: RigLengthUnit =
-    urlHasRigUnit ||
-    (preferredRigUnit !== "ft" && preferredRigUnit !== "m")
-      ? urlRigUnit
-      : preferredRigUnit;
+  // Same precedence as the server (`resolveGuestRigLengthUnit`).
+  const urlRigUnit = resolveGuestRigLengthUnit(
+    searchParams.get("rigUnit"),
+    preferredRigUnit,
+    searchParams.has("rigUnit"),
+  );
   const urlFiltersKey = siteFiltersKey(urlFilters);
   // Include unit in external-nav sync key so back/forward restores the toggle.
   const urlRigSyncKey = `${urlFiltersKey}|${urlRigUnit}`;
@@ -527,7 +531,7 @@ export default function CampgroundListControls({
     startTransition(() => {
       router.push(
         routes.campgroundDetail(campground.id, {
-          rigUnit: rigUnitRef.current === "m" ? "m" : undefined,
+          rigUnit: rigUnitRef.current,
         }),
       );
     });
@@ -559,7 +563,7 @@ export default function CampgroundListControls({
         q: latest.q,
         sort: leavePatch?.sort ?? latest.sort,
         rigLength: feet,
-        rigUnit: nextUnit === "m" ? "m" : undefined,
+        rigUnit: nextUnit,
       }),
     );
   }
@@ -1062,7 +1066,7 @@ export default function CampgroundListControls({
                         q: latestParamsRef.current.q,
                         sort: latestParamsRef.current.sort,
                         rigLength: resolveRigDraft(),
-                        rigUnit: rigUnitRef.current === "m" ? "m" : undefined,
+                        rigUnit: rigUnitRef.current,
                       }),
                     );
                   }, 300);

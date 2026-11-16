@@ -21,7 +21,8 @@
   "errors": {
     "nameRequired": "Veuillez entrer votre nom",
     "nameTooLong": "Le nom est trop long ({max, number} caractères maximum)",
-    "invalidRigLength": "Entrez une longueur positive jusqu'à {max, number} {unit}, ou laissez vide"
+    "invalidRigLength": "Entrez une longueur positive jusqu'à {max, number} {unit}, ou laissez vide",
+    "invalidRigUnit": "Choisissez une unité de longueur valide (pi ou m)"
   },
 
   "ProfilePage": {

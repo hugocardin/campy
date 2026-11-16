@@ -40,6 +40,7 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
     draft: rigDraft,
     setDraft: setRigDraft,
     unit: rigUnit,
+    unitTouched,
     onUnitChange: handleRigUnitChange,
     parse: parseRigDraft,
     invalidLengthParams,
@@ -80,10 +81,14 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
       defaultRigLength = parsed.feet;
     }
 
+    // Persist unit only when the guest toggled it or already has a saved
+    // preference — don't freeze the locale fallback on an unrelated save.
     const payload: ProfileUpdateInput = {
       full_name: normalizedName,
       default_rig_length: defaultRigLength,
-      preferred_rig_unit: rigUnit,
+      ...(unitTouched || profile.preferred_rig_unit != null
+        ? { preferred_rig_unit: rigUnit }
+        : {}),
     };
 
     startTransition(async () => {
@@ -101,7 +106,7 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
                 fieldMessages: {
                   full_name: t_profile("errors.nameRequired"),
                   default_rig_length: invalidRigLengthMessage,
-                  preferred_rig_unit: invalidRigLengthMessage,
+                  preferred_rig_unit: t_profile("errors.invalidRigUnit"),
                 },
                 fieldTooLongMessages: {
                   full_name: t_profile("errors.nameTooLong", {

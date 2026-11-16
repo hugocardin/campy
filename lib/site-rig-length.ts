@@ -15,8 +15,10 @@
  *
  * URL params (guest search):
  * - `rigLength=<feet>` — always canonical feet (same as DB / RPC `min_rig_length`)
- * - `rigUnit=m` — optional; omit or `ft` means feet. Controls the filter toggle
- *   and how the input is shown; does not change the numeric meaning of `rigLength`.
+ * - `rigUnit=ft|m` — display/input unit for the filter toggle. Prefer an
+ *   explicit value once the guest has a choice; omit means "use profile
+ *   preference / feet default". Does not change the numeric meaning of
+ *   `rigLength`.
  */
 export const SITE_TYPE_CODES = [
   "TENT",
@@ -109,23 +111,35 @@ export function parseStoredRigLengthUnit(
 /**
  * Resolve display unit for guest search: explicit URL `rigUnit` wins;
  * otherwise use a saved preference; otherwise feet.
+ *
+ * Pass `urlParamPresent: true` when the query key exists (even if empty /
+ * whitespace) so `?rigUnit=` is treated as an explicit feet choice rather
+ * than "absent → preference".
  */
 export function resolveGuestRigLengthUnit(
   urlValue: string | undefined | null,
   preferred?: RigLengthUnit | null,
+  urlParamPresent = false,
 ): RigLengthUnit {
-  if (urlValue != null && String(urlValue).trim() !== "") {
+  if (urlParamPresent || (urlValue != null && String(urlValue).trim() !== "")) {
     return parseRigLengthUnit(urlValue);
   }
   if (preferred === "m" || preferred === "ft") return preferred;
   return "ft";
 }
 
-/** Emit `rigUnit` only when metres (feet is the default / omitted). */
+/**
+ * Emit `rigUnit` for guest URLs.
+ * Always writes `ft` or `m` when a unit is known so a metres preference
+ * cannot steal an omitted URL (omit is reserved for "use preference /
+ * default", not "feet").
+ */
 export function formatRigLengthUnitParam(
   unit: RigLengthUnit | undefined,
 ): string | undefined {
-  return unit === "m" ? "m" : undefined;
+  if (unit === "m") return "m";
+  if (unit === "ft") return "ft";
+  return undefined;
 }
 
 export function feetToMetres(feet: number): number {
