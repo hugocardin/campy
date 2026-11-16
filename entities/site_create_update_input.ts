@@ -1,3 +1,5 @@
+import type { ElectricityAmp } from "@/lib/electricity-amps";
+
 export interface SiteCreateUpdateInput {
   id: string | undefined;
   name: string;
@@ -6,4 +8,5 @@ export interface SiteCreateUpdateInput {
   max_rig_length: number | undefined;
   price_per_night: number;
   min_stay_nights: number | undefined;
+  electricity_amps: ElectricityAmp[];
 }

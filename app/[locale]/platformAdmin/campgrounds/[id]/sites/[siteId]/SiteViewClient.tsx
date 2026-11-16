@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Site } from "@/entities/sites";
+import { formatElectricityAmps } from "@/lib/electricity-amps";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -100,6 +101,20 @@ export default function SiteViewClient({ site, amenities }: Props) {
                   {t_sites("form.maxRigLengthLabel")}
                 </h3>
                 <p>{site.max_rig_length}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  {t_sites("form.electricityAmpsLabel")}
+                </h3>
+                <p>
+                  {(() => {
+                    const amps = formatElectricityAmps(site.electricity_amps);
+                    return amps != null
+                      ? t_sites("electricityAmps.list", { amps })
+                      : t_sites("electricityAmps.none");
+                  })()}
+                </p>
               </div>
             </div>
           </div>

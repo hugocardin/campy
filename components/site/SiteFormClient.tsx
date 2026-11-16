@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
 import { SiteFormData } from "@/components/site/site-form-utils";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,6 +19,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { SiteType } from "@/entities/site-type";
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
+import {
+  ELECTRICITY_AMP_VALUES,
+  type ElectricityAmp,
+  normalizeElectricityAmps,
+} from "@/lib/electricity-amps";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import {
@@ -25,6 +31,13 @@ import {
   translateErrorCode,
   withErrorReference,
 } from "@/lib/errors";
+
+const AMP_LABEL_KEYS = {
+  15: "amp15",
+  20: "amp20",
+  30: "amp30",
+  50: "amp50",
+} as const satisfies Record<ElectricityAmp, string>;
 
 type SiteFormProps = {
   campgroundId: string;
@@ -56,6 +69,9 @@ export default function SiteFormClient({
     max_rig_length: initialData?.max_rig_length ?? "",
     price_per_night: initialData?.price_per_night ?? "",
     min_stay_nights: initialData?.min_stay_nights ?? "",
+    electricity_amps: normalizeElectricityAmps(
+      initialData?.electricity_amps ?? [],
+    ),
   }));
 
   const isFormValid = Boolean(
@@ -99,6 +115,7 @@ export default function SiteFormClient({
       max_rig_length: isNaN(maxRigLengthNum) ? undefined : maxRigLengthNum,
       price_per_night: pricePerNightNum,
       min_stay_nights: isNaN(minStayNightsNum) ? undefined : minStayNightsNum,
+      electricity_amps: normalizeElectricityAmps(form.electricity_amps),
     };
 
     startTransition(async () => {
@@ -107,7 +124,17 @@ export default function SiteFormClient({
       if (!result.success) {
         setError(
           withErrorReference(
-            translateErrorCode(result.errorCode, t_errors, tc("error"), result.details),
+            translateErrorCode(
+              result.errorCode,
+              t_errors,
+              tc("error"),
+              result.details,
+              {
+                fieldMessages: {
+                  electricity_amps: t_sites("errors.invalidElectricityAmps"),
+                },
+              },
+            ),
             result.details,
             (errorId) => tc("errorReference", { errorId }),
           ),
@@ -129,9 +156,23 @@ export default function SiteFormClient({
     setError(null);
   };
 
+  const handleAmpToggle = (amp: ElectricityAmp, checked: boolean) => {
+    setForm((prev) => {
+      const set = new Set(prev.electricity_amps);
+      if (checked) set.add(amp);
+      else set.delete(amp);
+      return {
+        ...prev,
+        electricity_amps: normalizeElectricityAmps([...set]),
+      };
+    });
+    setError(null);
+  };
+
   const sortedSiteTypes = [...siteTypes].sort((a, b) =>
     a.code.localeCompare(b.code),
   );
+  const selectedAmps = new Set(form.electricity_amps);
 
   return (
     <div className="space-y-10">
@@ -247,6 +288,37 @@ export default function SiteFormClient({
                 placeholder={t_sites("form.minStayNightPlaceholder")}
               />
             </div>
+
+            <fieldset className="space-y-2 border-0 p-0 m-0">
+              <legend className="text-sm font-medium leading-none">
+                {t_sites("form.electricityAmpsLabel")}
+              </legend>
+              <p className="text-xs text-muted-foreground">
+                {t_sites("form.electricityAmpsHint")}
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
+                {ELECTRICITY_AMP_VALUES.map((amp) => {
+                  const id = `electricity-amp-${amp}`;
+                  return (
+                    <div key={amp} className="flex items-center gap-2">
+                      <Checkbox
+                        id={id}
+                        checked={selectedAmps.has(amp)}
+                        onCheckedChange={(checked) =>
+                          handleAmpToggle(amp, checked === true)
+                        }
+                      />
+                      <Label
+                        htmlFor={id}
+                        className="font-normal cursor-pointer"
+                      >
+                        {t_sites(`electricityAmps.${AMP_LABEL_KEYS[amp]}`)}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
 
             <div className="flex justify-end pt-4">
               <Button

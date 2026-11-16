@@ -19,7 +19,7 @@ import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   CampgroundRadiusKm,
   DEFAULT_CAMPGROUND_RADIUS_KM,
-  HookupFilterKey,
+  HookupAmenityFilterKey,
   anyHookupFilterActive,
   parseCampgroundGeo,
   parseCampgroundHookups,
@@ -33,6 +33,11 @@ import {
   hookupsKey,
   withLatestCampgroundFilters,
 } from "@/lib/campground-search-query";
+import {
+  ELECTRICITY_AMP_NONE,
+  type ElectricityAmpFilterOption,
+  normalizeElectricityAmpFilters,
+} from "@/lib/electricity-amps";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -46,14 +51,40 @@ type Props = {
 
 const ALL_PROVINCES = "__all__";
 
-const HOOKUP_FILTERS: {
-  key: HookupFilterKey;
-  labelKey: "filterElectricity" | "filterWater" | "filterSewer";
+const AMP_FILTERS: {
+  value: ElectricityAmpFilterOption;
+  labelKey:
+    | "filterAmpNone"
+    | "filterAmp15"
+    | "filterAmp20"
+    | "filterAmp30"
+    | "filterAmp50";
 }[] = [
-  { key: "electricity", labelKey: "filterElectricity" },
+  { value: ELECTRICITY_AMP_NONE, labelKey: "filterAmpNone" },
+  { value: 15, labelKey: "filterAmp15" },
+  { value: 20, labelKey: "filterAmp20" },
+  { value: 30, labelKey: "filterAmp30" },
+  { value: 50, labelKey: "filterAmp50" },
+];
+
+const HOOKUP_AMENITY_FILTERS: {
+  key: HookupAmenityFilterKey;
+  labelKey: "filterWater" | "filterSewer";
+}[] = [
   { key: "water", labelKey: "filterWater" },
   { key: "sewer", labelKey: "filterSewer" },
 ];
+
+function toggleAmpFilter(
+  current: ElectricityAmpFilterOption[],
+  value: ElectricityAmpFilterOption,
+  checked: boolean,
+): ElectricityAmpFilterOption[] {
+  const set = new Set(normalizeElectricityAmpFilters(current));
+  if (checked) set.add(value);
+  else set.delete(value);
+  return normalizeElectricityAmpFilters([...set]);
+}
 
 export default function CampgroundListControls({
   resultCount,
@@ -79,6 +110,7 @@ export default function CampgroundListControls({
     radiusKm: searchParams.get("radiusKm") ?? undefined,
   });
   const urlHookups = parseCampgroundHookups({
+    amps: searchParams.get("amps") ?? undefined,
     electricity: searchParams.get("electricity") ?? undefined,
     water: searchParams.get("water") ?? undefined,
     sewer: searchParams.get("sewer") ?? undefined,
@@ -111,7 +143,7 @@ export default function CampgroundListControls({
     lat: geo?.lat,
     lng: geo?.lng,
     radiusKm: geo?.radiusKm ?? preferredRadius,
-    electricity: localHookups.electricity,
+    amps: localHookups.amps,
     water: localHookups.water,
     sewer: localHookups.sewer,
   });
@@ -158,7 +190,7 @@ export default function CampgroundListControls({
       lat: geo?.lat,
       lng: geo?.lng,
       radiusKm: geo?.radiusKm ?? preferredRadius,
-      electricity: localHookups.electricity,
+      amps: localHookups.amps,
       water: localHookups.water,
       sewer: localHookups.sewer,
     };
@@ -170,7 +202,7 @@ export default function CampgroundListControls({
     geo?.lng,
     geo?.radiusKm,
     preferredRadius,
-    localHookups.electricity,
+    localHookups.amps,
     localHookups.water,
     localHookups.sewer,
   ]);
@@ -201,7 +233,7 @@ export default function CampgroundListControls({
     const nextHookupsKey = hookupsKey(next);
     setLastPushedHookupsKey(nextHookupsKey);
     setLocalHookups({
-      electricity: next.electricity,
+      amps: next.amps,
       water: next.water,
       sewer: next.sewer,
     });
@@ -300,6 +332,7 @@ export default function CampgroundListControls({
   // Discrete controls only — keep the search input enabled during isPending so
   // typing is not blurred/lost while router.replace transitions.
   const discreteControlsDisabled = geoBusy || isPending;
+  const selectedAmps = new Set(localHookups.amps);
 
   return (
     <div
@@ -439,40 +472,90 @@ export default function CampgroundListControls({
         </div>
       </div>
 
-      <fieldset
-        className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
-        disabled={discreteControlsDisabled}
+      <div
+        className="space-y-3"
+        role="group"
+        aria-labelledby="hookups-label"
+        aria-describedby="hookups-hint"
       >
-        <legend className="text-sm font-medium text-foreground mr-1 float-left">
+        <p id="hookups-label" className="text-sm font-medium text-foreground">
           {t("hookupsLabel")}
-        </legend>
-        {HOOKUP_FILTERS.map(({ key, labelKey }) => {
-          const id = `hookup-${key}`;
-          return (
-            <div key={key} className="flex items-center gap-2">
-              <Checkbox
-                id={id}
-                checked={localHookups[key]}
-                disabled={discreteControlsDisabled}
-                onCheckedChange={(checked) => {
-                  clearDebounce();
-                  replaceQuery(
-                    withLatestCampgroundFilters(latestParamsRef.current, {
-                      q: search,
-                      sort: latestParamsRef.current.sort,
-                      [key]: checked === true,
-                    }),
-                  );
-                }}
-              />
-              <Label htmlFor={id} className="font-normal cursor-pointer">
-                {t(labelKey)}
-              </Label>
-            </div>
-          );
-        })}
-      </fieldset>
-      <p className="text-xs text-muted-foreground">{t("hookupsHint")}</p>
+        </p>
+        <fieldset
+          className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
+          disabled={discreteControlsDisabled}
+        >
+          <legend className="text-sm font-medium text-muted-foreground mr-1 float-left">
+            {t("electricityAmpsLabel")}
+          </legend>
+          {AMP_FILTERS.map(({ value, labelKey }) => {
+            const id = `amp-${value}`;
+            return (
+              <div key={String(value)} className="flex items-center gap-2">
+                <Checkbox
+                  id={id}
+                  checked={selectedAmps.has(value)}
+                  disabled={discreteControlsDisabled}
+                  onCheckedChange={(checked) => {
+                    clearDebounce();
+                    replaceQuery(
+                      withLatestCampgroundFilters(latestParamsRef.current, {
+                        q: search,
+                        sort: latestParamsRef.current.sort,
+                        amps: toggleAmpFilter(
+                          latestParamsRef.current.amps,
+                          value,
+                          checked === true,
+                        ),
+                      }),
+                    );
+                  }}
+                />
+                <Label htmlFor={id} className="font-normal cursor-pointer">
+                  {t(labelKey)}
+                </Label>
+              </div>
+            );
+          })}
+        </fieldset>
+
+        <fieldset
+          className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
+          disabled={discreteControlsDisabled}
+        >
+          <legend className="text-sm font-medium text-muted-foreground mr-1 float-left">
+            {t("waterSewerLabel")}
+          </legend>
+          {HOOKUP_AMENITY_FILTERS.map(({ key, labelKey }) => {
+            const id = `hookup-${key}`;
+            return (
+              <div key={key} className="flex items-center gap-2">
+                <Checkbox
+                  id={id}
+                  checked={localHookups[key]}
+                  disabled={discreteControlsDisabled}
+                  onCheckedChange={(checked) => {
+                    clearDebounce();
+                    replaceQuery(
+                      withLatestCampgroundFilters(latestParamsRef.current, {
+                        q: search,
+                        sort: latestParamsRef.current.sort,
+                        [key]: checked === true,
+                      }),
+                    );
+                  }}
+                />
+                <Label htmlFor={id} className="font-normal cursor-pointer">
+                  {t(labelKey)}
+                </Label>
+              </div>
+            );
+          })}
+        </fieldset>
+        <p id="hookups-hint" className="text-xs text-muted-foreground">
+          {t("hookupsHint")}
+        </p>
+      </div>
 
       {geoError ? (
         <p className="text-sm text-destructive" role="status">

@@ -1,3 +1,5 @@
+import type { ElectricityAmp } from "@/lib/electricity-amps";
+
 export interface Site {
   id: string;
   name: string;
@@ -8,4 +10,6 @@ export interface Site {
   price_per_night: number;
   //   pricing_rules
   min_stay_nights: number;
+  /** Available pedestal amps; empty = no electricity. */
+  electricity_amps: ElectricityAmp[];
 }

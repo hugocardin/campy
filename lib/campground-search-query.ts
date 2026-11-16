@@ -3,9 +3,12 @@ import {
   CampgroundRadiusKm,
   CampgroundSort,
   campgroundSortQueryValue,
+  formatCampgroundAmpsParam,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
 import { provinceFilterKey } from "@/lib/canadian-provinces";
+import type { ElectricityAmpFilterOption } from "@/lib/electricity-amps";
+import { normalizeElectricityAmpFilters } from "@/lib/electricity-amps";
 
 export type CampgroundQueryState = {
   q: string;
@@ -14,7 +17,7 @@ export type CampgroundQueryState = {
   lat?: number;
   lng?: number;
   radiusKm?: CampgroundRadiusKm;
-  electricity: boolean;
+  amps: ElectricityAmpFilterOption[];
   water: boolean;
   sewer: boolean;
 };
@@ -31,28 +34,29 @@ export function withLatestCampgroundFilters(
     lat: "lat" in patch ? patch.lat : latest.lat,
     lng: "lng" in patch ? patch.lng : latest.lng,
     radiusKm: "radiusKm" in patch ? patch.radiusKm : latest.radiusKm,
-    electricity: patch.electricity ?? latest.electricity,
+    amps: "amps" in patch ? (patch.amps ?? []) : latest.amps,
     water: patch.water ?? latest.water,
     sewer: patch.sewer ?? latest.sewer,
   };
 }
 
 export function hookupsFromQueryState(
-  state: Pick<CampgroundQueryState, "electricity" | "water" | "sewer">,
+  state: Pick<CampgroundQueryState, "amps" | "water" | "sewer">,
 ): CampgroundHookupFilters {
   return {
-    electricity: state.electricity,
+    amps: state.amps,
     water: state.water,
     sewer: state.sewer,
   };
 }
 
 export function hookupsKey(hookups: CampgroundHookupFilters): string {
+  const amps = normalizeElectricityAmpFilters(hookups.amps).join(",");
   return [
-    hookups.electricity ? "1" : "0",
+    amps,
     hookups.water ? "1" : "0",
     hookups.sewer ? "1" : "0",
-  ].join("");
+  ].join("|");
 }
 
 /** Build guest search URLSearchParams from query state (omit defaults / falsy). */
@@ -77,7 +81,8 @@ export function buildCampgroundSearchParams(
     params.set("lng", String(geo.lng));
     params.set("radiusKm", String(geo.radiusKm));
   }
-  if (next.electricity) params.set("electricity", "1");
+  const ampsParam = formatCampgroundAmpsParam(next.amps);
+  if (ampsParam) params.set("amps", ampsParam);
   if (next.water) params.set("water", "1");
   if (next.sewer) params.set("sewer", "1");
   return params;
@@ -89,7 +94,7 @@ export function clearedCampgroundQueryState(): CampgroundQueryState {
     q: "",
     sort: "name",
     province: "",
-    electricity: false,
+    amps: [],
     water: false,
     sewer: false,
   };

@@ -1,9 +1,9 @@
 /**
- * Amenity `code` values used by guest electricity/water/sewer search filters.
+ * Amenity `code` values used by guest water/sewer search filters.
+ * Electricity is site `electricity_amps` (issue #26), not an amenity code.
  * Must stay in sync with RPC hardcoded codes and schema seed.
  */
 export const PROTECTED_HOOKUP_AMENITY_CODES = [
-  "ELECTRICITY",
   "WATER",
   "SEWER",
 ] as const;

@@ -1,4 +1,6 @@
 import { Site } from "@/entities/sites";
+import type { ElectricityAmp } from "@/lib/electricity-amps";
+import { normalizeElectricityAmps } from "@/lib/electricity-amps";
 
 export type SiteFormData = {
   id?: string;
@@ -8,6 +10,7 @@ export type SiteFormData = {
   max_rig_length: string;
   price_per_night: string;
   min_stay_nights: string;
+  electricity_amps: ElectricityAmp[];
 };
 
 /**
@@ -26,5 +29,6 @@ export function toSiteFormData(site: Site): SiteFormData | undefined {
     max_rig_length: String(site.max_rig_length ?? ""),
     price_per_night: String(site.price_per_night ?? ""),
     min_stay_nights: String(site.min_stay_nights ?? ""),
+    electricity_amps: normalizeElectricityAmps(site.electricity_amps ?? []),
   };
 }

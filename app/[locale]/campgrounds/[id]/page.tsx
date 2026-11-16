@@ -14,6 +14,10 @@ import { getCampgroundById } from "@/data/campgrounds/get-campground";
 import { getSitesOfCampground } from "@/data/campgrounds/get-campground-sites";
 import { Amenity } from "@/entities/amenity";
 import { DbErrorCode } from "@/lib/errors";
+import {
+  formatElectricityAmps,
+  unionElectricityAmps,
+} from "@/lib/electricity-amps";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { isUuid } from "@/lib/is-uuid";
 import { routes } from "@/lib/routes";
@@ -136,6 +140,12 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
     amenities != null
       ? groupAmenitiesForLocale(amenities, tAmenities, locale)
       : [];
+  const campgroundAmpsNumbers =
+    sites != null
+      ? formatElectricityAmps(
+          unionElectricityAmps(sites.map((site) => site.electricity_amps)),
+        )
+      : null;
 
   const priceFormatter = new Intl.NumberFormat(locale, {
     style: "currency",
@@ -239,6 +249,21 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                     </h3>
                     <p>{campground.country}</p>
                   </div>
+
+                  {sites != null ? (
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                        {tSites("electricityAmps.summaryLabel")}
+                      </h3>
+                      <p>
+                        {campgroundAmpsNumbers != null
+                          ? tSites("electricityAmps.list", {
+                              amps: campgroundAmpsNumbers,
+                            })
+                          : tSites("electricityAmps.none")}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </CardContent>
@@ -302,6 +327,9 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                         </TableHead>
                         <TableHead>{tSites("form.siteTypeLabel")}</TableHead>
                         <TableHead>
+                          {tSites("form.electricityAmpsLabel")}
+                        </TableHead>
+                        <TableHead>
                           {tSites("form.maxRigLengthLabel")}
                         </TableHead>
                         <TableHead>
@@ -325,6 +353,16 @@ export default async function CampgroundDetailsPage({ params }: PageProps) {
                               "types",
                               site.site_type_code,
                             )}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const amps = formatElectricityAmps(
+                                site.electricity_amps,
+                              );
+                              return amps != null
+                                ? tSites("electricityAmps.list", { amps })
+                                : tSites("electricityAmps.none");
+                            })()}
                           </TableCell>
                           <TableCell>
                             {site.max_rig_length != null

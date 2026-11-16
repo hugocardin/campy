@@ -27,6 +27,15 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "campgrounds.form.latitudeLabel",
   "campgrounds.form.longitudeLabel",
   "sites.form.descriptionLabel",
+  // Amp labels are the same in both locales (IEC-style "15 A")
+  "search.controls.filterAmp15",
+  "search.controls.filterAmp20",
+  "search.controls.filterAmp30",
+  "search.controls.filterAmp50",
+  "sites.electricityAmps.amp15",
+  "sites.electricityAmps.amp20",
+  "sites.electricityAmps.amp30",
+  "sites.electricityAmps.amp50",
   // Official names identical in en-CA / fr-CA
   "search.provinces.AB",
   "search.provinces.MB",
