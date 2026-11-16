@@ -7,6 +7,7 @@ import {
   getCampgroundProvinces,
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
+import { getCurrentPreferredRigUnit } from "@/data/profile/get-preferred-rig-unit";
 import {
   parseCampgroundGeo,
   parseCampgroundSiteFilters,
@@ -15,7 +16,7 @@ import {
 import { campgroundSearchKey } from "@/lib/campground-search-query";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
 import type { CampgroundDetailQuery } from "@/lib/routes";
-import { parseRigLengthUnit } from "@/lib/site-rig-length";
+import { resolveGuestRigLengthUnit } from "@/lib/site-rig-length";
 import { generatePageMetadata } from "@/lib/utils";
 import { AlertCircle } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -61,22 +62,28 @@ export default async function Home({ searchParams }: PageProps) {
     geoActive: Boolean(geo),
   });
   const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
-  const detailQuery: CampgroundDetailQuery = {
-    rigUnit: parseRigLengthUnit(firstParam(params.rigUnit)),
-  };
+  const rigUnitParam = firstParam(params.rigUnit);
 
-  const [campgroundsResult, provincesResult] = await Promise.all([
-    getCampgrounds(
-      q,
-      sort,
-      province,
-      geo?.lat,
-      geo?.lng,
-      geo?.radiusKm,
-      siteFiltersKey,
-    ),
-    getCampgroundProvinces(),
-  ]);
+  const [campgroundsResult, provincesResult, preferredRigUnit] =
+    await Promise.all([
+      getCampgrounds(
+        q,
+        sort,
+        province,
+        geo?.lat,
+        geo?.lng,
+        geo?.radiusKm,
+        siteFiltersKey,
+      ),
+      getCampgroundProvinces(),
+      getCurrentPreferredRigUnit(),
+    ]);
+
+  // URL rigUnit wins; else signed-in preferred unit; else feet.
+  // Does not pre-fill rigLength from default_rig_length (issue #42 step 3).
+  const detailQuery: CampgroundDetailQuery = {
+    rigUnit: resolveGuestRigLengthUnit(rigUnitParam, preferredRigUnit),
+  };
 
   if (!campgroundsResult.success) {
     const tc = await getTranslations("common");
@@ -132,6 +139,7 @@ export default async function Home({ searchParams }: PageProps) {
               resultCount={campgrounds.length}
               resultsTruncated={truncated}
               provinces={provinces}
+              preferredRigUnit={preferredRigUnit}
             />
           </Suspense>
         </div>

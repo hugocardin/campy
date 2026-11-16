@@ -91,6 +91,36 @@ export function parseRigLengthUnit(
   return "ft";
 }
 
+/**
+ * Parse a stored `profiles.preferred_rig_unit` value.
+ * Only exact `ft` / `m` (case-insensitive); anything else → null (unset).
+ */
+export function parseStoredRigLengthUnit(
+  value: string | undefined | null,
+): RigLengthUnit | null {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw === "m") return "m";
+  if (raw === "ft") return "ft";
+  return null;
+}
+
+/**
+ * Resolve display unit for guest search: explicit URL `rigUnit` wins;
+ * otherwise use a saved preference; otherwise feet.
+ */
+export function resolveGuestRigLengthUnit(
+  urlValue: string | undefined | null,
+  preferred?: RigLengthUnit | null,
+): RigLengthUnit {
+  if (urlValue != null && String(urlValue).trim() !== "") {
+    return parseRigLengthUnit(urlValue);
+  }
+  if (preferred === "m" || preferred === "ft") return preferred;
+  return "ft";
+}
+
 /** Emit `rigUnit` only when metres (feet is the default / omitted). */
 export function formatRigLengthUnitParam(
   unit: RigLengthUnit | undefined,

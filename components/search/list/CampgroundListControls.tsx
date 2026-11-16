@@ -75,6 +75,12 @@ type Props = {
   /** Non-geo RPC hit the SQL LIMIT — hint to refine filters. */
   resultsTruncated?: boolean;
   provinces: string[];
+  /**
+   * Signed-in `profiles.preferred_rig_unit` when set. Seeds the unit toggle
+   * only when the URL has no `rigUnit` (issue #42 step 2). Does not pre-fill
+   * rig length (step 3).
+   */
+  preferredRigUnit?: RigLengthUnit | null;
 };
 
 const ALL_PROVINCES = "__all__";
@@ -173,6 +179,7 @@ export default function CampgroundListControls({
   resultCount,
   resultsTruncated = false,
   provinces,
+  preferredRigUnit = null,
 }: Props) {
   const t = useTranslations("search.controls");
   const tProvinces = useTranslations("search.provinces");
@@ -210,7 +217,14 @@ export default function CampgroundListControls({
     types: searchParams.get("types") ?? undefined,
     maxPrice: searchParams.get("maxPrice") ?? undefined,
   });
+  const urlHasRigUnit = searchParams.has("rigUnit");
   const urlRigUnit = parseRigLengthUnit(searchParams.get("rigUnit"));
+  // Preference seeds first paint only; once URL carries rigUnit, URL wins.
+  const initialRigUnit: RigLengthUnit =
+    urlHasRigUnit ||
+    (preferredRigUnit !== "ft" && preferredRigUnit !== "m")
+      ? urlRigUnit
+      : preferredRigUnit;
   const urlFiltersKey = siteFiltersKey(urlFilters);
   // Include unit in external-nav sync key so back/forward restores the toggle.
   const urlRigSyncKey = `${urlFiltersKey}|${urlRigUnit}`;
@@ -231,14 +245,14 @@ export default function CampgroundListControls({
   const [activePlace, setActivePlace] = useState<string | undefined>(placeLabel);
   const [prevPlaceLabel, setPrevPlaceLabel] = useState(placeLabel);
   const [localFilters, setLocalFilters] = useState(urlFilters);
-  const [rigUnit, setRigUnit] = useState<RigLengthUnit>(urlRigUnit);
+  const [rigUnit, setRigUnit] = useState<RigLengthUnit>(initialRigUnit);
   const [prevUrlRigSyncKey, setPrevUrlRigSyncKey] = useState(urlRigSyncKey);
   const [lastPushedFiltersKey, setLastPushedFiltersKey] =
     useState(urlFiltersKey);
   const [lastPushedRigUnit, setLastPushedRigUnit] =
-    useState<RigLengthUnit>(urlRigUnit);
+    useState<RigLengthUnit>(initialRigUnit);
   const [rigDraft, setRigDraft] = useState(
-    formatRigLengthForDisplay(urlFilters.rigLength, urlRigUnit),
+    formatRigLengthForDisplay(urlFilters.rigLength, initialRigUnit),
   );
   const [maxPriceDraft, setMaxPriceDraft] = useState(
     formatGuestMaxPriceParam(urlFilters.maxPrice) ?? "",

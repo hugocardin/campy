@@ -1,3 +1,5 @@
+import type { RigLengthUnit } from "@/lib/site-rig-length";
+
 export interface UserProfile {
   id: string;
   role_name: string;
@@ -5,6 +7,11 @@ export interface UserProfile {
   email: string;
   /** Canonical feet (`profiles.default_rig_length`); null when unset. */
   default_rig_length: number | null;
+  /**
+   * Preferred display unit (`profiles.preferred_rig_unit`); null → locale
+   * fallback in the profile form / search default.
+   */
+  preferred_rig_unit: RigLengthUnit | null;
 }
 
 export interface UserProfileNoRole {

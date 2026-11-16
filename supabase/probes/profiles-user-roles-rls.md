@@ -22,7 +22,7 @@ WHERE table_schema = 'public' AND table_name = 'profiles'
 ORDER BY ordinal_position;
 
 -- Expected authenticated UPDATE allow-list (migration intersects with live):
---   full_name, default_rig_length, preferred_site_type_id,
+--   full_name, default_rig_length, preferred_rig_unit, preferred_site_type_id,
 --   notification_preferences, bookmarked_campgrounds
 -- Known server-owned (never granted): id, role_id, email, created_at, updated_at
 
@@ -94,9 +94,9 @@ WHERE n.nspname = 'public'
 Expect the live policy **“Restrict role changes to platform_admin”** in the pre-apply snapshot; the migration drops it (trigger + `set_user_role` replace that lock).
 
 Expected profiles columns (document; live may differ):
-`id`, `role_id`, `full_name`, `email`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds`, `created_at`, `updated_at`.
+`id`, `role_id`, `full_name`, `email`, `default_rig_length`, `preferred_rig_unit`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds`, `created_at`, `updated_at`.
 
-Column UPDATE is granted only on `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (where present live). Any unclassified live column aborts the migration.
+Column UPDATE is granted only on `full_name`, `default_rig_length`, `preferred_rig_unit`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (where present live). Any unclassified live column aborts the migration.
 
 ## 1. Policy / trigger / grant inventory (after apply)
 
@@ -146,7 +146,7 @@ SELECT has_function_privilege('authenticated', 'public.set_user_role(uuid, text)
 
 -- Final grant set from live catalog (safe if an allow-list col is missing).
 -- Expect can_update = true ONLY for allow-list ∩ live:
---   full_name, default_rig_length, preferred_site_type_id,
+--   full_name, default_rig_length, preferred_rig_unit, preferred_site_type_id,
 --   notification_preferences, bookmarked_campgrounds
 -- Expect false for every other live column (id, role_id, email, timestamps, …).
 -- Paste into PR with §0 snapshot.
@@ -156,6 +156,7 @@ SELECT
   c.column_name IN (
     'full_name',
     'default_rig_length',
+    'preferred_rig_unit',
     'preferred_site_type_id',
     'notification_preferences',
     'bookmarked_campgrounds'
@@ -200,7 +201,7 @@ Use throwaway users via Auth Admin API; clean up with service role afterward.
 ## 3. Notes
 
 - Admin role changes go through **`set_user_role`**, not PostgREST `PATCH` (own-only SELECT would make cross-user PATCH match 0 rows).
-- Column UPDATE is granted only on `full_name`, `default_rig_length`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (where present live); any unclassified live column aborts the migration.
+- Column UPDATE is granted only on `full_name`, `default_rig_length`, `preferred_rig_unit`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds` (where present live); any unclassified live column aborts the migration.
 - Trusted writer bypass uses **`auth.role()`** / `request.jwt.claims` jsonb / legacy claim GUC, or **`session_user` in (`postgres`,`supabase_admin`)** — not `auth.uid() IS NULL`, and **not** general `supabase_auth_admin` (email sync uses a narrow Auth-email match).
 - `handle_new_user` / `sync_email_on_update` share `_campy_normalize_profile_email` (NULL or `@no-email.invalid`; never `''`). Neither reads `raw_user_meta_data`.
 - If `user_roles.code = 'user'` is missing, every signup fails closed (`P0001`) — intentional; keep that seed row.

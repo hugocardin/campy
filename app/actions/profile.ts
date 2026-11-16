@@ -14,7 +14,10 @@ import {
 } from "@/lib/profile-validation";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
-import { normalizeStoredRigLengthFeet } from "@/lib/site-rig-length";
+import {
+  normalizeStoredRigLengthFeet,
+  parseStoredRigLengthUnit,
+} from "@/lib/site-rig-length";
 import {
   handleDbSingle,
   handleUnexpectedError,
@@ -23,8 +26,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "next-intl/server";
 
 /**
- * Update the signed-in user's own profile (`full_name`, `default_rig_length`).
- * Rig length is stored in feet; metres conversion happens at the form edge.
+ * Update the signed-in user's own profile (`full_name`, `default_rig_length`,
+ * `preferred_rig_unit`). Rig length is stored in feet; metres conversion
+ * happens at the form edge. Preferred unit is `ft`/`m` for display defaults.
  * Email / role_id stay server-owned (RLS + BEFORE UPDATE trigger).
  * `updated_at` is set by `trg_profiles_set_updated_at` (not client-writable).
  */
@@ -63,6 +67,13 @@ export async function updateProfileAction(
       });
     }
 
+    const preferredRigUnit = parseStoredRigLengthUnit(input.preferred_rig_unit);
+    if (!preferredRigUnit) {
+      return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+        field: "preferred_rig_unit",
+      });
+    }
+
     const fullName = normalizePersonName(input.full_name);
     if (!fullName) {
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
@@ -86,14 +97,15 @@ export async function updateProfileAction(
       defaultRigLength = parsed.feet;
     }
 
-    // Column UPDATE grant is allow-listed (full_name, default_rig_length, …).
-    // Do not set updated_at — trigger trg_profiles_set_updated_at owns it.
+    // Column UPDATE grant is allow-listed (full_name, default_rig_length,
+    // preferred_rig_unit, …). Do not set updated_at — trigger owns it.
     const result = await handleDbSingle(
       supabase
         .from("profiles")
         .update({
           full_name: fullName,
           default_rig_length: defaultRigLength,
+          preferred_rig_unit: preferredRigUnit,
         })
         .eq("id", user.id)
         .select("id")

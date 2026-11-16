@@ -16,13 +16,15 @@
 -- as defense in depth (role_id / email / id + last-admin guard).
 --
 -- Expected profiles columns (Campy live / OpenAPI; §0 snapshot confirms):
---   id, role_id, full_name, email, default_rig_length, preferred_site_type_id,
---   notification_preferences, bookmarked_campgrounds, created_at, updated_at
+--   id, role_id, full_name, email, default_rig_length, preferred_rig_unit,
+--   preferred_site_type_id, notification_preferences, bookmarked_campgrounds,
+--   created_at, updated_at
 -- Authenticated UPDATE allow-list (intersection with live cols only):
---   full_name, default_rig_length, preferred_site_type_id,
+--   full_name, default_rig_length, preferred_rig_unit, preferred_site_type_id,
 --   notification_preferences, bookmarked_campgrounds
 -- Unexpected live columns (not in allow-list and not known server-owned) → RAISE
 -- so the applier must classify them (fail closed; not a deny-list grant).
+-- preferred_rig_unit added in 20261116135025_preferred_rig_unit.sql (#42 step 2).
 --
 -- Depends on public.is_platform_admin() from 20261031030842_admin_catalog_rls.sql.
 --
@@ -514,6 +516,7 @@ DECLARE
   expected_editable text[] := ARRAY[
     'full_name',
     'default_rig_length',
+    'preferred_rig_unit',
     'preferred_site_type_id',
     'notification_preferences',
     'bookmarked_campgrounds'

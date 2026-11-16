@@ -1,5 +1,6 @@
 import { UserProfile } from "@/entities/user-profile";
 import { ActionResult, resultSuccess } from "@/lib/errors";
+import { parseStoredRigLengthUnit } from "@/lib/site-rig-length";
 import { handleDbSingle, handleUnexpectedError } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
 
@@ -7,6 +8,7 @@ type ProfileWithRoleNameRow = {
   full_name: string | null;
   email: string | null;
   default_rig_length: number | string | null;
+  preferred_rig_unit: string | null;
   role_name: { code: string };
 };
 
@@ -26,6 +28,7 @@ function toDomain(row: ProfileWithRoleNameRow, userId: string): UserProfile {
     full_name: (row.full_name ?? "").trim(),
     email: (row.email ?? "").trim(),
     default_rig_length: toDefaultRigLength(row.default_rig_length),
+    preferred_rig_unit: parseStoredRigLengthUnit(row.preferred_rig_unit),
   };
 }
 
@@ -40,7 +43,7 @@ export const getUserProfile = async (
         .from("profiles")
         .select(
           `
-        full_name, email, default_rig_length,
+        full_name, email, default_rig_length, preferred_rig_unit,
         role_name:user_roles ( code )
         `,
         )

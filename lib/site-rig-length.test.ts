@@ -14,6 +14,8 @@ import {
   parseGuestRigLength,
   parseRigLengthToFeet,
   parseRigLengthUnit,
+  parseStoredRigLengthUnit,
+  resolveGuestRigLengthUnit,
   siteTypeRequiresMaxRigLength,
 } from "./site-rig-length";
 
@@ -136,6 +138,28 @@ describe("site-rig-length", () => {
     assert.equal(formatRigLengthUnitParam("ft"), undefined);
     assert.equal(formatRigLengthUnitParam(undefined), undefined);
     assert.equal(formatRigLengthUnitParam("m"), "m");
+  });
+
+  it("parses stored preferred_rig_unit (exact ft|m only)", () => {
+    assert.equal(parseStoredRigLengthUnit(null), null);
+    assert.equal(parseStoredRigLengthUnit(undefined), null);
+    assert.equal(parseStoredRigLengthUnit(""), null);
+    assert.equal(parseStoredRigLengthUnit("yards"), null);
+    assert.equal(parseStoredRigLengthUnit("metre"), null);
+    assert.equal(parseStoredRigLengthUnit("ft"), "ft");
+    assert.equal(parseStoredRigLengthUnit("FT"), "ft");
+    assert.equal(parseStoredRigLengthUnit("m"), "m");
+    assert.equal(parseStoredRigLengthUnit(" M "), "m");
+  });
+
+  it("resolves guest search unit: URL wins, else preferred, else ft", () => {
+    assert.equal(resolveGuestRigLengthUnit(undefined, "m"), "m");
+    assert.equal(resolveGuestRigLengthUnit(null, "ft"), "ft");
+    assert.equal(resolveGuestRigLengthUnit("", "m"), "m");
+    assert.equal(resolveGuestRigLengthUnit("m", "ft"), "m");
+    assert.equal(resolveGuestRigLengthUnit("ft", "m"), "ft");
+    assert.equal(resolveGuestRigLengthUnit(undefined, null), "ft");
+    assert.equal(resolveGuestRigLengthUnit(undefined, undefined), "ft");
   });
 
   it("converts display values and formats drafts from feet", () => {
