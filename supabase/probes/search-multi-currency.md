@@ -71,6 +71,8 @@ Migrations:
   `bookings.site_id` ON DELETE RESTRICT; EXCEPTION DETAIL; site-insert lock)
 - `20261116223419_campground_currency_lock_admin_rpc` (private DEFINER
   rule; public RPC requires `is_platform_admin`; site `campground_id` moves)
+- `20261116223726_campground_currency_lock_rpc_definer` (public probe
+  SECURITY DEFINER so it can call private without granting private USAGE)
 
 Admin edit calls the RPC; update action maps trigger `23514` + DETAIL only
 (no TS pre-check).
