@@ -26,9 +26,9 @@ import {
   type ElectricityAmp,
   normalizeElectricityAmps,
 } from "@/lib/electricity-amps";
-import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
+import RigLengthInput from "@/components/rig-length/RigLengthInput";
 import {
-  convertRigLengthDisplay,
+  convertRigDraftOnUnitChange,
   isLodgingSiteType,
   maxRigLengthInUnit,
   parseRigLengthToFeet,
@@ -36,7 +36,7 @@ import {
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   ActionResult,
   translateErrorCode,
@@ -69,8 +69,10 @@ export default function SiteFormClient({
   onSubmit,
 }: SiteFormProps) {
   const tc = useTranslations("common");
+  const tUnits = useTranslations("common.units");
   const t_errors = useTranslations("errors");
   const t_sites = useTranslations("sites");
+  const locale = useLocale();
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +99,11 @@ export default function SiteFormClient({
 
   const isLodging = isLodgingSiteType(selectedTypeCode);
   const requiresMaxRig = siteTypeRequiresMaxRigLength(selectedTypeCode);
+  const unitLabel = rigUnit === "m" ? tUnits("m") : tUnits("ft");
+  const invalidMaxLengthMessage = t_sites("errors.invalidMaxLength", {
+    max: maxRigLengthInUnit(rigUnit),
+    unit: unitLabel,
+  });
 
   const maxRigParsed = parseRigLengthToFeet(form.max_rig_length, rigUnit);
   const isFormValid = Boolean(
@@ -130,26 +137,10 @@ export default function SiteFormClient({
         return setError(t_sites("errors.maxRigLengthRequired"));
       }
       if (!maxRigParsedSubmit.ok) {
-        return setError(
-          t_sites("errors.invalidMaxLength", {
-            max: maxRigLengthInUnit(rigUnit),
-            unit:
-              rigUnit === "m"
-                ? t_sites("form.rigLengthUnitM")
-                : t_sites("form.rigLengthUnitFt"),
-          }),
-        );
+        return setError(invalidMaxLengthMessage);
       }
     } else if (form.max_rig_length.trim() !== "" && !maxRigParsedSubmit.ok) {
-      return setError(
-        t_sites("errors.invalidMaxLength", {
-          max: maxRigLengthInUnit(rigUnit),
-          unit:
-            rigUnit === "m"
-              ? t_sites("form.rigLengthUnitM")
-              : t_sites("form.rigLengthUnitFt"),
-        }),
-      );
+      return setError(invalidMaxLengthMessage);
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
       return setError(t_sites("errors.invalidPricePerNight"));
@@ -232,18 +223,15 @@ export default function SiteFormClient({
 
   const handleRigUnitChange = (nextUnit: RigLengthUnit) => {
     if (nextUnit === rigUnit) return;
-    setForm((prev) => {
-      const trimmed = prev.max_rig_length.trim();
-      if (trimmed === "") return prev;
-      const n = Number(trimmed);
-      if (!Number.isFinite(n) || n <= 0) return prev;
-      const converted = convertRigLengthDisplay(n, rigUnit, nextUnit);
-      return {
-        ...prev,
-        max_rig_length:
-          converted != null ? String(converted) : prev.max_rig_length,
-      };
-    });
+    setForm((prev) => ({
+      ...prev,
+      max_rig_length: convertRigDraftOnUnitChange(
+        prev.max_rig_length,
+        rigUnit,
+        nextUnit,
+        locale,
+      ),
+    }));
     setRigUnit(nextUnit);
     setError(null);
   };
@@ -270,7 +258,12 @@ export default function SiteFormClient({
     <div className="space-y-10">
       <ErrorAlert errorMsg={error} />
 
-      <form id="site-form" onSubmit={handleSubmit} className="space-y-10">
+      <form
+        id="site-form"
+        noValidate
+        onSubmit={handleSubmit}
+        className="space-y-10"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
           {/* Left column */}
           <div className="space-y-6">
@@ -313,39 +306,31 @@ export default function SiteFormClient({
                     <span className="text-red-500"> *</span>
                   ) : null}
                 </Label>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <Input
-                    id="max_rig_length"
-                    name="max_rig_length"
-                    type="number"
-                    min={1}
-                    max={maxRigLengthInUnit(rigUnit)}
-                    step="any"
-                    value={form.max_rig_length}
-                    onChange={handleChange}
-                    className="flex-1"
-                    placeholder={
-                      rigUnit === "m"
-                        ? t_sites("form.maxRigLengthPlaceholderM")
-                        : t_sites("form.maxRigLengthPlaceholderFt")
-                    }
-                    required={requiresMaxRig}
-                  />
-                  <RigLengthUnitToggle
-                    value={rigUnit}
-                    onChange={handleRigUnitChange}
-                    groupLabel={t_sites("form.rigLengthUnitGroupLabel")}
-                    ftLabel={t_sites("form.rigLengthUnitFt")}
-                    mLabel={t_sites("form.rigLengthUnitM")}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {requiresMaxRig
-                    ? t_sites("form.maxRigLengthRequiredHint")
-                    : null}
-                  {requiresMaxRig ? " " : null}
-                  {t_sites("form.maxRigLengthStoredHint")}
-                </p>
+                <RigLengthInput
+                  id="max_rig_length"
+                  name="max_rig_length"
+                  className="mt-1.5"
+                  value={form.max_rig_length}
+                  onChange={(value) => {
+                    setForm((prev) => ({ ...prev, max_rig_length: value }));
+                    setError(null);
+                  }}
+                  unit={rigUnit}
+                  onUnitChange={handleRigUnitChange}
+                  groupLabel={t_sites("form.rigLengthUnitGroupLabel")}
+                  placeholderFt={t_sites("form.maxRigLengthPlaceholderFt")}
+                  placeholderM={t_sites("form.maxRigLengthPlaceholderM")}
+                  required={requiresMaxRig}
+                  hint={
+                    <>
+                      {requiresMaxRig
+                        ? t_sites("form.maxRigLengthRequiredHint")
+                        : null}
+                      {requiresMaxRig ? " " : null}
+                      {t_sites("form.maxRigLengthStoredHint")}
+                    </>
+                  }
+                />
               </div>
             ) : null}
           </div>

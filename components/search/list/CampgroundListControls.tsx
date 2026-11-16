@@ -16,7 +16,7 @@ import {
   provinceFilterKey,
 } from "@/lib/canadian-provinces";
 import SearchSuggestInput from "@/components/search/SearchSuggestInput";
-import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
+import RigLengthInput from "@/components/rig-length/RigLengthInput";
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   CampgroundRadiusKm,
@@ -57,9 +57,8 @@ import {
 } from "@/lib/guest-site-types";
 import { routes } from "@/lib/routes";
 import {
-  convertRigLengthDisplay,
+  convertRigDraftOnUnitChange,
   formatRigLengthForDisplay,
-  maxRigLengthInUnit,
   parseGuestRigLength,
   parseRigLengthUnit,
   type RigLengthUnit,
@@ -527,14 +526,14 @@ export default function CampgroundListControls({
     // Cancel pending rig debounce and flush the draft in the *current* unit
     // before flipping (avoids a stale timer re-parsing metres as a new feet value).
     const feet = takePendingRigLength();
-    const draft = rigDraftRef.current.trim();
-    const n = Number(draft);
-    const converted =
-      draft !== "" && Number.isFinite(n) && n > 0
-        ? convertRigLengthDisplay(n, fromUnit, nextUnit)
-        : undefined;
+    const converted = convertRigDraftOnUnitChange(
+      rigDraftRef.current,
+      fromUnit,
+      nextUnit,
+      locale,
+    );
     updateRigUnit(nextUnit);
-    updateRigDraft(converted != null ? String(converted) : "");
+    updateRigDraft(converted);
     const latest = latestParamsRef.current;
     const leavePatch = leavePlacePending
       ? leavePlaceUrlPatch(latest)
@@ -1031,50 +1030,35 @@ export default function CampgroundListControls({
               >
                 {t("rigLengthLabel")}
               </Label>
-              <div className="mt-1.5 flex items-center gap-2">
-                <Input
-                  id="rig-length-filter"
-                  type="number"
-                  min={1}
-                  max={maxRigLengthInUnit(rigUnit)}
-                  step="any"
-                  inputMode="decimal"
-                  className="w-28"
-                  placeholder={
-                    rigUnit === "m"
-                      ? t("rigLengthPlaceholderM")
-                      : t("rigLengthPlaceholderFt")
+              <RigLengthInput
+                id="rig-length-filter"
+                className="mt-1.5"
+                inputClassName="w-28"
+                value={rigDraft}
+                disabled={geoBusy}
+                onChange={(value) => {
+                  updateRigDraft(value);
+                  if (rigDebounceRef.current != null) {
+                    window.clearTimeout(rigDebounceRef.current);
                   }
-                  value={rigDraft}
-                  disabled={geoBusy}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    updateRigDraft(value);
-                    if (rigDebounceRef.current != null) {
-                      window.clearTimeout(rigDebounceRef.current);
-                    }
-                    rigDebounceRef.current = window.setTimeout(() => {
-                      rigDebounceRef.current = null;
-                      replaceQuery(
-                        withLatestCampgroundFilters(latestParamsRef.current, {
-                          q: latestParamsRef.current.q,
-                          sort: latestParamsRef.current.sort,
-                          rigLength: resolveRigDraft(),
-                          rigUnit: rigUnitRef.current === "m" ? "m" : undefined,
-                        }),
-                      );
-                    }, 300);
-                  }}
-                />
-                <RigLengthUnitToggle
-                  value={rigUnit}
-                  onChange={onRigUnitChange}
-                  disabled={geoBusy}
-                  groupLabel={t("rigLengthUnitGroupLabel")}
-                  ftLabel={t("rigLengthUnitFt")}
-                  mLabel={t("rigLengthUnitM")}
-                />
-              </div>
+                  rigDebounceRef.current = window.setTimeout(() => {
+                    rigDebounceRef.current = null;
+                    replaceQuery(
+                      withLatestCampgroundFilters(latestParamsRef.current, {
+                        q: latestParamsRef.current.q,
+                        sort: latestParamsRef.current.sort,
+                        rigLength: resolveRigDraft(),
+                        rigUnit: rigUnitRef.current === "m" ? "m" : undefined,
+                      }),
+                    );
+                  }, 300);
+                }}
+                unit={rigUnit}
+                onUnitChange={onRigUnitChange}
+                groupLabel={t("rigLengthUnitGroupLabel")}
+                placeholderFt={t("rigLengthPlaceholderFt")}
+                placeholderM={t("rigLengthPlaceholderM")}
+              />
             </div>
           ) : null}
 

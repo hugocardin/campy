@@ -15,8 +15,6 @@
     "rigLengthPlaceholderFt": "e.g. 35",
     "rigLengthPlaceholderM": "e.g. 11",
     "rigLengthUnitGroupLabel": "Length unit",
-    "rigLengthUnitFt": "ft",
-    "rigLengthUnitM": "m",
     "rigLengthStoredHint": "Saved in feet."
   },
 

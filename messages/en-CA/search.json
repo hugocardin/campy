@@ -54,8 +54,6 @@
     "rigLengthPlaceholderFt": "e.g. 35",
     "rigLengthPlaceholderM": "e.g. 11",
     "rigLengthUnitGroupLabel": "Length unit",
-    "rigLengthUnitFt": "ft",
-    "rigLengthUnitM": "m",
 
     "siteFiltersHint": "Shows parks with at least one site that matches selected site types, any selected amp (or None), every selected water/sewer hookup, driveway, rig length, and max price (when set).",
     "filterAmpNone": "None",

@@ -4,7 +4,8 @@ import { Save } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
-import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
+import RigLengthInput from "@/components/rig-length/RigLengthInput";
+import { useRigLengthInput } from "@/components/rig-length/useRigLengthInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,75 +20,40 @@ import {
   FULL_NAME_MAX_LENGTH,
   normalizePersonName,
 } from "@/lib/profile-validation";
-import {
-  convertRigLengthDisplay,
-  formatRigLengthForDisplay,
-  maxRigLengthInUnit,
-  parseDecimalInput,
-  parseRigLengthToFeet,
-  type RigLengthUnit,
-} from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 type Props = {
   profile: UserProfile;
   onSubmit: (input: ProfileUpdateInput) => Promise<ActionResult>;
 };
 
-function defaultRigUnitForLocale(locale: string): RigLengthUnit {
-  return locale.toLowerCase().startsWith("fr") ? "m" : "ft";
-}
-
 export default function ProfileFormClient({ profile, onSubmit }: Props) {
   const tc = useTranslations("common");
   const t_errors = useTranslations("errors");
   const t_profile = useTranslations("profile");
-  const locale = useLocale();
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fullName, setFullName] = useState(profile.full_name);
-  const [rigUnit, setRigUnit] = useState<RigLengthUnit>(() =>
-    defaultRigUnitForLocale(locale),
-  );
-  const [rigDraft, setRigDraft] = useState(() =>
-    formatRigLengthForDisplay(
-      profile.default_rig_length,
-      defaultRigUnitForLocale(locale),
-      locale,
-    ),
-  );
-
-  const unitLabel =
-    rigUnit === "m"
-      ? t_profile("form.rigLengthUnitM")
-      : t_profile("form.rigLengthUnitFt");
+  const {
+    draft: rigDraft,
+    setDraft: setRigDraft,
+    unit: rigUnit,
+    onUnitChange: handleRigUnitChange,
+    parse: parseRigDraft,
+    unitLabel,
+    max: rigMax,
+  } = useRigLengthInput({
+    initialFeet: profile.default_rig_length,
+  });
 
   const invalidRigLengthMessage = t_profile("errors.invalidRigLength", {
-    max: maxRigLengthInUnit(rigUnit),
+    max: rigMax,
     unit: unitLabel,
   });
 
   const isFormValid = normalizePersonName(fullName).length > 0;
-
-  const handleRigUnitChange = (nextUnit: RigLengthUnit) => {
-    if (nextUnit === rigUnit) return;
-    setRigDraft((prev) => {
-      const trimmed = prev.trim();
-      if (trimmed === "") return prev;
-      const n = parseDecimalInput(trimmed);
-      if (n == null || n <= 0) return prev;
-      const converted = convertRigLengthDisplay(n, rigUnit, nextUnit);
-      if (converted == null) return prev;
-      return new Intl.NumberFormat(locale, {
-        maximumFractionDigits: nextUnit === "m" ? 2 : 1,
-        useGrouping: false,
-      }).format(converted);
-    });
-    setRigUnit(nextUnit);
-    setError(null);
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +72,7 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
     const trimmedRig = rigDraft.trim();
     let defaultRigLength: number | null = null;
     if (trimmedRig !== "") {
-      const parsed = parseRigLengthToFeet(trimmedRig, rigUnit);
+      const parsed = parseRigDraft();
       if (!parsed.ok) {
         return setError(invalidRigLengthMessage);
       }
@@ -200,36 +166,30 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
             <Label htmlFor="default_rig_length">
               {t_profile("form.defaultRigLengthLabel")}
             </Label>
-            <div className="mt-1.5 flex items-center gap-2">
-              <Input
-                id="default_rig_length"
-                name="default_rig_length"
-                type="text"
-                inputMode="decimal"
-                value={rigDraft}
-                onChange={(e) => {
-                  setRigDraft(e.target.value);
-                  setError(null);
-                }}
-                className="flex-1"
-                placeholder={
-                  rigUnit === "m"
-                    ? t_profile("form.rigLengthPlaceholderM")
-                    : t_profile("form.rigLengthPlaceholderFt")
-                }
-              />
-              <RigLengthUnitToggle
-                value={rigUnit}
-                onChange={handleRigUnitChange}
-                groupLabel={t_profile("form.rigLengthUnitGroupLabel")}
-                ftLabel={t_profile("form.rigLengthUnitFt")}
-                mLabel={t_profile("form.rigLengthUnitM")}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t_profile("form.defaultRigLengthHint")}{" "}
-              {t_profile("form.rigLengthStoredHint")}
-            </p>
+            <RigLengthInput
+              id="default_rig_length"
+              name="default_rig_length"
+              className="mt-1.5"
+              value={rigDraft}
+              onChange={(value) => {
+                setRigDraft(value);
+                setError(null);
+              }}
+              unit={rigUnit}
+              onUnitChange={(next) => {
+                handleRigUnitChange(next);
+                setError(null);
+              }}
+              groupLabel={t_profile("form.rigLengthUnitGroupLabel")}
+              placeholderFt={t_profile("form.rigLengthPlaceholderFt")}
+              placeholderM={t_profile("form.rigLengthPlaceholderM")}
+              hint={
+                <>
+                  {t_profile("form.defaultRigLengthHint")}{" "}
+                  {t_profile("form.rigLengthStoredHint")}
+                </>
+              }
+            />
           </div>
 
           <div className="flex justify-end pt-2">

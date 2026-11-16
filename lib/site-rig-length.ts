@@ -159,6 +159,33 @@ export function parseDecimalInput(
 }
 
 /**
+ * Convert a typed draft string when the ft/m toggle flips.
+ * Empty / unparsable drafts are left unchanged (strict decimal parse).
+ * Pass `locale` so fr-CA keeps a decimal comma after conversion.
+ */
+export function convertRigDraftOnUnitChange(
+  draft: string,
+  from: RigLengthUnit,
+  to: RigLengthUnit,
+  locale?: string,
+): string {
+  if (from === to) return draft;
+  const trimmed = draft.trim();
+  if (trimmed === "") return draft;
+  const n = parseDecimalInput(trimmed);
+  if (n == null || n <= 0) return draft;
+  const converted = convertRigLengthDisplay(n, from, to);
+  if (converted == null) return draft;
+  if (locale) {
+    return new Intl.NumberFormat(locale, {
+      maximumFractionDigits: to === "m" ? 2 : 1,
+      useGrouping: false,
+    }).format(converted);
+  }
+  return String(converted);
+}
+
+/**
  * Format a canonical feet value for an input in the chosen unit.
  * Empty when feet is missing / invalid.
  * Pass `locale` so fr-CA drafts use a decimal comma (matches typed input).

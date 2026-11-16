@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   RIG_LENGTH_MAX_FT,
   RIG_LENGTH_MAX_M,
+  convertRigDraftOnUnitChange,
   convertRigLengthDisplay,
   formatGuestRigLengthParam,
   formatRigLength,
@@ -145,6 +146,20 @@ describe("site-rig-length", () => {
     assert.equal(formatRigLengthForDisplay(undefined, "m"), "");
     assert.equal(formatGuestRigLengthParam(35), "35");
     assert.equal(formatGuestRigLengthParam(35.12), "35.1");
+  });
+
+  it("converts typed drafts on unit toggle (strict parse + locale)", () => {
+    assert.equal(convertRigDraftOnUnitChange("35", "ft", "m"), "10.67");
+    assert.equal(convertRigDraftOnUnitChange("10,67", "m", "ft", "fr-CA"), "35");
+    assert.equal(
+      convertRigDraftOnUnitChange("35", "ft", "m", "fr-CA"),
+      "10,67",
+    );
+    assert.equal(convertRigDraftOnUnitChange("", "ft", "m"), "");
+    assert.equal(convertRigDraftOnUnitChange("  ", "ft", "m"), "  ");
+    assert.equal(convertRigDraftOnUnitChange("abc", "ft", "m"), "abc");
+    assert.equal(convertRigDraftOnUnitChange("1e2", "ft", "m"), "1e2");
+    assert.equal(convertRigDraftOnUnitChange("35", "ft", "ft"), "35");
   });
 
   it("formats dual ft/m for site cards (locale + 2-decimal metres)", () => {

@@ -20,8 +20,6 @@
     "maxRigLengthPlaceholderM": "ex. 11",
     "maxRigLengthRequiredHint": "Obligatoire pour les emplacements VR et VR-et-tente.",
     "rigLengthUnitGroupLabel": "Unité de longueur",
-    "rigLengthUnitFt": "pi",
-    "rigLengthUnitM": "m",
     "maxRigLengthStoredHint": "Enregistrée en pieds.",
 
     "siteTypeLabel": "Type d'emplacement",

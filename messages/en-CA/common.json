@@ -15,6 +15,11 @@
   "save": "Save",
   "processing": "Processing...",
 
+  "units": {
+    "ft": "ft",
+    "m": "m"
+  },
+
   "header": {
     "profile": "Profile",
     "plateformAdminDashboard": "Plateform Admin Dashboard"
