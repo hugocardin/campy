@@ -206,6 +206,7 @@ export default function CampgroundListControls({
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const rigDebounceRef = useRef<number | null>(null);
+  const leavePlacePendingRef = useRef(false);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
@@ -392,23 +393,22 @@ export default function CampgroundListControls({
 
   function onSearchInputChange(nextValue: string) {
     setSearch(nextValue);
-    // Leaving place mode: clear place/geo immediately (q stays empty), then let
-    // the normal debounced effect push the typed text — avoids a junk RPC on
-    // the first keystroke of a long place label.
+    // Leaving place mode: clear place/geo in the ref only; one debounced
+    // replaceQuery pushes typed q + geo clear together (avoids a flash of the
+    // full catalog between two navigations).
     if (activePlace && nextValue !== activePlace) {
       setActivePlace(undefined);
       const latest = latestParamsRef.current;
       const nextSort = latest.sort === "distance" ? "name" : latest.sort;
-      replaceQuery(
-        withLatestCampgroundFilters(latest, {
-          q: "",
-          sort: nextSort,
-          place: undefined,
-          lat: undefined,
-          lng: undefined,
-          radiusKm: undefined,
-        }),
-      );
+      latestParamsRef.current = withLatestCampgroundFilters(latest, {
+        q: nextValue,
+        sort: nextSort,
+        place: undefined,
+        lat: undefined,
+        lng: undefined,
+        radiusKm: undefined,
+      });
+      leavePlacePendingRef.current = true;
     }
   }
 
@@ -494,17 +494,30 @@ export default function CampgroundListControls({
     // Place mode owns the URL via lat/lng/place — do not debounce q.
     if (activePlace) return;
     const trimmed = search.trim();
-    if (trimmed === qParam || trimmed === lastPushedQ) return;
+    const leavingPlace = leavePlacePendingRef.current;
+    // When leaving place mode, always push once (even if q stays empty) so geo
+    // clears in the same navigation as the typed text.
+    if (
+      !leavingPlace &&
+      (trimmed === qParam || trimmed === lastPushedQ)
+    ) {
+      return;
+    }
 
     clearSearchDebounce();
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
+      leavePlacePendingRef.current = false;
       const latest = latestParamsRef.current;
       const rigLength = takePendingRigLength();
       replaceQuery({
         ...latest,
         q: search,
         place: undefined,
+        // Ensure geo clears even if a stale ref still had coords.
+        ...(leavingPlace
+          ? { lat: undefined, lng: undefined, radiusKm: undefined }
+          : {}),
         rigLength: stayKindAllowsRigLength(latest.stayKind)
           ? rigLength
           : undefined,

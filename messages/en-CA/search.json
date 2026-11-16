@@ -15,6 +15,7 @@
     "suggestionsLoading": "Searching…",
     "suggestionsEmpty": "No matching places or campgrounds.",
     "suggestionsPlacesUnavailable": "Place suggestions are temporarily unavailable. Try a campground name.",
+    "suggestionsCampgroundsUnavailable": "Campground suggestions are temporarily unavailable. Try a place name.",
     "suggestionsError": "Suggestions are temporarily unavailable. Try again.",
     "suggestionPlace": "Place",
     "suggestionCampground": "Campground",

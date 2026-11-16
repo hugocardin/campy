@@ -13,13 +13,10 @@ export { photonLangFromLocale } from "@/lib/geocoding/types";
 /**
  * Photon (Komoot) — free OSM autocomplete, no API key.
  *
- * Why Photon (issue #24 open decision):
- * - Designed for as-you-type suggestions (Nominatim discourages that).
- * - French / English via `lang` (Québec keeps accents).
- * - No key for demo / CI; swap later for Mapbox/Geoapify/LocationIQ if needed.
- * - Rank inside North America via `bbox`, then filter CA / US / MX.
+ * Why Photon (issue #24): as-you-type, fr/en names, no key for demo.
+ * Rank inside North America via `bbox`, then filter CA / US / MX.
+ * Layers + osm_tag includes cover cities/regions plus parks, lakes, postcodes.
  *
- * Usage: identify as Campy, cache responses (see `geocode-cache.ts`), debounce UI.
  * Env override: `PHOTON_API_URL` (default https://photon.komoot.io).
  */
 
@@ -36,6 +33,8 @@ type PhotonFeature = {
     type?: string;
     postcode?: string;
     county?: string;
+    osm_key?: string;
+    osm_value?: string;
   };
 };
 
@@ -45,10 +44,29 @@ type PhotonResponse = {
 
 const ALLOWED = new Set<string>(GEOCODE_COUNTRY_ALLOWLIST);
 
-/** Rough North America box so Photon ranks inside CA/US/MX (issue #24 review). */
+/** Rough North America box so Photon ranks inside CA/US/MX. */
 const NORTH_AMERICA_BBOX = "-170,14,-50,84";
 
 const PHOTON_TIMEOUT_MS = 3000;
+
+/** Locality layers + other (parks/lakes/postcodes via osm_tag). */
+const PHOTON_LAYERS = [
+  "city",
+  "locality",
+  "district",
+  "county",
+  "state",
+  "other",
+] as const;
+
+/** Parks / lakes / postcodes (#24 place types beyond city/region). */
+const PHOTON_OSM_TAGS = [
+  "boundary:protected_area",
+  "leisure:park",
+  "leisure:nature_reserve",
+  "natural:water",
+  "place:postcode",
+] as const;
 
 function photonBaseUrl(): string {
   const raw = process.env.PHOTON_API_URL?.trim();
@@ -59,7 +77,11 @@ function photonBaseUrl(): string {
 function formatLabel(
   props: NonNullable<PhotonFeature["properties"]>,
 ): { label: string; subtitle?: string } | null {
-  const name = props.name?.trim() || props.city?.trim() || "";
+  const name =
+    props.name?.trim() ||
+    props.postcode?.trim() ||
+    props.city?.trim() ||
+    "";
   if (!name) return null;
   const parts: string[] = [];
   if (props.state?.trim() && props.state !== name) parts.push(props.state.trim());
@@ -115,9 +137,11 @@ export async function searchPhotonPlaces(
   url.searchParams.set("lang", lang);
   url.searchParams.set("limit", String(Math.min(limit * 2, 10)));
   url.searchParams.set("bbox", NORTH_AMERICA_BBOX);
-  // Locality-ish layers for radius search (not streets / POIs).
-  for (const layer of ["city", "locality", "district", "county", "state"]) {
+  for (const layer of PHOTON_LAYERS) {
     url.searchParams.append("layer", layer);
+  }
+  for (const tag of PHOTON_OSM_TAGS) {
+    url.searchParams.append("osm_tag", tag);
   }
 
   const signal =

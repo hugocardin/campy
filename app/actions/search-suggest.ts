@@ -1,7 +1,13 @@
 "use server";
 
 import { suggestCampgrounds } from "@/data/campgrounds/suggest-campgrounds";
+import { clientIpFromHeaders } from "@/lib/geocoding/client-ip";
 import { geocodeCacheGet, geocodeCacheSet } from "@/lib/geocoding/geocode-cache";
+import {
+  photonCircuitIsOpen,
+  photonCircuitRecordFailure,
+  photonCircuitRecordSuccess,
+} from "@/lib/geocoding/photon-circuit";
 import { searchPhotonPlaces } from "@/lib/geocoding/photon";
 import { geocodeRateLimitAllow } from "@/lib/geocoding/rate-limit";
 import {
@@ -9,6 +15,7 @@ import {
   SUGGEST_MIN_CHARS,
   SUGGEST_PLACE_LIMIT,
   photonLangFromLocale,
+  type CampgroundSuggestion,
   type GeocodedPlace,
   type SearchSuggestion,
 } from "@/lib/geocoding/types";
@@ -18,10 +25,12 @@ import { handleUnexpectedError } from "@/lib/supabase/db-utils";
 import { routing } from "@/i18n/routing";
 import { headers } from "next/headers";
 
+export type SearchSuggestUnavailable = "places" | "campgrounds" | "all";
+
 export type SearchSuggestResult = {
   suggestions: SearchSuggestion[];
-  /** True when place geocoding failed (campgrounds may still be present). */
-  placesUnavailable?: boolean;
+  /** Which half(s) failed — drives distinct UI copy. */
+  unavailable?: SearchSuggestUnavailable;
 };
 
 const NEGATIVE_CACHE_TTL_MS = 30_000;
@@ -62,11 +71,9 @@ export async function searchSuggestAction(
     const cacheKey = `photon:${lang}:${q.toLowerCase()}`;
 
     const headerStore = await headers();
-    const forwarded = headerStore.get("x-forwarded-for");
-    const ip =
-      forwarded?.split(",")[0]?.trim() ||
-      headerStore.get("x-real-ip") ||
-      "unknown";
+    const ip = clientIpFromHeaders(headerStore);
+    const rateKey = ip ? `photon:ip:${ip}` : "photon:global";
+    const rateOk = geocodeRateLimitAllow(rateKey, { global: !ip });
 
     let places: GeocodedPlace[] = [];
     let placesUnavailable = false;
@@ -76,11 +83,11 @@ export async function searchSuggestAction(
     );
     const campgroundsPromise = suggestCampgrounds(q, SUGGEST_CAMPGROUND_LIMIT);
 
-    if (isNegativeCache(cached)) {
+    if (isNegativeCache(cached) || photonCircuitIsOpen()) {
       placesUnavailable = true;
     } else if (cached) {
       places = cached;
-    } else if (!geocodeRateLimitAllow(`photon:${ip}`)) {
+    } else if (!rateOk) {
       placesUnavailable = true;
     } else {
       try {
@@ -89,29 +96,44 @@ export async function searchSuggestAction(
           limit: SUGGEST_PLACE_LIMIT,
         });
         geocodeCacheSet(cacheKey, places);
-      } catch {
+        photonCircuitRecordSuccess();
+      } catch (err) {
+        console.error("[searchSuggest] Photon failed", err);
         places = [];
         placesUnavailable = true;
         geocodeCacheSet(cacheKey, NEGATIVE_SENTINEL, NEGATIVE_CACHE_TTL_MS);
+        photonCircuitRecordFailure();
       }
     }
 
     const campgroundsResult = await campgroundsPromise;
-    const campgrounds = campgroundsResult.success
-      ? campgroundsResult.data
-      : [];
+    let campgrounds: CampgroundSuggestion[] = [];
+    let campgroundsUnavailable = false;
 
-    // Whole action path succeeded; surface places-only degradation separately.
-    // Campground RPC failure with empty places → treat as all-unavailable via
-    // empty suggestions (UI uses placesUnavailable only when places half failed).
+    if (!campgroundsResult.success) {
+      console.error(
+        "[searchSuggest] suggest_campgrounds failed",
+        campgroundsResult.errorCode,
+        campgroundsResult.details,
+      );
+      campgroundsUnavailable = true;
+    } else {
+      campgrounds = campgroundsResult.data;
+    }
+
     const suggestions: SearchSuggestion[] = [
       ...places.map((p) => ({ kind: "place" as const, ...p })),
       ...campgrounds.map((c) => ({ kind: "campground" as const, ...c })),
     ];
 
+    let unavailable: SearchSuggestUnavailable | undefined;
+    if (placesUnavailable && campgroundsUnavailable) unavailable = "all";
+    else if (placesUnavailable) unavailable = "places";
+    else if (campgroundsUnavailable) unavailable = "campgrounds";
+
     return resultSuccess({
       suggestions,
-      placesUnavailable: placesUnavailable || undefined,
+      unavailable,
     });
   } catch (err) {
     return handleUnexpectedError(err);

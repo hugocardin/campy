@@ -22,7 +22,7 @@ type Props = {
   disabled?: boolean;
 };
 
-type SuggestErrorKind = "places" | "all" | null;
+type SuggestErrorKind = "places" | "campgrounds" | "all" | null;
 
 export default function SearchSuggestInput({
   value,
@@ -78,7 +78,7 @@ export default function SearchSuggestInput({
             return;
           }
           setSuggestions(result.data.suggestions);
-          setErrorKind(result.data.placesUnavailable ? "places" : null);
+          setErrorKind(result.data.unavailable ?? null);
           setHighlight(-1);
           if (document.activeElement === inputRef.current) {
             setOpen(true);
@@ -116,6 +116,7 @@ export default function SearchSuggestInput({
 
   function choose(suggestion: SearchSuggestion) {
     setUserTyped(false);
+    setLoading(false);
     setOpen(false);
     setSuggestions([]);
     setFetchedFor("");
@@ -254,14 +255,20 @@ export default function SearchSuggestInput({
               </li>
             );
           })}
-          {!visibleLoading &&
-          visibleSuggestions.length === 0 &&
-          visibleError === "places" ? (
+          {!visibleLoading && visibleError === "places" ? (
             <li
               className="px-3 py-2 text-sm text-muted-foreground"
               role="presentation"
             >
               {t("suggestionsPlacesUnavailable")}
+            </li>
+          ) : null}
+          {!visibleLoading && visibleError === "campgrounds" ? (
+            <li
+              className="px-3 py-2 text-sm text-muted-foreground"
+              role="presentation"
+            >
+              {t("suggestionsCampgroundsUnavailable")}
             </li>
           ) : null}
           {!visibleLoading &&

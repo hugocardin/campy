@@ -15,6 +15,7 @@
     "suggestionsLoading": "Recherche…",
     "suggestionsEmpty": "Aucun lieu ni camping correspondant.",
     "suggestionsPlacesUnavailable": "Les suggestions de lieux sont temporairement indisponibles. Essayez un nom de camping.",
+    "suggestionsCampgroundsUnavailable": "Les suggestions de campings sont temporairement indisponibles. Essayez un nom de lieu.",
     "suggestionsError": "Les suggestions sont temporairement indisponibles. Réessayez.",
     "suggestionPlace": "Lieu",
     "suggestionCampground": "Camping",
