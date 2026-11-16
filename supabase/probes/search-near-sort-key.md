@@ -24,7 +24,7 @@ With `price_sort`, `campground_matching_site_min_price(...)` runs once per park 
 ## Live smoke
 
 ```sql
--- Vancouver-ish; adjust if seed coords differ
+-- Vancouver-ish: price / distance / name-desc / city / province smoke
 SELECT name, round(distance_m::numeric) AS distance_m, min_price_per_night
 FROM search_campgrounds_near(
   lat := 49.28, lng := -123.12, radius_m := 500000,
@@ -43,18 +43,7 @@ FROM search_campgrounds_near(
   sort_key := 'price-desc', result_limit := 10
 );
 
--- Name vs distance must disagree for a real regression check.
--- From Vancouver, Alice is nearer than Gold Creek, so name ASC matches
--- distance order and does not prove the fix. name-desc must put Gold Creek
--- first (alphabetically later but farther) — old buggy distance ORDER would
--- still put Alice first.
-SELECT name, round(distance_m::numeric) AS distance_m
-FROM search_campgrounds_near(
-  lat := 49.28, lng := -123.12, radius_m := 500000,
-  sort_key := 'name', result_limit := 10
-);
-
-SELECT name, round(distance_m::numeric) AS distance_m
+SELECT name
 FROM search_campgrounds_near(
   lat := 49.28, lng := -123.12, radius_m := 500000,
   sort_key := 'name-desc', result_limit := 10
@@ -71,10 +60,25 @@ FROM search_campgrounds_near(
   lat := 49.28, lng := -123.12, radius_m := 500000,
   sort_key := 'province', result_limit := 10
 );
+
+-- name ASC regression (#48): origin where nearer ≠ alphabetically first.
+-- Maple Ridge: distance → Gold Creek (~27 km), Alice (~73 km).
+-- name ASC must return Alice then Gold Creek (would match distance if buggy).
+SELECT name, round(distance_m::numeric) AS distance_m
+FROM search_campgrounds_near(
+  lat := 49.22, lng := -122.60, radius_m := 200000,
+  sort_key := 'distance', result_limit := 10
+);
+
+SELECT name, round(distance_m::numeric) AS distance_m
+FROM search_campgrounds_near(
+  lat := 49.22, lng := -122.60, radius_m := 200000,
+  sort_key := 'name', result_limit := 10
+);
 ```
 
 Expect:
 
-- distance ≠ price order when parks differ
-- `name-desc`: **Gold Creek then Alice** (proves name order — Alice is nearer, so a distance-ordered bug would still put Alice first)
-- `name` ASC: Alice then Gold Creek (same pair; alone does not discriminate from distance)
+- Vancouver: distance ≠ price order when parks differ; `name-desc` / city / province smoke only
+- Maple Ridge `distance`: **Gold Creek then Alice**
+- Maple Ridge `name`: **Alice then Gold Creek** (discriminating — Gold Creek is nearer)
