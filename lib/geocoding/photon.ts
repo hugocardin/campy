@@ -5,17 +5,23 @@ import {
   type GeocodeCountryCode,
   type GeocodedPlace,
   SUGGEST_PLACE_LIMIT,
-  photonLangFromLocale,
 } from "@/lib/geocoding/types";
+import { buildPhotonSearchUrl } from "@/lib/geocoding/photon-url";
 
 export { photonLangFromLocale } from "@/lib/geocoding/types";
+export {
+  buildPhotonSearchUrl,
+  PHOTON_OSM_TAGS,
+  PHOTON_LAYERS,
+} from "@/lib/geocoding/photon-url";
 
 /**
  * Photon (Komoot) — free OSM autocomplete, no API key.
  *
  * Why Photon (issue #24): as-you-type, fr/en names, no key for demo.
  * Rank inside North America via `bbox`, then filter CA / US / MX.
- * Layers + osm_tag includes cover cities/regions plus parks, lakes, postcodes.
+ * Layers + osm_tag cover cities/regions plus parks, lakes, postcodes.
+ * Note: Photon ANDs layer with osm_tag — see PHOTON_OSM_TAGS.
  *
  * Env override: `PHOTON_API_URL` (default https://photon.komoot.io).
  */
@@ -44,35 +50,7 @@ type PhotonResponse = {
 
 const ALLOWED = new Set<string>(GEOCODE_COUNTRY_ALLOWLIST);
 
-/** Rough North America box so Photon ranks inside CA/US/MX. */
-const NORTH_AMERICA_BBOX = "-170,14,-50,84";
-
 const PHOTON_TIMEOUT_MS = 3000;
-
-/** Locality layers + other (parks/lakes/postcodes via osm_tag). */
-const PHOTON_LAYERS = [
-  "city",
-  "locality",
-  "district",
-  "county",
-  "state",
-  "other",
-] as const;
-
-/** Parks / lakes / postcodes (#24 place types beyond city/region). */
-const PHOTON_OSM_TAGS = [
-  "boundary:protected_area",
-  "leisure:park",
-  "leisure:nature_reserve",
-  "natural:water",
-  "place:postcode",
-] as const;
-
-function photonBaseUrl(): string {
-  const raw = process.env.PHOTON_API_URL?.trim();
-  if (raw) return raw.replace(/\/$/, "");
-  return "https://photon.komoot.io";
-}
 
 function formatLabel(
   props: NonNullable<PhotonFeature["properties"]>,
@@ -126,23 +104,13 @@ export async function searchPhotonPlaces(
   query: string,
   options?: { locale?: string; limit?: number; signal?: AbortSignal },
 ): Promise<GeocodedPlace[]> {
-  const q = query.trim().slice(0, 100);
-  if (q.length < 3) return [];
+  const url = buildPhotonSearchUrl(query, options);
+  if (!url) return [];
 
-  const lang = photonLangFromLocale(options?.locale ?? "en-CA");
-  const limit = Math.min(Math.max(options?.limit ?? SUGGEST_PLACE_LIMIT, 1), 10);
-
-  const url = new URL(`${photonBaseUrl()}/api/`);
-  url.searchParams.set("q", q);
-  url.searchParams.set("lang", lang);
-  url.searchParams.set("limit", String(Math.min(limit * 2, 10)));
-  url.searchParams.set("bbox", NORTH_AMERICA_BBOX);
-  for (const layer of PHOTON_LAYERS) {
-    url.searchParams.append("layer", layer);
-  }
-  for (const tag of PHOTON_OSM_TAGS) {
-    url.searchParams.append("osm_tag", tag);
-  }
+  const limit = Math.min(
+    Math.max(options?.limit ?? SUGGEST_PLACE_LIMIT, 1),
+    10,
+  );
 
   const signal =
     options?.signal ??

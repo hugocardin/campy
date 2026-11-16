@@ -393,21 +393,11 @@ export default function CampgroundListControls({
 
   function onSearchInputChange(nextValue: string) {
     setSearch(nextValue);
-    // Leaving place mode: clear place/geo in the ref only; one debounced
-    // replaceQuery pushes typed q + geo clear together (avoids a flash of the
-    // full catalog between two navigations).
+    // Leaving place mode: clear local place flag only. The sync effect rebuilds
+    // latestParamsRef from the still-geo URL, so geo/sort are fixed in the
+    // debounced replaceQuery below (single navigation; no catalog flash).
     if (activePlace && nextValue !== activePlace) {
       setActivePlace(undefined);
-      const latest = latestParamsRef.current;
-      const nextSort = latest.sort === "distance" ? "name" : latest.sort;
-      latestParamsRef.current = withLatestCampgroundFilters(latest, {
-        q: nextValue,
-        sort: nextSort,
-        place: undefined,
-        lat: undefined,
-        lng: undefined,
-        radiusKm: undefined,
-      });
       leavePlacePendingRef.current = true;
     }
   }
@@ -510,14 +500,24 @@ export default function CampgroundListControls({
       leavePlacePendingRef.current = false;
       const latest = latestParamsRef.current;
       const rigLength = takePendingRigLength();
+      // Sync effect may have restored URL geo + distance sort into the ref;
+      // when leaving place, clear those here in the same navigation as typed q.
+      const leavePlacePatch = leavingPlace
+        ? {
+            lat: undefined,
+            lng: undefined,
+            radiusKm: undefined,
+            sort:
+              latest.sort === "distance"
+                ? ("name" as const)
+                : latest.sort,
+          }
+        : {};
       replaceQuery({
         ...latest,
         q: search,
         place: undefined,
-        // Ensure geo clears even if a stale ref still had coords.
-        ...(leavingPlace
-          ? { lat: undefined, lng: undefined, radiusKm: undefined }
-          : {}),
+        ...leavePlacePatch,
         rigLength: stayKindAllowsRigLength(latest.stayKind)
           ? rigLength
           : undefined,

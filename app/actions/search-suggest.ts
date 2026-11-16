@@ -73,7 +73,6 @@ export async function searchSuggestAction(
     const headerStore = await headers();
     const ip = clientIpFromHeaders(headerStore);
     const rateKey = ip ? `photon:ip:${ip}` : "photon:global";
-    const rateOk = geocodeRateLimitAllow(rateKey, { global: !ip });
 
     let places: GeocodedPlace[] = [];
     let placesUnavailable = false;
@@ -83,11 +82,13 @@ export async function searchSuggestAction(
     );
     const campgroundsPromise = suggestCampgrounds(q, SUGGEST_CAMPGROUND_LIMIT);
 
-    if (isNegativeCache(cached) || photonCircuitIsOpen()) {
-      placesUnavailable = true;
-    } else if (cached) {
+    // Positive cache first (serve during outages); circuit/negative skip upstream
+    // only; rate-limit only when we actually call Photon.
+    if (cached && !isNegativeCache(cached)) {
       places = cached;
-    } else if (!rateOk) {
+    } else if (isNegativeCache(cached) || photonCircuitIsOpen()) {
+      placesUnavailable = true;
+    } else if (!geocodeRateLimitAllow(rateKey, { global: !ip })) {
       placesUnavailable = true;
     } else {
       try {
