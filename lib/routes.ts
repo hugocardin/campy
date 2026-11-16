@@ -28,6 +28,7 @@ export const routes = {
 
   auth: () => "/auth",
   profile: () => "/profile",
+  profileEdit: () => "/profile/edit",
   platformAdmin: {
     root: () => "/platformAdmin",
     amenities: () => "/platformAdmin/amenities",
