@@ -7,7 +7,9 @@ import {
 } from "@/lib/canadian-provinces";
 import {
   CAMPGROUND_SORT_CONFIG,
+  CampgroundHookupFilters,
   CampgroundSort,
+  anyHookupFilterActive,
   campgroundRadiusMeters,
   parseCampgroundSort,
   sanitizeCampgroundSearchTerm,
@@ -142,6 +144,14 @@ export const getCampgroundProvinces = cache(
   },
 );
 
+function hookupRpcArgs(hookups: CampgroundHookupFilters) {
+  return {
+    require_electricity: hookups.electricity,
+    require_water: hookups.water,
+    require_sewer: hookups.sewer,
+  };
+}
+
 /** Primitives (not an object) so React `cache` can dedupe by argument identity. */
 export const getCampgrounds = cache(
   async (
@@ -151,6 +161,9 @@ export const getCampgrounds = cache(
     lat?: number,
     lng?: number,
     radiusKm?: number,
+    electricity = false,
+    water = false,
+    sewer = false,
   ): Promise<ActionResult<Campground[]>> => {
     try {
       const supabase = await createClient();
@@ -161,6 +174,12 @@ export const getCampgrounds = cache(
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       // Unknown / malicious ?province= is ignored (All provinces).
       const provinceCode = resolveProvinceCode(province);
+      const hookups: CampgroundHookupFilters = {
+        electricity: Boolean(electricity),
+        water: Boolean(water),
+        sewer: Boolean(sewer),
+      };
+      const hookupsActive = anyHookupFilterActive(hookups);
 
       let provinceAliases: string[] = [];
       if (provinceCode) {
@@ -180,6 +199,7 @@ export const getCampgrounds = cache(
             q: term || null,
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
+            ...hookupRpcArgs(hookups),
           }),
         );
 
@@ -198,13 +218,15 @@ export const getCampgrounds = cache(
       const nonGeoSort =
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
 
-      // Province filter uses search_campgrounds RPC (same lower(btrim) as near-me).
-      // RPC has no LIMIT / ORDER BY — sort here like the unfiltered v_campgrounds path.
-      if (provinceAliases.length > 0) {
+      // Province and/or hookups use search_campgrounds RPC (guest-safe; no PostgREST
+      // amenity filter injection). RPC has no LIMIT / ORDER BY — sort in JS.
+      if (provinceAliases.length > 0 || hookupsActive) {
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds", {
             q: term || null,
-            province_aliases: provinceAliases,
+            province_aliases:
+              provinceAliases.length > 0 ? provinceAliases : null,
+            ...hookupRpcArgs(hookups),
           }),
         );
 

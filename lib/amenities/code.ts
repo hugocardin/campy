@@ -1,3 +1,8 @@
+export {
+  PROTECTED_HOOKUP_AMENITY_CODES,
+  isProtectedHookupAmenityCode,
+} from "./hookup-codes";
+
 /**
  * App-level cap for amenity `code` (UTF-16 length after trim + uppercase).
  * DB column limit is not in-repo (no migrations); keep this conservative so

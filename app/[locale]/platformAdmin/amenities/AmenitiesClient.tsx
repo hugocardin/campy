@@ -8,7 +8,10 @@ import {
   deleteAmenityAction,
 } from "@/app/actions/amenities";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
-import { AMENITY_CODE_MAX_LENGTH } from "@/lib/amenities/code";
+import {
+  AMENITY_CODE_MAX_LENGTH,
+  isProtectedHookupAmenityCode,
+} from "@/lib/amenities/code";
 import {
   AmenityMissingField,
   translateErrorCode,
@@ -71,14 +74,16 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
     errorCode: string | undefined,
     details: Record<string, unknown> | undefined,
   ) => {
+    const message =
+      details?.reason === "hookup_code_protected"
+        ? t_amenities("errors.hookupCodeProtected")
+        : translateErrorCode(errorCode, t_errors, tc("error"), details, {
+            fieldMessages: amenityFieldMessages,
+            fieldTooLongMessages: amenityFieldTooLongMessages,
+          });
     setError(
-      withErrorReference(
-        translateErrorCode(errorCode, t_errors, tc("error"), details, {
-          fieldMessages: amenityFieldMessages,
-          fieldTooLongMessages: amenityFieldTooLongMessages,
-        }),
-        details,
-        (errorId) => tc("errorReference", { errorId }),
+      withErrorReference(message, details, (errorId) =>
+        tc("errorReference", { errorId }),
       ),
     );
   };
@@ -208,14 +213,17 @@ export default function AmenitiesClient({ amenities, categories }: Props) {
                   <TableCell className="text-right">
                     <DeleteButtonWithConfirmation
                       title={t_amenities("actions.deleteAmenityTitle")}
-                      description={t_amenities(
-                        "actions.confirmAmenityDeletion",
-                        {
-                          code: a.code,
-                        },
-                      )}
+                      description={
+                        isProtectedHookupAmenityCode(a.code)
+                          ? t_amenities("errors.hookupCodeProtected")
+                          : t_amenities("actions.confirmAmenityDeletion", {
+                              code: a.code,
+                            })
+                      }
                       onConfirm={() => handleDelete(a.id)}
-                      disabled={submitting}
+                      disabled={
+                        submitting || isProtectedHookupAmenityCode(a.code)
+                      }
                     ></DeleteButtonWithConfirmation>
                   </TableCell>
                 </TableRow>

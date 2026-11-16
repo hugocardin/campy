@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,14 +18,21 @@ import {
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   CampgroundRadiusKm,
-  CampgroundSort,
   DEFAULT_CAMPGROUND_RADIUS_KM,
-  campgroundSortQueryValue,
+  HookupFilterKey,
+  anyHookupFilterActive,
   parseCampgroundGeo,
+  parseCampgroundHookups,
   parseCampgroundSort,
   roundCampgroundCoord,
-  validateCampgroundGeo,
 } from "@/lib/campground-search";
+import {
+  CampgroundQueryState,
+  buildCampgroundSearchParams,
+  clearedCampgroundQueryState,
+  hookupsKey,
+  withLatestCampgroundFilters,
+} from "@/lib/campground-search-query";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -37,16 +46,14 @@ type Props = {
 
 const ALL_PROVINCES = "__all__";
 
-type QueryState = {
-  q: string;
-  sort: CampgroundSort;
-  province: string;
-  lat?: number;
-  lng?: number;
-  radiusKm?: CampgroundRadiusKm;
-};
-
-type LatestParams = Omit<QueryState, "q">;
+const HOOKUP_FILTERS: {
+  key: HookupFilterKey;
+  labelKey: "filterElectricity" | "filterWater" | "filterSewer";
+}[] = [
+  { key: "electricity", labelKey: "filterElectricity" },
+  { key: "water", labelKey: "filterWater" },
+  { key: "sewer", labelKey: "filterSewer" },
+];
 
 export default function CampgroundListControls({
   resultCount,
@@ -71,6 +78,12 @@ export default function CampgroundListControls({
     lng: searchParams.get("lng") ?? undefined,
     radiusKm: searchParams.get("radiusKm") ?? undefined,
   });
+  const urlHookups = parseCampgroundHookups({
+    electricity: searchParams.get("electricity") ?? undefined,
+    water: searchParams.get("water") ?? undefined,
+    sewer: searchParams.get("sewer") ?? undefined,
+  });
+  const urlHookupsKey = hookupsKey(urlHookups);
   const sortParam = parseCampgroundSort(
     searchParams.get("sort") ?? undefined,
     { geoActive: Boolean(geo) },
@@ -83,17 +96,24 @@ export default function CampgroundListControls({
   const [search, setSearch] = useState(qParam);
   const [prevQParam, setPrevQParam] = useState(qParam);
   const [lastPushedQ, setLastPushedQ] = useState(qParam);
+  const [localHookups, setLocalHookups] = useState(urlHookups);
+  const [prevUrlHookupsKey, setPrevUrlHookupsKey] = useState(urlHookupsKey);
+  const [lastPushedHookupsKey, setLastPushedHookupsKey] =
+    useState(urlHookupsKey);
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
-  const latestParamsRef = useRef<LatestParams & { q: string }>({
+  const latestParamsRef = useRef<CampgroundQueryState>({
     q: search,
     sort: sortParam,
     province: provinceParam,
     lat: geo?.lat,
     lng: geo?.lng,
     radiusKm: geo?.radiusKm ?? preferredRadius,
+    electricity: localHookups.electricity,
+    water: localHookups.water,
+    sewer: localHookups.sewer,
   });
 
   // Sync input from URL only for external changes (back/forward / Clear).
@@ -107,6 +127,18 @@ export default function CampgroundListControls({
     }
   }
 
+  // Sync hookup *state* from URL only for external changes (not our pending push).
+  // Ref updates happen in an effect below (react-hooks/refs forbids ref writes in render).
+  if (urlHookupsKey !== prevUrlHookupsKey) {
+    setPrevUrlHookupsKey(urlHookupsKey);
+    if (urlHookupsKey !== lastPushedHookupsKey) {
+      setLastPushedHookupsKey(urlHookupsKey);
+      setLocalHookups(urlHookups);
+    } else {
+      setLocalHookups(urlHookups);
+    }
+  }
+
   // Keep preferred radius in sync when geo URL changes (e.g. back/forward).
   if (geo?.radiusKm != null && geo.radiusKm !== prevGeoRadius) {
     setPrevGeoRadius(geo.radiusKm);
@@ -115,6 +147,9 @@ export default function CampgroundListControls({
     setPrevGeoRadius(undefined);
   }
 
+  // Keep latestParamsRef aligned with URL/search + local hookups. Hookup local
+  // state is optimistic; this effect runs after render so pending toggles that
+  // already updated the ref via replaceQuery are not clobbered by stale URL.
   useEffect(() => {
     latestParamsRef.current = {
       q: search,
@@ -123,6 +158,9 @@ export default function CampgroundListControls({
       lat: geo?.lat,
       lng: geo?.lng,
       radiusKm: geo?.radiusKm ?? preferredRadius,
+      electricity: localHookups.electricity,
+      water: localHookups.water,
+      sewer: localHookups.sewer,
     };
   }, [
     search,
@@ -132,6 +170,9 @@ export default function CampgroundListControls({
     geo?.lng,
     geo?.radiusKm,
     preferredRadius,
+    localHookups.electricity,
+    localHookups.water,
+    localHookups.sewer,
   ]);
 
   useEffect(() => {
@@ -154,39 +195,19 @@ export default function CampgroundListControls({
     setGeoBusy(false);
   }
 
-  function replaceQuery(next: QueryState) {
+  function replaceQuery(next: CampgroundQueryState) {
     const trimmedQ = next.q.trim();
     setLastPushedQ(trimmedQ);
-    latestParamsRef.current = {
-      q: next.q,
-      sort: next.sort,
-      province: next.province,
-      lat: next.lat,
-      lng: next.lng,
-      radiusKm: next.radiusKm,
-    };
+    const nextHookupsKey = hookupsKey(next);
+    setLastPushedHookupsKey(nextHookupsKey);
+    setLocalHookups({
+      electricity: next.electricity,
+      water: next.water,
+      sewer: next.sewer,
+    });
+    latestParamsRef.current = next;
 
-    const params = new URLSearchParams();
-    if (trimmedQ) {
-      params.set("q", trimmedQ);
-    }
-    const geo = validateCampgroundGeo(next.lat, next.lng, next.radiusKm);
-    const sortQuery = campgroundSortQueryValue(next.sort, Boolean(geo));
-    if (sortQuery) {
-      params.set("sort", sortQuery);
-    }
-    if (next.province) {
-      params.set(
-        "province",
-        provinceFilterKey(next.province) ?? next.province,
-      );
-    }
-    if (geo) {
-      params.set("lat", String(geo.lat));
-      params.set("lng", String(geo.lng));
-      params.set("radiusKm", String(geo.radiusKm));
-    }
-
+    const params = buildCampgroundSearchParams(next);
     const query = params.toString();
     startTransition(() => {
       router.replace(query ? `${pathname}?${query}` : pathname);
@@ -200,14 +221,10 @@ export default function CampgroundListControls({
     clearDebounce();
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
-      const { sort, province, lat, lng, radiusKm } = latestParamsRef.current;
+      const latest = latestParamsRef.current;
       replaceQuery({
+        ...latest,
         q: search,
-        sort,
-        province,
-        lat,
-        lng,
-        radiusKm,
       });
     }, 300);
 
@@ -232,14 +249,15 @@ export default function CampgroundListControls({
         clearDebounce();
         const radiusKm =
           latestParamsRef.current.radiusKm ?? preferredRadius;
-        replaceQuery({
-          q: latestParamsRef.current.q,
-          sort: "distance",
-          province: latestParamsRef.current.province,
-          lat: roundCampgroundCoord(pos.coords.latitude),
-          lng: roundCampgroundCoord(pos.coords.longitude),
-          radiusKm,
-        });
+        replaceQuery(
+          withLatestCampgroundFilters(latestParamsRef.current, {
+            q: latestParamsRef.current.q,
+            sort: "distance",
+            lat: roundCampgroundCoord(pos.coords.latitude),
+            lng: roundCampgroundCoord(pos.coords.longitude),
+            radiusKm,
+          }),
+        );
       },
       (err) => {
         if (cancelledRef.current || requestId !== geoRequestIdRef.current) {
@@ -273,154 +291,191 @@ export default function CampgroundListControls({
       a.label.localeCompare(b.label, locale, { sensitivity: "base" }),
     );
 
-  const hasFilters = Boolean(search || provinceParam || geo);
-  const controlsDisabled = geoBusy;
+  const hasFilters = Boolean(
+    search ||
+      provinceParam ||
+      geo ||
+      anyHookupFilterActive(localHookups),
+  );
+  // Discrete controls only — keep the search input enabled during isPending so
+  // typing is not blurred/lost while router.replace transitions.
+  const discreteControlsDisabled = geoBusy || isPending;
 
   return (
     <div
-      className={`space-y-4 md:space-y-0 md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 ${isPending || geoBusy ? "opacity-80" : ""}`}
+      className={`space-y-4 ${isPending || geoBusy ? "opacity-80" : ""}`}
     >
-      <div className="relative flex-1 min-w-48">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder={t("searchPlaceholder")}
-          className="pl-10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label={t("searchPlaceholder")}
-          disabled={controlsDisabled}
-        />
-      </div>
+      <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t("searchPlaceholder")}
+            className="pl-10"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={t("searchPlaceholder")}
+            disabled={geoBusy}
+          />
+        </div>
 
-      <Select
-        value={sortParam}
-        disabled={controlsDisabled}
-        onValueChange={(value) => {
-          clearDebounce();
-          replaceQuery({
-            q: search,
-            sort: parseCampgroundSort(value, { geoActive: Boolean(geo) }),
-            province: latestParamsRef.current.province,
-            lat: latestParamsRef.current.lat,
-            lng: latestParamsRef.current.lng,
-            radiusKm: latestParamsRef.current.radiusKm,
-          });
-        }}
-      >
-        <SelectTrigger className="w-45">
-          <SelectValue placeholder={t("sortLabel")} />
-        </SelectTrigger>
-        <SelectContent>
-          {geo ? (
-            <SelectItem value="distance">{t("sortDistance")}</SelectItem>
-          ) : null}
-          <SelectItem value="name">{t("sortNameAsc")}</SelectItem>
-          <SelectItem value="name-desc">{t("sortNameDesc")}</SelectItem>
-          <SelectItem value="city">{t("sortCity")}</SelectItem>
-          <SelectItem value="province">{t("sortProvince")}</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={provinceParam || ALL_PROVINCES}
-        disabled={controlsDisabled}
-        onValueChange={(value) => {
-          clearDebounce();
-          replaceQuery({
-            q: search,
-            sort: latestParamsRef.current.sort,
-            province: value === ALL_PROVINCES ? "" : value,
-            lat: latestParamsRef.current.lat,
-            lng: latestParamsRef.current.lng,
-            radiusKm: latestParamsRef.current.radiusKm,
-          });
-        }}
-      >
-        <SelectTrigger className="w-56">
-          <SelectValue placeholder={t("provinceLabel")} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_PROVINCES}>{t("provinceAll")}</SelectItem>
-          {provinceOptions.map(({ key, label }) => (
-            <SelectItem key={key} value={key}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {geo ? (
         <Select
-          value={String(geo.radiusKm)}
-          disabled={controlsDisabled}
+          value={sortParam}
+          disabled={discreteControlsDisabled}
           onValueChange={(value) => {
             clearDebounce();
-            const nextRadius = (CAMPGROUND_RADIUS_KM_PRESETS as readonly number[]).includes(
-              Number(value),
-            )
-              ? (Number(value) as CampgroundRadiusKm)
-              : DEFAULT_CAMPGROUND_RADIUS_KM;
-            setPreferredRadius(nextRadius);
-            replaceQuery({
-              q: search,
-              sort: latestParamsRef.current.sort,
-              province: latestParamsRef.current.province,
-              lat: latestParamsRef.current.lat,
-              lng: latestParamsRef.current.lng,
-              radiusKm: nextRadius,
-            });
+            replaceQuery(
+              withLatestCampgroundFilters(latestParamsRef.current, {
+                q: search,
+                sort: parseCampgroundSort(value, { geoActive: Boolean(geo) }),
+              }),
+            );
           }}
         >
-          <SelectTrigger className="w-40" aria-label={t("radiusLabel")}>
-            <SelectValue placeholder={t("radiusLabel")} />
+          <SelectTrigger className="w-45">
+            <SelectValue placeholder={t("sortLabel")} />
           </SelectTrigger>
           <SelectContent>
-            {CAMPGROUND_RADIUS_KM_PRESETS.map((km) => (
-              <SelectItem key={km} value={String(km)}>
-                {t("radiusKm", { km })}
+            {geo ? (
+              <SelectItem value="distance">{t("sortDistance")}</SelectItem>
+            ) : null}
+            <SelectItem value="name">{t("sortNameAsc")}</SelectItem>
+            <SelectItem value="name-desc">{t("sortNameDesc")}</SelectItem>
+            <SelectItem value="city">{t("sortCity")}</SelectItem>
+            <SelectItem value="province">{t("sortProvince")}</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={provinceParam || ALL_PROVINCES}
+          disabled={discreteControlsDisabled}
+          onValueChange={(value) => {
+            clearDebounce();
+            replaceQuery(
+              withLatestCampgroundFilters(latestParamsRef.current, {
+                q: search,
+                sort: latestParamsRef.current.sort,
+                province: value === ALL_PROVINCES ? "" : value,
+              }),
+            );
+          }}
+        >
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder={t("provinceLabel")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_PROVINCES}>{t("provinceAll")}</SelectItem>
+            {provinceOptions.map(({ key, label }) => (
+              <SelectItem key={key} value={key}>
+                {label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      ) : null}
 
-      <Button
-        type="button"
-        variant={geo ? "default" : "outline"}
-        onClick={onNearMe}
-        disabled={geoBusy}
-        aria-label={t("nearMe")}
-      >
-        <LocateFixed className="h-4 w-4" />
-        {geoBusy ? t("nearMeLocating") : t("nearMe")}
-      </Button>
+        {geo ? (
+          <Select
+            value={String(geo.radiusKm)}
+            disabled={discreteControlsDisabled}
+            onValueChange={(value) => {
+              clearDebounce();
+              const nextRadius = (CAMPGROUND_RADIUS_KM_PRESETS as readonly number[]).includes(
+                Number(value),
+              )
+                ? (Number(value) as CampgroundRadiusKm)
+                : DEFAULT_CAMPGROUND_RADIUS_KM;
+              setPreferredRadius(nextRadius);
+              replaceQuery(
+                withLatestCampgroundFilters(latestParamsRef.current, {
+                  q: search,
+                  sort: latestParamsRef.current.sort,
+                  radiusKm: nextRadius,
+                }),
+              );
+            }}
+          >
+            <SelectTrigger className="w-40" aria-label={t("radiusLabel")}>
+              <SelectValue placeholder={t("radiusLabel")} />
+            </SelectTrigger>
+            <SelectContent>
+              {CAMPGROUND_RADIUS_KM_PRESETS.map((km) => (
+                <SelectItem key={km} value={String(km)}>
+                  {t("radiusKm", { km })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
 
-      {hasFilters || geoBusy ? (
         <Button
           type="button"
-          variant="outline"
-          onClick={() => {
-            clearDebounce();
-            cancelGeolocation();
-            setSearch("");
-            setGeoError(null);
-            replaceQuery({
-              q: "",
-              sort: "name",
-              province: "",
-            });
-          }}
+          variant={geo ? "default" : "outline"}
+          onClick={onNearMe}
+          disabled={discreteControlsDisabled}
+          aria-label={t("nearMe")}
         >
-          {t("clearFilters")}
+          <LocateFixed className="h-4 w-4" />
+          {geoBusy ? t("nearMeLocating") : t("nearMe")}
         </Button>
-      ) : null}
 
-      <div className="text-sm text-muted-foreground md:ml-auto">
-        {t("resultCount", { count: resultCount })}
+        {hasFilters || geoBusy ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={discreteControlsDisabled}
+            onClick={() => {
+              clearDebounce();
+              cancelGeolocation();
+              setSearch("");
+              setGeoError(null);
+              replaceQuery(clearedCampgroundQueryState());
+            }}
+          >
+            {t("clearFilters")}
+          </Button>
+        ) : null}
+
+        <div className="text-sm text-muted-foreground md:ml-auto">
+          {t("resultCount", { count: resultCount })}
+        </div>
       </div>
 
+      <fieldset
+        className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
+        disabled={discreteControlsDisabled}
+      >
+        <legend className="text-sm font-medium text-foreground mr-1 float-left">
+          {t("hookupsLabel")}
+        </legend>
+        {HOOKUP_FILTERS.map(({ key, labelKey }) => {
+          const id = `hookup-${key}`;
+          return (
+            <div key={key} className="flex items-center gap-2">
+              <Checkbox
+                id={id}
+                checked={localHookups[key]}
+                disabled={discreteControlsDisabled}
+                onCheckedChange={(checked) => {
+                  clearDebounce();
+                  replaceQuery(
+                    withLatestCampgroundFilters(latestParamsRef.current, {
+                      q: search,
+                      sort: latestParamsRef.current.sort,
+                      [key]: checked === true,
+                    }),
+                  );
+                }}
+              />
+              <Label htmlFor={id} className="font-normal cursor-pointer">
+                {t(labelKey)}
+              </Label>
+            </div>
+          );
+        })}
+      </fieldset>
+      <p className="text-xs text-muted-foreground">{t("hookupsHint")}</p>
+
       {geoError ? (
-        <p className="basis-full text-sm text-destructive" role="status">
+        <p className="text-sm text-destructive" role="status">
           {geoError}
         </p>
       ) : null}

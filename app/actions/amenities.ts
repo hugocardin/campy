@@ -8,7 +8,10 @@ import {
   resultError,
   resultSuccess,
 } from "@/lib/errors";
-import { normalizeAmenityCode } from "@/lib/amenities/code";
+import {
+  isProtectedHookupAmenityCode,
+  normalizeAmenityCode,
+} from "@/lib/amenities/code";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
@@ -98,6 +101,19 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
 
     const supabase = await createClient();
 
+    const existing = await handleDbSingle(
+      supabase.from("amenities").select("id, code").eq("id", id).single(),
+    );
+    if (!existing.success) {
+      return existing;
+    }
+    if (isProtectedHookupAmenityCode(existing.data.code)) {
+      return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
+        reason: "hookup_code_protected",
+        field: AmenityMissingField.code,
+      });
+    }
+
     const { data, error } = await supabase
       .from("amenities")
       .delete()
@@ -108,6 +124,13 @@ export async function deleteAmenityAction(id: string): Promise<ActionResult> {
       if (error.code === "23503") {
         return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
           reason: "resource_in_use",
+        });
+      }
+      // DB trigger protect_hookup_amenity_codes → check_violation (23514)
+      if (error.code === "23514") {
+        return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
+          reason: "hookup_code_protected",
+          field: AmenityMissingField.code,
         });
       }
       return mapPostgrestError(error);
