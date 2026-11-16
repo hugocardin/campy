@@ -4,12 +4,12 @@ import { suggestCampgrounds } from "@/data/campgrounds/suggest-campgrounds";
 import { clientIpFromHeaders } from "@/lib/geocoding/client-ip";
 import { geocodeCacheGet, geocodeCacheSet } from "@/lib/geocoding/geocode-cache";
 import {
-  photonCircuitIsOpen,
+  photonCircuitIsOpenLocal,
   photonCircuitRecordFailure,
   photonCircuitRecordSuccess,
 } from "@/lib/geocoding/photon-circuit";
 import { searchPhotonPlaces } from "@/lib/geocoding/photon";
-import { geocodeRateLimitAllow } from "@/lib/geocoding/rate-limit";
+import { geocodeRateLimitAllowPhoton } from "@/lib/geocoding/rate-limit";
 import {
   SUGGEST_CAMPGROUND_LIMIT,
   SUGGEST_MIN_CHARS,
@@ -72,7 +72,6 @@ export async function searchSuggestAction(
 
     const headerStore = await headers();
     const ip = clientIpFromHeaders(headerStore);
-    const rateKey = ip ? `photon:ip:${ip}` : "photon:global";
 
     let places: GeocodedPlace[] = [];
     let placesUnavailable = false;
@@ -82,13 +81,13 @@ export async function searchSuggestAction(
     );
     const campgroundsPromise = suggestCampgrounds(q, SUGGEST_CAMPGROUND_LIMIT);
 
-    // Positive cache first (serve during outages); circuit/negative skip upstream
-    // only; rate-limit only when we actually call Photon.
+    // Positive cache first; shared admit is one round trip (circuit+IP+upstream).
+    // Circuit success/failure recording is fire-and-forget (not on the hot path).
     if (cached && !isNegativeCache(cached)) {
       places = cached;
-    } else if (isNegativeCache(cached) || photonCircuitIsOpen()) {
+    } else if (isNegativeCache(cached) || photonCircuitIsOpenLocal()) {
       placesUnavailable = true;
-    } else if (!geocodeRateLimitAllow(rateKey, { global: !ip })) {
+    } else if (!(await geocodeRateLimitAllowPhoton(ip))) {
       placesUnavailable = true;
     } else {
       try {

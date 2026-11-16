@@ -5,6 +5,8 @@ import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   HOOKUP_AMENITY_CODES,
+  SEARCH_CAMPGROUNDS_LIMIT,
+  SEARCH_CAMPGROUNDS_RPC_MAX,
   anyHookupFilterActive,
   anySiteFilterActive,
   campgroundRadiusMeters,
@@ -23,6 +25,15 @@ import {
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
 } from "./campground-search";
+
+describe("SEARCH_CAMPGROUNDS_LIMIT vs RPC max", () => {
+  it("allows LIMIT+1 probe within the SQL clamp", () => {
+    assert.ok(
+      SEARCH_CAMPGROUNDS_LIMIT + 1 <= SEARCH_CAMPGROUNDS_RPC_MAX,
+      `SEARCH_CAMPGROUNDS_LIMIT+1 (${SEARCH_CAMPGROUNDS_LIMIT + 1}) must be ≤ SEARCH_CAMPGROUNDS_RPC_MAX (${SEARCH_CAMPGROUNDS_RPC_MAX})`,
+    );
+  });
+});
 
 describe("parseCampgroundPlaceLabel", () => {
   it("trims, strips controls, and caps length", () => {

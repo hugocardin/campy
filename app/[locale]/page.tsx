@@ -104,7 +104,7 @@ export default async function Home({ searchParams }: PageProps) {
     );
   }
 
-  const campgrounds = campgroundsResult.data;
+  const { campgrounds, truncated } = campgroundsResult.data;
   const provinces = provincesResult.success ? provincesResult.data : [];
   const tControls = await getTranslations("search.controls");
   // Same axes as getCampgrounds; sort omitted — see campgroundSearchKey.
@@ -128,6 +128,7 @@ export default async function Home({ searchParams }: PageProps) {
           >
             <CampgroundListControls
               resultCount={campgrounds.length}
+              resultsTruncated={truncated}
               provinces={provinces}
             />
           </Suspense>
@@ -137,15 +138,24 @@ export default async function Home({ searchParams }: PageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 flex-1 min-h-0">
             <div className="flex flex-col min-h-75 lg:min-h-0 rounded-xl border border-border overflow-hidden">
               <div className="flex-1 relative min-h-75">
-                <CampgroundsMapDynamic
-                  campgrounds={campgrounds}
-                  searchCenter={
-                    geo ? { lat: geo.lat, lng: geo.lng } : undefined
+                <Suspense
+                  fallback={
+                    <div className="absolute inset-0 flex items-center justify-center bg-muted/40 text-muted-foreground">
+                      <p className="text-sm">{tControls("mapLoading")}</p>
+                    </div>
                   }
-                  radiusKm={geo?.radiusKm}
-                  searchKey={mapSearchKey}
-                  detailQuery={detailQuery}
-                />
+                >
+                  <CampgroundsMapDynamic
+                    campgrounds={campgrounds}
+                    searchCenter={
+                      geo ? { lat: geo.lat, lng: geo.lng } : undefined
+                    }
+                    radiusKm={geo?.radiusKm}
+                    searchKey={mapSearchKey}
+                    searchQuery={q}
+                    detailQuery={detailQuery}
+                  />
+                </Suspense>
               </div>
             </div>
 
@@ -163,7 +173,9 @@ export default async function Home({ searchParams }: PageProps) {
                   <div className="p-6">
                     {campgrounds.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-12">
-                        {tControls("noResults")}
+                        {q?.trim()
+                          ? tControls("noResultsFor", { query: q.trim() })
+                          : tControls("noResults")}
                       </p>
                     ) : (
                       <CampgroundList

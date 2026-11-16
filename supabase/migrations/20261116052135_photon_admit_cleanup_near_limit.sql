@@ -1,0 +1,255 @@
+-- PR #39 follow-up: rare idle-bucket cleanup + near result_limit for truncation.
+-- Applied live; filename renamed to match schema_migrations version after apply.
+
+CREATE INDEX IF NOT EXISTS geocode_rate_buckets_updated_at_idx
+  ON public.geocode_rate_buckets (updated_at);
+
+CREATE OR REPLACE FUNCTION public.photon_proxy_admit(p_client_key text DEFAULT NULL)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_client text;
+  v_ip_cap constant double precision := 8;
+  v_ip_refill constant double precision := 1.0 / 500.0;
+  v_up_cap constant double precision := 40;
+  v_up_refill constant double precision := 1.0 / 100.0;
+BEGIN
+  -- ~1% of admits: drop idle IP buckets (>1h). Avoids hot-path DELETE every call.
+  IF random() < 0.01 THEN
+    DELETE FROM public.geocode_rate_buckets
+    WHERE bucket_key LIKE 'photon:ip:%'
+      AND updated_at < clock_timestamp() - interval '1 hour';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.photon_circuit_state AS s
+    WHERE s.id = 1
+      AND s.open_until IS NOT NULL
+      AND s.open_until > clock_timestamp()
+  ) THEN
+    RETURN 'circuit_open';
+  END IF;
+
+  v_client := nullif(left(btrim(coalesce(p_client_key, '')), 200), '');
+  IF v_client IS NOT NULL THEN
+    IF v_client NOT LIKE 'photon:ip:%' THEN
+      RETURN 'limited';
+    END IF;
+    IF NOT public._geocode_rate_limit_take_fixed(v_client, v_ip_cap, v_ip_refill) THEN
+      RETURN 'limited';
+    END IF;
+  END IF;
+
+  IF NOT public._geocode_rate_limit_take_fixed(
+    'photon:upstream',
+    v_up_cap,
+    v_up_refill
+  ) THEN
+    RETURN 'limited';
+  END IF;
+
+  RETURN 'ok';
+END;
+$$;
+
+COMMENT ON FUNCTION public.photon_proxy_admit(text) IS
+  'Service-role Photon gate: circuit + IP-first + upstream; rare idle cleanup (#24/#39).';
+
+-- Expand near with optional result_limit (default 200, max 201 for truncation probe).
+DROP FUNCTION IF EXISTS public.search_campgrounds_near(
+  double precision, double precision, double precision, text, text[],
+  smallint[], boolean, boolean, boolean, text, numeric, text
+);
+
+CREATE OR REPLACE FUNCTION public.search_campgrounds_near(
+  lat double precision,
+  lng double precision,
+  radius_m double precision,
+  q text DEFAULT NULL,
+  province_aliases text[] DEFAULT NULL,
+  require_amps smallint[] DEFAULT NULL,
+  require_water boolean DEFAULT false,
+  require_sewer boolean DEFAULT false,
+  require_dump_station boolean DEFAULT false,
+  require_driveway_type text DEFAULT NULL,
+  min_rig_length numeric DEFAULT NULL,
+  stay_kind text DEFAULT NULL,
+  result_limit integer DEFAULT 200
+)
+RETURNS TABLE (
+  id uuid,
+  name text,
+  description text,
+  address text,
+  city text,
+  province text,
+  country text,
+  website text,
+  phone text,
+  latitude double precision,
+  longitude double precision,
+  distance_m double precision
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_limit integer;
+BEGIN
+  PERFORM public.campground_search_prepare();
+  v_limit := least(greatest(coalesce(result_limit, 200), 1), 201);
+
+  RETURN QUERY
+  WITH params AS (
+    SELECT
+      search_campgrounds_near.lat AS lat,
+      search_campgrounds_near.lng AS lng,
+      search_campgrounds_near.radius_m AS radius_raw,
+      nullif(left(btrim(coalesce(search_campgrounds_near.q, '')), 100), '') AS q_raw,
+      nullif(
+        replace(
+          replace(
+            replace(
+              left(btrim(coalesce(search_campgrounds_near.q, '')), 100),
+              '\',
+              '\\'
+            ),
+            '%',
+            '\%'
+          ),
+          '_',
+          '\_'
+        ),
+        ''
+      ) AS q_pat,
+      CASE
+        WHEN search_campgrounds_near.province_aliases IS NULL THEN NULL
+        WHEN cardinality(search_campgrounds_near.province_aliases) = 0 THEN ARRAY[]::text[]
+        WHEN cardinality(search_campgrounds_near.province_aliases) > 32 THEN ARRAY[]::text[]
+        ELSE coalesce(
+          (
+            SELECT array_agg(lower(btrim(a)))
+            FROM unnest(search_campgrounds_near.province_aliases) AS a
+            WHERE btrim(a) <> ''
+              AND char_length(btrim(a)) <= 100
+          ),
+          ARRAY[]::text[]
+        )
+      END AS province_aliases_norm,
+      n.amps_filter,
+      n.required_codes,
+      coalesce(search_campgrounds_near.require_dump_station, false) AS require_dump,
+      n.driveway_filter,
+      n.min_rig,
+      n.stay_kind_norm
+    FROM public.normalize_campground_site_filter_params(
+      search_campgrounds_near.require_amps,
+      search_campgrounds_near.require_water,
+      search_campgrounds_near.require_sewer,
+      search_campgrounds_near.require_driveway_type,
+      search_campgrounds_near.min_rig_length,
+      search_campgrounds_near.stay_kind
+    ) AS n
+  ),
+  origin AS (
+    SELECT
+      public.ST_SetSRID(
+        public.ST_MakePoint(p.lng, p.lat),
+        4326
+      )::public.geography AS geog,
+      least(greatest(p.radius_raw, 0), 200000) AS radius_m,
+      p.q_pat,
+      p.q_raw,
+      p.province_aliases_norm,
+      p.amps_filter,
+      p.required_codes,
+      p.require_dump,
+      p.driveway_filter,
+      p.min_rig,
+      p.stay_kind_norm
+    FROM params AS p
+    WHERE p.lat IS NOT NULL
+      AND p.lng IS NOT NULL
+      AND p.radius_raw IS NOT NULL
+      AND p.lat NOT IN ('NaN'::float8, 'Infinity'::float8, '-Infinity'::float8)
+      AND p.lng NOT IN ('NaN'::float8, 'Infinity'::float8, '-Infinity'::float8)
+      AND p.radius_raw NOT IN ('NaN'::float8, 'Infinity'::float8, '-Infinity'::float8)
+      AND p.lat BETWEEN -90 AND 90
+      AND p.lng BETWEEN -180 AND 180
+      AND NOT (p.lat = 0 AND p.lng = 0)
+  )
+  SELECT
+    c.id,
+    c.name,
+    c.description,
+    c.address,
+    c.city,
+    c.province,
+    c.country,
+    c.website,
+    c.phone,
+    public.st_y(c.location::public.geometry) AS latitude,
+    public.st_x(c.location::public.geometry) AS longitude,
+    public.ST_Distance(c.location, o.geog) AS distance_m
+  FROM public.campgrounds AS c
+  CROSS JOIN origin AS o
+  WHERE c.active = true
+    AND c.location IS NOT NULL
+    AND public.ST_DWithin(c.location, o.geog, o.radius_m)
+    AND public.campground_text_matches(c.name, c.city, c.province, o.q_pat, o.q_raw)
+    AND (
+      o.province_aliases_norm IS NULL
+      OR lower(btrim(c.province)) = ANY (o.province_aliases_norm)
+    )
+    AND (
+      NOT o.require_dump
+      OR EXISTS (
+        SELECT 1
+        FROM public.campground_amenities AS ca
+        JOIN public.amenities AS am ON am.id = ca.amenity_id
+        WHERE ca.campground_id = c.id
+          AND am.code = 'DUMP_STATION'
+      )
+    )
+    AND (
+      (
+        cardinality(o.amps_filter) = 0
+        AND cardinality(o.required_codes) = 0
+        AND o.driveway_filter IS NULL
+        AND o.min_rig IS NULL
+        AND o.stay_kind_norm IS NULL
+      )
+      OR public.campground_has_matching_site(
+        c.id,
+        o.amps_filter,
+        o.required_codes,
+        o.driveway_filter,
+        o.min_rig,
+        o.stay_kind_norm
+      )
+    )
+  ORDER BY distance_m ASC, c.name ASC, c.id ASC
+  LIMIT v_limit;
+END;
+$$;
+
+COMMENT ON FUNCTION public.search_campgrounds_near(
+  double precision, double precision, double precision, text, text[],
+  smallint[], boolean, boolean, boolean, text, numeric, text, integer
+) IS
+  'Guest geo search; ORDER BY distance; result_limit ≤201 for truncation probe (#24/#39).';
+
+REVOKE ALL ON FUNCTION public.search_campgrounds_near(
+  double precision, double precision, double precision, text, text[],
+  smallint[], boolean, boolean, boolean, text, numeric, text, integer
+) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.search_campgrounds_near(
+  double precision, double precision, double precision, text, text[],
+  smallint[], boolean, boolean, boolean, text, numeric, text, integer
+) TO anon, authenticated;
