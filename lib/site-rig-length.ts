@@ -1,8 +1,7 @@
 /**
  * Site-type rules for `max_rig_length` (issue #27).
- * Keep in sync with SQL `site_max_rig_length_valid`
- * (`supabase/migrations/20261116022329_dump_driveway_rig_search.sql`
- * + `20261116023948` / `20261116024448` trigger follow-ups).
+ * Keep in sync with SQL `sites_enforce_type_attributes`
+ * (`supabase/migrations/20261116024448_*` / `20261116024947_*`).
  * Codes are duplicated in SQL/TS intentionally for now;
  * a `site_types` flag column can centralize later.
  *

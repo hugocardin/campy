@@ -249,6 +249,8 @@ export default function CampgroundListControls({
     localFilters,
   ]);
 
+  // Sync ref after render-time setRigDraft (external URL sync). Event handlers
+  // must use updateRigDraft so the ref is current before the next paint.
   useEffect(() => {
     rigDraftRef.current = rigDraft;
   }, [rigDraft]);
@@ -268,23 +270,31 @@ export default function CampgroundListControls({
     }
   }
 
+  function updateRigDraft(value: string) {
+    rigDraftRef.current = value;
+    setRigDraft(value);
+  }
+
+  /** Parse the live draft; clear the field when a non-empty value is invalid. */
+  function resolveRigDraft(): number | undefined {
+    const draft = rigDraftRef.current;
+    const parsed = parseGuestRigLength(draft);
+    if (draft.trim() !== "" && parsed == null) {
+      updateRigDraft("");
+    }
+    return parsed;
+  }
+
   /**
    * Cancel a pending rig debounce and return the draft value (flush into next patch).
    * Always reads `rigDraftRef` so timers started on an older search render still see
    * the latest typed length.
    */
   function takePendingRigLength(): number | undefined {
-    const draft = rigDraftRef.current;
     if (rigDebounceRef.current != null) {
       window.clearTimeout(rigDebounceRef.current);
       rigDebounceRef.current = null;
-      const parsed = parseGuestRigLength(draft);
-      // Dropped/invalid draft (e.g. >200) — clear the field so UI matches the URL.
-      if (draft.trim() !== "" && parsed == null) {
-        setRigDraft("");
-        rigDraftRef.current = "";
-      }
-      return parsed;
+      return resolveRigDraft();
     }
     return latestParamsRef.current.rigLength;
   }
@@ -310,8 +320,7 @@ export default function CampgroundListControls({
     });
     // Do not overwrite mid-typing rigDraft here — external URL sync does that.
     if (!stayKindAllowsRigLength(next.stayKind)) {
-      setRigDraft("");
-      rigDraftRef.current = "";
+      updateRigDraft("");
     }
     latestParamsRef.current = next;
 
@@ -572,8 +581,7 @@ export default function CampgroundListControls({
               }
               cancelGeolocation();
               setSearch("");
-              setRigDraft("");
-              rigDraftRef.current = "";
+              updateRigDraft("");
               setGeoError(null);
               replaceQuery(clearedCampgroundQueryState());
             }}
@@ -729,26 +737,17 @@ export default function CampgroundListControls({
                 disabled={geoBusy}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setRigDraft(value);
-                  rigDraftRef.current = value;
+                  updateRigDraft(value);
                   if (rigDebounceRef.current != null) {
                     window.clearTimeout(rigDebounceRef.current);
                   }
                   rigDebounceRef.current = window.setTimeout(() => {
                     rigDebounceRef.current = null;
-                    const parsed = parseGuestRigLength(rigDraftRef.current);
-                    if (
-                      rigDraftRef.current.trim() !== "" &&
-                      parsed == null
-                    ) {
-                      setRigDraft("");
-                      rigDraftRef.current = "";
-                    }
                     replaceQuery(
                       withLatestCampgroundFilters(latestParamsRef.current, {
                         q: latestParamsRef.current.q,
                         sort: latestParamsRef.current.sort,
-                        rigLength: parsed,
+                        rigLength: resolveRigDraft(),
                       }),
                     );
                   }, 300);
