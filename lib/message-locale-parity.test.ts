@@ -39,6 +39,7 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   // SI metre abbreviation is identical in en-CA / fr-CA
   "search.controls.rigLengthUnitM",
   "sites.form.rigLengthUnitM",
+  "profile.form.rigLengthUnitM",
 
   // Official names identical in en-CA / fr-CA
   "search.provinces.AB",

@@ -6,8 +6,18 @@ import { createClient } from "@/lib/supabase/server";
 type ProfileWithRoleNameRow = {
   full_name: string | null;
   email: string | null;
+  default_rig_length: number | string | null;
   role_name: { code: string };
 };
+
+function toDefaultRigLength(
+  value: number | string | null,
+): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
 
 function toDomain(row: ProfileWithRoleNameRow, userId: string): UserProfile {
   return {
@@ -15,6 +25,7 @@ function toDomain(row: ProfileWithRoleNameRow, userId: string): UserProfile {
     role_name: row.role_name.code,
     full_name: (row.full_name ?? "").trim(),
     email: (row.email ?? "").trim(),
+    default_rig_length: toDefaultRigLength(row.default_rig_length),
   };
 }
 
@@ -29,7 +40,7 @@ export const getUserProfile = async (
         .from("profiles")
         .select(
           `
-        full_name, email,
+        full_name, email, default_rig_length,
         role_name:user_roles ( code )
         `,
         )

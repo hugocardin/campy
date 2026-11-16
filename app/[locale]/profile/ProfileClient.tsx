@@ -1,12 +1,15 @@
 "use client";
 
 import { EditButton } from "@/components/buttons/EditButton";
+import FormattedRigLength from "@/components/rig-length/FormattedRigLength";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserProfile } from "@/entities/user-profile";
+import { getInitials } from "@/lib/person-initials";
+import { routes } from "@/lib/routes";
 import { User } from "@supabase/supabase-js";
-import { Calendar, Mail } from "lucide-react";
+import { Calendar, Mail, Ruler } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 
 type Props = {
@@ -17,13 +20,7 @@ type Props = {
 export default function ProfileClient({ profile, user }: Props) {
   const t_profile = useTranslations("profile");
 
-  const initials = profile.full_name
-    ? profile.full_name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-    : profile.email?.[0]?.toUpperCase();
+  const initials = getInitials(profile.full_name, profile.email);
 
   const currentLocale = useLocale();
   const joinedDate = new Date(user.created_at).toLocaleDateString(
@@ -62,7 +59,7 @@ export default function ProfileClient({ profile, user }: Props) {
                   {profile.role_name}
                 </Badge>
 
-                <EditButton href="" />
+                <EditButton href={routes.profileEdit()} />
               </div>
             </div>
 
@@ -70,7 +67,7 @@ export default function ProfileClient({ profile, user }: Props) {
             <div className="flex-1 space-y-5 pt-1 sm:pt-3">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  {profile.full_name}
+                  {profile.full_name || t_profile("form.nameUnset")}
                 </h1>
                 <p className="text-muted-foreground mt-1 flex items-center gap-2">
                   <Mail className="h-4 w-4" />
@@ -85,6 +82,16 @@ export default function ProfileClient({ profile, user }: Props) {
                     {t_profile("form.joined")}
                   </dt>
                   <dd className="text-base font-medium">{joinedDate}</dd>
+                </div>
+
+                <div className="space-y-1">
+                  <dt className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Ruler className="h-4 w-4" />
+                    {t_profile("form.defaultRigLengthLabel")}
+                  </dt>
+                  <dd className="text-base font-medium">
+                    <FormattedRigLength feet={profile.default_rig_length} />
+                  </dd>
                 </div>
               </dl>
             </div>

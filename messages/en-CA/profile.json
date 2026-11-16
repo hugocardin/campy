@@ -4,9 +4,26 @@
 
   "form": {
     "fullname": "Full Name",
+    "namePlaceholder": "Your name",
+    "nameUnset": "No name set",
     "email": "Email",
+    "emailReadOnlyHint": "Email is managed by your sign-in account.",
     "role": "Role",
-    "joined": "Joined"
+    "joined": "Joined",
+    "defaultRigLengthLabel": "Default rig length",
+    "defaultRigLengthHint": "Saved for future searches. Leave blank if you have no default.",
+    "rigLengthPlaceholderFt": "e.g. 35",
+    "rigLengthPlaceholderM": "e.g. 11",
+    "rigLengthUnitGroupLabel": "Length unit",
+    "rigLengthUnitFt": "ft",
+    "rigLengthUnitM": "m",
+    "rigLengthStoredHint": "Saved in feet."
+  },
+
+  "errors": {
+    "nameRequired": "Please enter your name",
+    "nameTooLong": "Name is too long ({max, number} characters max)",
+    "invalidRigLength": "Enter a positive length up to {max, number} {unit}, or leave blank"
   },
 
   "ProfilePage": {
@@ -17,6 +34,17 @@
     "meta": {
       "title": "Profile | Campy",
       "description": "Manage your bookings, preferences and account settings on Campy."
+    }
+  },
+
+  "ProfileEditPage": {
+    "pageHeader": {
+      "title": "Edit profile",
+      "description": "Update your name and default rig length"
+    },
+    "meta": {
+      "title": "Edit profile | Campy",
+      "description": "Edit your Campy profile name and default rig length."
     }
   }
 }
