@@ -4,7 +4,6 @@ import {
   GEOCODE_COUNTRY_ALLOWLIST,
   type GeocodeCountryCode,
   type GeocodedPlace,
-  SUGGEST_PLACE_LIMIT,
 } from "@/lib/geocoding/types";
 import { buildPhotonSearchUrl } from "@/lib/geocoding/photon-url";
 
@@ -104,13 +103,9 @@ export async function searchPhotonPlaces(
   query: string,
   options?: { locale?: string; limit?: number; signal?: AbortSignal },
 ): Promise<GeocodedPlace[]> {
-  const url = buildPhotonSearchUrl(query, options);
-  if (!url) return [];
-
-  const limit = Math.min(
-    Math.max(options?.limit ?? SUGGEST_PLACE_LIMIT, 1),
-    10,
-  );
+  const built = buildPhotonSearchUrl(query, options);
+  if (!built) return [];
+  const { url, limit } = built;
 
   const signal =
     options?.signal ??

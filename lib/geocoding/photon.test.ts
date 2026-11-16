@@ -14,9 +14,9 @@ describe("photonLangFromLocale", () => {
 
 describe("buildPhotonSearchUrl", () => {
   it("includes place + administrative osm_tags so cities are not AND-filtered out", () => {
-    const url = buildPhotonSearchUrl("Sherbrooke", { locale: "en-CA" });
-    assert.ok(url);
-    const tags = url.searchParams.getAll("osm_tag");
+    const built = buildPhotonSearchUrl("Sherbrooke", { locale: "en-CA" });
+    assert.ok(built);
+    const tags = built.url.searchParams.getAll("osm_tag");
     assert.ok(tags.includes("place"));
     assert.ok(tags.includes("boundary:administrative"));
     assert.ok(tags.includes("natural:water"));

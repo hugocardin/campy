@@ -234,6 +234,8 @@ export default function CampgroundListControls({
       setLastPushedQ(qParam);
       setPrevPlaceLabel(placeLabel);
       setActivePlace(placeLabel);
+      // Back/forward / Clear owns the URL — don't apply a stale leave-place push.
+      leavePlacePendingRef.current = false;
       if (search !== displayFromUrl) {
         setSearch(displayFromUrl);
       }
@@ -318,6 +320,11 @@ export default function CampgroundListControls({
       window.clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
     }
+  }
+
+  /** Drop a pending leave-place push when another navigation owns the URL. */
+  function cancelLeavePlacePending() {
+    leavePlacePendingRef.current = false;
   }
 
   function updateRigDraft(value: string) {
@@ -406,6 +413,7 @@ export default function CampgroundListControls({
     place: Extract<SearchSuggestion, { kind: "place" }>,
   ) {
     clearSearchDebounce();
+    cancelLeavePlacePending();
     const label = place.subtitle
       ? `${place.label}, ${place.subtitle}`
       : place.label;
@@ -429,6 +437,7 @@ export default function CampgroundListControls({
     campground: Extract<SearchSuggestion, { kind: "campground" }>,
   ) {
     clearSearchDebounce();
+    cancelLeavePlacePending();
     startTransition(() => {
       router.push(
         routes.campgroundDetail(campground.id, {
@@ -468,6 +477,7 @@ export default function CampgroundListControls({
     patch: Parameters<typeof withLatestCampgroundFilters>[1],
   ) {
     clearSearchDebounce();
+    cancelLeavePlacePending();
     const rigLength = takePendingRigLength();
     replaceQuery(
       withLatestCampgroundFilters(latestParamsRef.current, {
@@ -732,6 +742,7 @@ export default function CampgroundListControls({
             disabled={discreteControlsDisabled}
             onClick={() => {
               clearSearchDebounce();
+              cancelLeavePlacePending();
               if (rigDebounceRef.current != null) {
                 window.clearTimeout(rigDebounceRef.current);
                 rigDebounceRef.current = null;

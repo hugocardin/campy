@@ -35,16 +35,20 @@ export function photonBaseUrl(): string {
   return "https://photon.komoot.io";
 }
 
+export function clampPhotonLimit(limit?: number): number {
+  return Math.min(Math.max(limit ?? SUGGEST_PLACE_LIMIT, 1), 10);
+}
+
 /** Build the Photon API URL (no fetch — safe for unit tests). */
 export function buildPhotonSearchUrl(
   query: string,
   options?: { locale?: string; limit?: number },
-): URL | null {
+): { url: URL; limit: number } | null {
   const q = query.trim().slice(0, 100);
   if (q.length < 3) return null;
 
   const lang = photonLangFromLocale(options?.locale ?? "en-CA");
-  const limit = Math.min(Math.max(options?.limit ?? SUGGEST_PLACE_LIMIT, 1), 10);
+  const limit = clampPhotonLimit(options?.limit);
 
   const url = new URL(`${photonBaseUrl()}/api/`);
   url.searchParams.set("q", q);
@@ -57,5 +61,5 @@ export function buildPhotonSearchUrl(
   for (const tag of PHOTON_OSM_TAGS) {
     url.searchParams.append("osm_tag", tag);
   }
-  return url;
+  return { url, limit };
 }
