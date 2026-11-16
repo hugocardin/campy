@@ -39,6 +39,8 @@ import {
   translateErrorCode,
   withErrorReference,
 } from "@/lib/errors";
+import type { GuestPriceCurrency } from "@/lib/campground-price";
+import { GUEST_PRICE_CURRENCY } from "@/lib/campground-price";
 
 const AMP_LABEL_KEYS = {
   15: "amp15",
@@ -51,6 +53,8 @@ const DRIVEWAY_NONE = "__none__";
 
 type SiteFormProps = {
   campgroundId: string;
+  /** Park listing currency shown next to the price field (#51). */
+  listingCurrency?: GuestPriceCurrency;
   siteTypes: SiteType[];
   initialData?: SiteFormData;
   onSubmit: (
@@ -61,6 +65,7 @@ type SiteFormProps = {
 
 export default function SiteFormClient({
   campgroundId,
+  listingCurrency = GUEST_PRICE_CURRENCY,
   siteTypes,
   initialData,
   onSubmit,
@@ -346,7 +351,7 @@ export default function SiteFormClient({
 
             <div>
               <Label htmlFor="price_per_night">
-                {t_sites("form.pricePerNightLabel")}{" "}
+                {t_sites("form.pricePerNightLabel")} ({listingCurrency}){" "}
                 <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -358,7 +363,16 @@ export default function SiteFormClient({
                 onChange={handleChange}
                 className="mt-1.5"
                 placeholder={t_sites("form.pricePerNightPlaceholder")}
+                aria-describedby="price-currency-hint"
               />
+              <p
+                id="price-currency-hint"
+                className="mt-1 text-xs text-muted-foreground"
+              >
+                {t_sites("form.priceCurrencyHint", {
+                  currency: listingCurrency,
+                })}
+              </p>
             </div>
 
             <div>

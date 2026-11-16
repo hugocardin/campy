@@ -26,6 +26,7 @@
     "siteTypePlaceholder": "Select a type",
     "pricePerNightLabel": "Price per night",
     "pricePerNightPlaceholder": "e.g. 45.00",
+    "priceCurrencyHint": "Amounts are in {currency} (park listing currency; no conversion).",
     "minStayNightLabel": "Minimal stay nights",
     "minStayNightPlaceholder": "e.g. 2",
     "electricityAmpsLabel": "Electricity amps",

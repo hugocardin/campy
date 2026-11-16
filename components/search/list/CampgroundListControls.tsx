@@ -32,8 +32,11 @@ import {
 } from "@/lib/campground-search";
 import {
   GUEST_MAX_PRICE_CAP,
+  GUEST_PRICE_CURRENCIES,
+  GUEST_PRICE_CURRENCY,
   formatGuestMaxPriceParam,
   parseGuestMaxPrice,
+  parseGuestPriceCurrency,
 } from "@/lib/campground-price";
 import {
   CampgroundQueryState,
@@ -174,6 +177,7 @@ function queryStateFromFilters(
     | "stayKind"
     | "siteTypes"
     | "maxPrice"
+    | "priceCurrency"
     | "amenityCodes"
   >,
   filters: ReturnType<typeof parseCampgroundSiteFilters>,
@@ -193,6 +197,7 @@ function queryStateFromFilters(
     stayKind: filters.stayKind,
     siteTypes: filters.siteTypes,
     maxPrice: filters.maxPrice,
+    priceCurrency: filters.priceCurrency,
     amenityCodes: filters.amenityCodes,
   };
 }
@@ -266,6 +271,7 @@ export default function CampgroundListControls({
     stay: searchParams.get("stay") ?? undefined,
     types: searchParams.get("types") ?? undefined,
     maxPrice: searchParams.get("maxPrice") ?? undefined,
+    currency: searchParams.get("currency") ?? undefined,
     amenities: searchParams.get("amenities") ?? undefined,
   });
   // Same precedence as the server (`resolveGuestRigLengthUnit` / State).
@@ -1201,38 +1207,83 @@ export default function CampgroundListControls({
             >
               {t("maxPriceLabel")}
             </Label>
-            <Input
-              id="max-price-filter"
-              type="number"
-              min={1}
-              max={GUEST_MAX_PRICE_CAP}
-              step="any"
-              inputMode="decimal"
-              className="w-32 mt-1.5"
-              placeholder={t("maxPricePlaceholder")}
-              value={maxPriceDraft}
-              disabled={geoBusy}
-              aria-describedby="max-price-hint"
-              onChange={(e) => {
-                const value = e.target.value;
-                updateMaxPriceDraft(value);
-                if (maxPriceDebounceRef.current != null) {
-                  window.clearTimeout(maxPriceDebounceRef.current);
-                }
-                maxPriceDebounceRef.current = window.setTimeout(() => {
-                  maxPriceDebounceRef.current = null;
-                  replaceQuery(
-                    withLatestCampgroundFilters(latestParamsRef.current, {
-                      q: latestParamsRef.current.q,
-                      sort: latestParamsRef.current.sort,
-                      maxPrice: resolveMaxPriceDraft(),
-                    }),
-                  );
-                }, 300);
-              }}
-            />
-            <p id="max-price-hint" className="sr-only">
-              {t("maxPriceHint")}
+            <div className="mt-1.5 flex items-center gap-2">
+              <Input
+                id="max-price-filter"
+                type="number"
+                min={1}
+                max={GUEST_MAX_PRICE_CAP}
+                step="any"
+                inputMode="decimal"
+                className="w-28"
+                placeholder={t("maxPricePlaceholder")}
+                value={maxPriceDraft}
+                disabled={geoBusy}
+                aria-describedby="max-price-hint"
+                onChange={(e) => {
+                  const value = e.target.value;
+                  updateMaxPriceDraft(value);
+                  if (maxPriceDebounceRef.current != null) {
+                    window.clearTimeout(maxPriceDebounceRef.current);
+                  }
+                  maxPriceDebounceRef.current = window.setTimeout(() => {
+                    maxPriceDebounceRef.current = null;
+                    replaceQuery(
+                      withLatestCampgroundFilters(latestParamsRef.current, {
+                        q: latestParamsRef.current.q,
+                        sort: latestParamsRef.current.sort,
+                        maxPrice: resolveMaxPriceDraft(),
+                        priceCurrency:
+                          latestParamsRef.current.priceCurrency ??
+                          GUEST_PRICE_CURRENCY,
+                      }),
+                    );
+                  }, 300);
+                }}
+              />
+              <Select
+                value={urlFilters.priceCurrency ?? GUEST_PRICE_CURRENCY}
+                disabled={geoBusy || discreteControlsDisabled}
+                onValueChange={(value) => {
+                  const priceCurrency =
+                    parseGuestPriceCurrency(value) ?? GUEST_PRICE_CURRENCY;
+                  replaceWithFilters({
+                    q: search,
+                    sort: latestParamsRef.current.sort,
+                    maxPrice: resolveMaxPriceDraft(),
+                    priceCurrency,
+                  });
+                }}
+              >
+                <SelectTrigger
+                  className="w-24"
+                  aria-label={t("priceCurrencyLabel")}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GUEST_PRICE_CURRENCIES.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p
+              id="max-price-hint"
+              className={
+                urlFilters.maxPrice != null
+                  ? "mt-1 text-xs text-muted-foreground"
+                  : "sr-only"
+              }
+            >
+              {urlFilters.maxPrice != null
+                ? t("priceCurrencyScopeNote", {
+                    currency:
+                      urlFilters.priceCurrency ?? GUEST_PRICE_CURRENCY,
+                  })
+                : t("maxPriceHint")}
             </p>
           </div>
         </div>

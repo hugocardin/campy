@@ -19,6 +19,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { UserProfileNoRole } from "@/entities/user-profile";
 import {
+  GUEST_PRICE_CURRENCIES,
+  GUEST_PRICE_CURRENCY,
+  parseGuestPriceCurrency,
+} from "@/lib/campground-price";
+import {
   ActionResult,
   translateErrorCode,
   withErrorReference,
@@ -53,6 +58,7 @@ export default function CampgroundFormClient({
     city: initialData?.city ?? "",
     province: initialData?.province ?? "",
     country: initialData?.country ?? "",
+    currency: initialData?.currency ?? GUEST_PRICE_CURRENCY,
     website: initialData?.website ?? "",
     phone: initialData?.phone ?? "",
     location: {
@@ -86,6 +92,23 @@ export default function CampgroundFormClient({
       return setError(t_campgrounds("errors.longitudeInvalid"));
     if (form.website.trim() && !toSafeHttpUrl(form.website))
       return setError(t_campgrounds("errors.websiteInvalid"));
+    if (!parseGuestPriceCurrency(form.currency))
+      return setError(t_campgrounds("errors.currencyInvalid"));
+
+    // Changing currency reinterprets existing site base prices (no FX) — #51.
+    if (
+      initialData?.id &&
+      initialData.currency &&
+      form.currency !== initialData.currency
+    ) {
+      const confirmed = window.confirm(
+        t_campgrounds("form.currencyChangeConfirm", {
+          from: initialData.currency,
+          to: form.currency,
+        }),
+      );
+      if (!confirmed) return;
+    }
 
     const payload: CampgroundCreateUpdateInput = {
       id: initialData?.id,
@@ -96,6 +119,7 @@ export default function CampgroundFormClient({
       city: form.city,
       province: form.province,
       country: form.country,
+      currency: form.currency,
       website: form.website,
       phone: form.phone,
       location: {
@@ -118,6 +142,7 @@ export default function CampgroundFormClient({
               {
                 fieldMessages: {
                   "campground.website": t_campgrounds("errors.websiteInvalid"),
+                  "campground.currency": t_campgrounds("errors.currencyInvalid"),
                 },
               },
             ),
@@ -296,18 +321,54 @@ export default function CampgroundFormClient({
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="country">
-                {t_campgrounds("form.countryLabel")}
-              </Label>
-              <Input
-                id="country"
-                name="country"
-                value={form.country}
-                onChange={handleChange}
-                className="mt-1.5"
-                placeholder={t_campgrounds("form.countryPlaceholder")}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="country">
+                  {t_campgrounds("form.countryLabel")}
+                </Label>
+                <Input
+                  id="country"
+                  name="country"
+                  value={form.country}
+                  onChange={handleChange}
+                  className="mt-1.5"
+                  placeholder={t_campgrounds("form.countryPlaceholder")}
+                />
+              </div>
+              <div>
+                <Label htmlFor="currency">
+                  {t_campgrounds("form.currencyLabel")}
+                </Label>
+                <Select
+                  value={form.currency || GUEST_PRICE_CURRENCY}
+                  onValueChange={(value) => {
+                    const currency =
+                      parseGuestPriceCurrency(value) ?? GUEST_PRICE_CURRENCY;
+                    setForm((prev) => ({ ...prev, currency }));
+                  }}
+                >
+                  <SelectTrigger
+                    id="currency"
+                    className="mt-1.5"
+                    aria-describedby="currency-hint"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GUEST_PRICE_CURRENCIES.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p
+                  id="currency-hint"
+                  className="mt-1 text-xs text-muted-foreground"
+                >
+                  {t_campgrounds("form.currencyHint")}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

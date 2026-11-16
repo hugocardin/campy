@@ -2,7 +2,12 @@
 
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { redirect } from "@/i18n/navigation";
-import { ActionResult, DbErrorCode, resultError } from "@/lib/errors";
+import {
+  GUEST_PRICE_CURRENCY,
+  parseGuestPriceCurrency,
+  type GuestPriceCurrency,
+} from "@/lib/campground-price";
+import { ActionResult, DbErrorCode, resultError, resultSuccess } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
 import { CAMPGROUND_PROVINCES_CACHE_TAG } from "@/data/campgrounds/get-campgrounds";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
@@ -33,6 +38,31 @@ function normalizeWebsiteInput(
     });
   }
   return { success: true, data: trimmed };
+}
+
+/**
+ * Validate listing currency. Create may omit → CAD; update / explicit junk → error
+ * (never silently rewrite an existing park to CAD — #51).
+ */
+function normalizeListingCurrencyInput(
+  currency: string | undefined | null,
+  options: { defaultIfMissing: boolean },
+): ActionResult<GuestPriceCurrency> {
+  if (currency == null || String(currency).trim() === "") {
+    if (options.defaultIfMissing) {
+      return resultSuccess(GUEST_PRICE_CURRENCY);
+    }
+    return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
+      field: "campground.currency",
+    });
+  }
+  const parsed = parseGuestPriceCurrency(currency);
+  if (!parsed) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "campground.currency",
+    });
+  }
+  return resultSuccess(parsed);
 }
 
 function revalidateCampgroundPublicAndAdmin(id: string) {
@@ -108,6 +138,12 @@ export async function updateCampgroundAction(
     if (!websiteResult.success) {
       return websiteResult;
     }
+    const currencyResult = normalizeListingCurrencyInput(input.currency, {
+      defaultIfMissing: false,
+    });
+    if (!currencyResult.success) {
+      return currencyResult;
+    }
 
     const supabase = await createClient();
 
@@ -129,6 +165,7 @@ export async function updateCampgroundAction(
           city: input.city || null,
           province: input.province || null,
           country: input.country || null,
+          currency: currencyResult.data,
           website: websiteResult.data,
           phone: input.phone || null,
           updated_at: new Date().toISOString(),
@@ -172,6 +209,12 @@ export async function createCampgroundAction(
     if (!websiteResult.success) {
       return websiteResult;
     }
+    const currencyResult = normalizeListingCurrencyInput(input.currency, {
+      defaultIfMissing: true,
+    });
+    if (!currencyResult.success) {
+      return currencyResult;
+    }
 
     const locationWKT = `POINT(${input.location.lng} ${input.location.lat})`;
     const supabase = await createClient();
@@ -187,6 +230,7 @@ export async function createCampgroundAction(
           city: input.city?.trim() || null,
           province: input.province?.trim() || null,
           country: input.country?.trim() || null,
+          currency: currencyResult.data,
           website: websiteResult.data,
           phone: input.phone?.trim() || null,
           location: `SRID=4326;${locationWKT}`,

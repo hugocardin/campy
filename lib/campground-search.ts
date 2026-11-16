@@ -1,7 +1,11 @@
 import {
   type SiteHookupAmenityCode,
 } from "@/lib/amenities/hookup-codes";
-import { parseGuestMaxPrice } from "@/lib/campground-price";
+import {
+  parseGuestMaxPrice,
+  parseGuestPriceCurrency,
+  type GuestPriceCurrency,
+} from "@/lib/campground-price";
 import {
   type DrivewayType,
   parseDrivewayUrlParam,
@@ -83,8 +87,13 @@ export type CampgroundSiteFilters = CampgroundHookupFilters & {
   stayKind?: StayKind;
   /** Fine site types (TENT/RV/…); AND with stay when both set. */
   siteTypes: GuestSiteTypeCode[];
-  /** Max nightly base price on a matching site (CAD). */
+  /** Max nightly base price on a matching site (same currency). */
   maxPrice?: number;
+  /**
+   * Listing currency for maxPrice / price-sort scope (CAD / USD / MXN).
+   * Omitted when not comparing amounts.
+   */
+  priceCurrency?: GuestPriceCurrency;
   /**
    * Park amenities (canonical keys, e.g. PET_FRIENDLY). AND on
    * `campground_amenities` — every selected code must be present.
@@ -108,6 +117,7 @@ export type CampgroundListFilters = {
   stayKind?: StayKind;
   siteTypes?: GuestSiteTypeCode[];
   maxPrice?: number;
+  priceCurrency?: GuestPriceCurrency;
   amenityCodes?: string[];
 };
 
@@ -300,9 +310,9 @@ export function parseCampgroundHookups(params: {
 }
 
 /**
- * Parse dump / driveway / rig / stay / types / maxPrice / amenities URL params
- * (issues #27 / #24). Rig length and driveway are ignored when stay=lodging.
- * Fine site types incompatible with stay are dropped.
+ * Parse dump / driveway / rig / stay / types / maxPrice / currency / amenities
+ * URL params (issues #27 / #24). Rig length and driveway are ignored when
+ * stay=lodging. Fine site types incompatible with stay are dropped.
  */
 export function parseCampgroundSiteFilters(params: {
   amps?: string;
@@ -315,6 +325,7 @@ export function parseCampgroundSiteFilters(params: {
   stay?: string;
   types?: string;
   maxPrice?: string;
+  currency?: string;
   amenities?: string;
 }): CampgroundSiteFilters {
   const stayKind = parseStayKind(params.stay);
@@ -335,6 +346,7 @@ export function parseCampgroundSiteFilters(params: {
     stayKind,
     siteTypes,
     maxPrice: parseGuestMaxPrice(params.maxPrice),
+    priceCurrency: parseGuestPriceCurrency(params.currency),
     amenityCodes: parseGuestAmenityCodes(params.amenities),
   };
 }

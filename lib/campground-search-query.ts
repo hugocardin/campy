@@ -8,7 +8,12 @@ import {
   validateCampgroundGeo,
 } from "@/lib/campground-search";
 import { provinceFilterKey } from "@/lib/canadian-provinces";
-import { formatGuestMaxPriceParam } from "@/lib/campground-price";
+import {
+  GUEST_PRICE_CURRENCY,
+  formatGuestMaxPriceParam,
+  formatGuestPriceCurrencyParam,
+  type GuestPriceCurrency,
+} from "@/lib/campground-price";
 import type { DrivewayType } from "@/lib/driveway-type";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import type { ElectricityAmpFilterOption } from "@/lib/electricity-amps";
@@ -65,6 +70,8 @@ export type CampgroundQueryState = {
   siteTypes: GuestSiteTypeCode[];
   /** Max nightly base price (URL `maxPrice`). */
   maxPrice?: number;
+  /** Listing currency for maxPrice / price-sort (URL `currency`). */
+  priceCurrency?: GuestPriceCurrency;
   /** Park amenities (URL `amenities`); canonical keys. */
   amenityCodes: string[];
 };
@@ -87,6 +94,8 @@ export function withLatestCampgroundFilters(
     "drivewayType" in patch ? patch.drivewayType : latest.drivewayType;
   const maxPriceRaw =
     "maxPrice" in patch ? patch.maxPrice : latest.maxPrice;
+  const priceCurrencyRaw =
+    "priceCurrency" in patch ? patch.priceCurrency : latest.priceCurrency;
   const amenityCodesRaw =
     "amenityCodes" in patch
       ? (patch.amenityCodes ?? [])
@@ -115,6 +124,7 @@ export function withLatestCampgroundFilters(
     rigUnit:
       rigUnitRaw === "m" || rigUnitRaw === "ft" ? rigUnitRaw : undefined,
     maxPrice: maxPriceRaw,
+    priceCurrency: priceCurrencyRaw,
     amenityCodes: amenityCodesRaw,
   };
 }
@@ -141,6 +151,7 @@ export function siteFiltersFromQueryState(
     | "stayKind"
     | "siteTypes"
     | "maxPrice"
+    | "priceCurrency"
     | "amenityCodes"
   >,
 ): CampgroundSiteFilters {
@@ -157,6 +168,7 @@ export function siteFiltersFromQueryState(
     stayKind: state.stayKind,
     siteTypes,
     maxPrice: state.maxPrice,
+    priceCurrency: state.priceCurrency,
     amenityCodes: state.amenityCodes,
   };
 }
@@ -180,6 +192,7 @@ export function siteFiltersKey(filters: CampgroundSiteFilters): string {
     filters.stayKind ?? "",
     formatGuestSiteTypesParam(filters.siteTypes) ?? "",
     formatGuestMaxPriceParam(filters.maxPrice) ?? "",
+    formatGuestPriceCurrencyParam(filters.priceCurrency) ?? "",
     formatGuestAmenityCodesParam(filters.amenityCodes) ?? "",
   ].join("|");
 }
@@ -247,6 +260,20 @@ export function buildCampgroundSearchParams(
   if (typesParam) params.set("types", typesParam);
   const maxPriceParam = formatGuestMaxPriceParam(next.maxPrice);
   if (maxPriceParam) params.set("maxPrice", maxPriceParam);
+  // Emit currency when maxPrice scopes amounts, when price-sorting (preference
+  // for grouping — does not hide other currencies), or when not CAD default.
+  const priceSort = next.sort === "price" || next.sort === "price-desc";
+  const needsCurrency =
+    maxPriceParam != null ||
+    priceSort ||
+    (next.priceCurrency != null &&
+      next.priceCurrency !== GUEST_PRICE_CURRENCY);
+  if (needsCurrency) {
+    const currencyParam = formatGuestPriceCurrencyParam(
+      next.priceCurrency ?? GUEST_PRICE_CURRENCY,
+    );
+    if (currencyParam) params.set("currency", currencyParam);
+  }
   const amenitiesParam = formatGuestAmenityCodesParam(next.amenityCodes);
   if (amenitiesParam) params.set("amenities", amenitiesParam);
   return params;

@@ -66,6 +66,7 @@ export default async function SiteEditPage({
       >
         <SiteFormClient
           campgroundId={campground.id}
+          listingCurrency={campground.currency}
           siteTypes={siteTypes}
           initialData={toSiteFormData(site)}
           onSubmit={updateSiteAction}

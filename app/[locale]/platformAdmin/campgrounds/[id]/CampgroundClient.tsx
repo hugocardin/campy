@@ -112,11 +112,19 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  {t_campgrounds("form.countryLabel")}
-                </h3>
-                <p>{campground.country}</p>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                    {t_campgrounds("form.countryLabel")}
+                  </h3>
+                  <p>{campground.country}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                    {t_campgrounds("form.currencyLabel")}
+                  </h3>
+                  <p>{campground.currency}</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-6">

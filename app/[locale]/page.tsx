@@ -7,6 +7,7 @@ import {
   getCampgrounds,
 } from "@/data/campgrounds/get-campgrounds";
 import { getCurrentRigSearchPrefs } from "@/data/profile/get-rig-search-prefs";
+import { resolveGuestPriceCurrencyFilter } from "@/lib/campground-price";
 import {
   parseCampgroundGeo,
   parseCampgroundSiteFilters,
@@ -61,6 +62,7 @@ export default async function Home({ searchParams }: PageProps) {
     stay: firstParam(params.stay),
     types: firstParam(params.types),
     maxPrice: firstParam(params.maxPrice),
+    currency: firstParam(params.currency),
     amenities: firstParam(params.amenities),
   });
   const sort = parseCampgroundSort(firstParam(params.sort), {
@@ -199,11 +201,28 @@ export default async function Home({ searchParams }: PageProps) {
             searchKey={mapSearchKey}
             searchQuery={q}
             detailQuery={detailQuery}
-            emptyMessage={
-              q?.trim()
-                ? tControls("noResultsFor", { query: q.trim() })
-                : tControls("noResults")
-            }
+            emptyMessage={(() => {
+              const trimmedQ = q?.trim();
+              const scopedCurrency = resolveGuestPriceCurrencyFilter({
+                currency: siteFiltersParsed.priceCurrency,
+                maxPrice: siteFiltersParsed.maxPrice,
+              });
+              if (scopedCurrency != null && trimmedQ) {
+                return tControls("noResultsForCurrencyScope", {
+                  query: trimmedQ,
+                  currency: scopedCurrency,
+                });
+              }
+              if (scopedCurrency != null) {
+                return tControls("noResultsCurrencyScope", {
+                  currency: scopedCurrency,
+                });
+              }
+              if (trimmedQ) {
+                return tControls("noResultsFor", { query: trimmedQ });
+              }
+              return tControls("noResults");
+            })()}
           />
         </div>
       </div>

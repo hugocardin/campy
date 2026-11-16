@@ -16,7 +16,12 @@ import {
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
-import { formatGuestMaxPriceParam } from "@/lib/campground-price";
+import {
+  formatGuestMaxPriceParam,
+  formatGuestPriceCurrencyParam,
+  resolveCampgroundPriceCurrency,
+  resolveGuestPriceCurrencyFilter,
+} from "@/lib/campground-price";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
@@ -50,7 +55,7 @@ export type CampgroundSearchPayload = {
 
 /** Guest-safe columns — never select commission_* from v_campgrounds. */
 export const GUEST_CAMPGROUND_COLUMNS =
-  "id, name, description, address, city, province, country, latitude, longitude, website, phone" as const;
+  "id, name, description, address, city, province, country, currency, latitude, longitude, website, phone" as const;
 
 type CampgroundRow = {
   id: string;
@@ -60,12 +65,14 @@ type CampgroundRow = {
   city: string | null;
   province: string | null;
   country: string | null;
+  currency?: string | null;
   latitude: number | null;
   longitude: number | null;
   website: string | null;
   phone: string | null;
   distance_m?: number | null;
   min_price_per_night?: number | null;
+  price_currency?: string | null;
 };
 
 function toFiniteNumber(value: number | null | undefined): number | null {
@@ -86,6 +93,10 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
       ? undefined
       : toFiniteNumber(Number(row.min_price_per_night));
 
+  const priceCurrency = resolveCampgroundPriceCurrency(
+    row.price_currency ?? row.currency,
+  );
+
   return {
     id: row.id,
     name: row.name,
@@ -97,6 +108,7 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
     location,
     distanceMeters: distanceMeters ?? undefined,
     minPricePerNight: minPrice ?? undefined,
+    priceCurrency,
     website: row.website ?? "",
     phone: row.phone ?? "",
   };
@@ -169,7 +181,15 @@ export const getCampgroundProvinces = cache(
   },
 );
 
-function siteFilterRpcArgs(filters: CampgroundSiteFilters) {
+function siteFilterRpcArgs(
+  filters: CampgroundSiteFilters,
+  sort?: string,
+) {
+  const priceCurrency = resolveGuestPriceCurrencyFilter({
+    currency: filters.priceCurrency,
+    maxPrice: filters.maxPrice,
+    sort,
+  });
   return {
     require_amps: electricityAmpsToRpcArg(filters.amps),
     require_water: filters.water,
@@ -183,6 +203,7 @@ function siteFilterRpcArgs(filters: CampgroundSiteFilters) {
     max_price: filters.maxPrice ?? null,
     require_amenity_codes:
       filters.amenityCodes.length > 0 ? filters.amenityCodes : null,
+    filter_currency: priceCurrency ?? null,
   };
 }
 
@@ -209,6 +230,8 @@ export function buildCampgroundSiteFiltersCacheKey(
   if (types) params.set("types", types);
   const maxPrice = formatGuestMaxPriceParam(filters.maxPrice);
   if (maxPrice) params.set("maxPrice", maxPrice);
+  const currency = formatGuestPriceCurrencyParam(filters.priceCurrency);
+  if (currency) params.set("currency", currency);
   const amenities = formatGuestAmenityCodesParam(filters.amenityCodes);
   if (amenities) params.set("amenities", amenities);
   return params.toString();
@@ -226,6 +249,7 @@ function parseSiteFiltersCacheKey(key: string): CampgroundSiteFilters {
     stay: params.get("stay") ?? undefined,
     types: params.get("types") ?? undefined,
     maxPrice: params.get("maxPrice") ?? undefined,
+    currency: params.get("currency") ?? undefined,
     amenities: params.get("amenities") ?? undefined,
   });
 }
@@ -286,7 +310,7 @@ export const getCampgrounds = cache(
             q: term || null,
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
-            ...siteFilterRpcArgs(siteFilters),
+            ...siteFilterRpcArgs(siteFilters, resolvedSort),
             sort_key: resolvedSort,
             result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
@@ -317,7 +341,7 @@ export const getCampgrounds = cache(
           q: term || null,
           province_aliases:
             provinceAliases.length > 0 ? provinceAliases : null,
-          ...siteFilterRpcArgs(siteFilters),
+          ...siteFilterRpcArgs(siteFilters, nonGeoSort),
           sort_key: nonGeoSort,
           result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
         }),

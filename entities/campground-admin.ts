@@ -1,3 +1,5 @@
+import type { GuestPriceCurrency } from "@/lib/campground-price";
+
 export interface CampgroundAdmin {
   id: string;
   owner_id: string;
@@ -9,6 +11,8 @@ export interface CampgroundAdmin {
   city: string;
   province: string;
   country: string;
+  /** Listing currency for site base prices (CAD / USD / MXN). */
+  currency: GuestPriceCurrency;
   location: {
     lat: number;
     lng: number;

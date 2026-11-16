@@ -1,4 +1,8 @@
 import { CampgroundAdmin } from "@/entities/campground-admin";
+import {
+  GUEST_PRICE_CURRENCY,
+  resolveCampgroundPriceCurrency,
+} from "@/lib/campground-price";
 import { ActionResult, DbErrorCode, resultError, resultSuccess } from "@/lib/errors";
 import {
   handleDbResponse,
@@ -18,6 +22,7 @@ type CampgroundAdminRow = {
   city: string;
   province: string;
   country: string;
+  currency: string | null;
   latitude: number;
   longitude: number;
   website: string | null;
@@ -37,6 +42,9 @@ function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
     city: row.city,
     province: row.province,
     country: row.country,
+    currency: resolveCampgroundPriceCurrency(
+      row.currency ?? GUEST_PRICE_CURRENCY,
+    ),
     location: {
       lat: Number(row.latitude),
       lng: Number(row.longitude),

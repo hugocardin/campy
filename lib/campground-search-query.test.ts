@@ -87,7 +87,37 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.get("stay"), "camping");
     assert.equal(params.get("types"), "tent,rv");
     assert.equal(params.get("maxPrice"), "80");
+    // maxPrice implies currency scope (default CAD).
+    assert.equal(params.get("currency"), "CAD");
     assert.equal(params.get("amenities"), "pet_friendly,wifi");
+  });
+
+  it("emits currency with maxPrice or price-sort preference (sort does not scope)", () => {
+    const usd = buildCampgroundSearchParams({
+      ...base,
+      maxPrice: 60,
+      priceCurrency: "USD",
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+    });
+    assert.equal(usd.get("currency"), "USD");
+    assert.equal(usd.get("maxPrice"), "60");
+
+    const priceSort = buildCampgroundSearchParams({
+      q: "",
+      sort: "price",
+      province: "",
+      amps: [],
+      water: false,
+      sewer: false,
+      dumpStation: false,
+      siteTypes: [],
+      amenityCodes: [],
+    });
+    // Preference for grouping (CAD default) — RPC still lists other currencies.
+    assert.equal(priceSort.get("currency"), "CAD");
+    assert.equal(priceSort.get("sort"), "price");
   });
 
   it("allows toggling amenity codes", () => {
@@ -261,7 +291,7 @@ describe("buildCampgroundSearchParams / clear", () => {
         maxPrice: 60,
         amenityCodes: ["WIFI", "POOL"],
       }),
-      "none,30|0|1|1|BACK_IN|28|camping|tent|60|pool,wifi",
+      "none,30|0|1|1|BACK_IN|28|camping|tent|60||pool,wifi",
     );
     assert.equal(
       hookupsKey({ amps: [], water: false, sewer: false }),

@@ -1,3 +1,5 @@
+import type { GuestPriceCurrency } from "@/lib/campground-price";
+
 export interface Campground {
   id: string;
   name: string;
@@ -18,6 +20,11 @@ export interface Campground {
    * filters (or all sites when no site filters). From search RPCs (#24).
    */
   minPricePerNight?: number | null;
+  /**
+   * Listing currency for `minPricePerNight` / site base prices
+   * (`campgrounds.currency`: CAD / USD / MXN). Normalized at the data boundary.
+   */
+  priceCurrency: GuestPriceCurrency;
   website: string;
   phone: string;
 }
