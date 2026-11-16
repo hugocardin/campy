@@ -117,17 +117,6 @@ export type CampgroundGeo = {
   radiusKm: CampgroundRadiusKm;
 };
 
-/** Name/city/province sorts that map to a column on Campground / v_campgrounds. */
-export const CAMPGROUND_COLUMN_SORT_CONFIG: Record<
-  "name" | "name-desc" | "city" | "province",
-  { column: "name" | "city" | "province"; ascending: boolean }
-> = {
-  name: { column: "name", ascending: true },
-  "name-desc": { column: "name", ascending: false },
-  city: { column: "city", ascending: true },
-  province: { column: "province", ascending: true },
-};
-
 const CAMPGROUND_SORT_VALUES = new Set<string>(CAMPGROUND_SORT_KEYS);
 
 export function parseCampgroundSort(
@@ -142,11 +131,6 @@ export function parseCampgroundSort(
   }
   // Geo default: closest first. Non-geo default: name A–Z.
   return options?.geoActive ? "distance" : "name";
-}
-
-/** True when sort needs min_price_per_night from search RPCs. */
-export function isCampgroundPriceSort(sort: CampgroundSort): boolean {
-  return sort === "price" || sort === "price-desc";
 }
 
 /** Default sort for the current mode — omit from the URL when active. */
