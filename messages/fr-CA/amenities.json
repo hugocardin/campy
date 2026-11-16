@@ -17,7 +17,8 @@
     "SOCCER": "Soccer / football",
     "ELECTRICITY": "Électricité",
     "WATER": "Eau",
-    "SEWER": "Égouts"
+    "SEWER": "Égouts",
+    "DUMP_STATION": "Station de vidange"
   },
 
   "form": {
@@ -29,11 +30,12 @@
     "codeRequired": "Le nom de la commodité est requis, mais n'a pas été fourni.",
     "categoryRequired": "La catégorie est requise, mais n'a pas été fournie.",
     "codeTooLong": "Le nom de la commodité doit compter au plus {max} caractères.",
-    "hookupCodeProtected": "Les commodités eau et égouts servent à la recherche et ne peuvent pas être supprimées ni renommées."
+    "hookupCodeProtected": "Les commodités eau, égouts et station de vidange servent à la recherche et ne peuvent pas être supprimées ni renommées."
   },
 
   "hints": {
-    "electricityAmpsOnSiteForm": "Les ampères d’électricité se règlent sur le formulaire d’emplacement, pas comme commodité."
+    "electricityAmpsOnSiteForm": "Les ampères d’électricité se règlent sur le formulaire d’emplacement, pas comme commodité.",
+    "drivewayOnSiteForm": "Le type d’allée (traversante / marche arrière) se règle sur le formulaire d’emplacement, pas comme commodité."
   },
 
   "actions": {

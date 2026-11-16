@@ -98,9 +98,10 @@ export default function SiteAmenitiesClient({
         </CardHeader>
 
         <CardContent className="space-y-8">
-          <p className="text-sm text-muted-foreground">
-            {t_amenities("hints.electricityAmpsOnSiteForm")}
-          </p>
+          <div className="space-y-1 text-sm text-muted-foreground">
+            <p>{t_amenities("hints.electricityAmpsOnSiteForm")}</p>
+            <p>{t_amenities("hints.drivewayOnSiteForm")}</p>
+          </div>
           {allAmenities.length === 0 ? (
             <p className="text-muted-foreground italic">
               {t_amenities("noResult")}

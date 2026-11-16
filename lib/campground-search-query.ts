@@ -1,14 +1,21 @@
 import {
   CampgroundHookupFilters,
   CampgroundRadiusKm,
+  CampgroundSiteFilters,
   CampgroundSort,
   campgroundSortQueryValue,
   formatCampgroundAmpsParam,
+  formatDrivewayUrlParam,
+  formatGuestRigLengthParam,
+  formatStayKindParam,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
 import { provinceFilterKey } from "@/lib/canadian-provinces";
+import type { DrivewayType } from "@/lib/driveway-type";
 import type { ElectricityAmpFilterOption } from "@/lib/electricity-amps";
 import { normalizeElectricityAmpFilters } from "@/lib/electricity-amps";
+import type { StayKind } from "@/lib/stay-kind";
+import { stayKindAllowsRigLength } from "@/lib/stay-kind";
 
 export type CampgroundQueryState = {
   q: string;
@@ -20,6 +27,10 @@ export type CampgroundQueryState = {
   amps: ElectricityAmpFilterOption[];
   water: boolean;
   sewer: boolean;
+  dumpStation: boolean;
+  drivewayType?: DrivewayType;
+  rigLength?: number;
+  stayKind?: StayKind;
 };
 
 /** Merge a partial update onto the latest query state (hookups / geo / province). */
@@ -27,6 +38,10 @@ export function withLatestCampgroundFilters(
   latest: CampgroundQueryState,
   patch: Partial<CampgroundQueryState> & Pick<CampgroundQueryState, "q" | "sort">,
 ): CampgroundQueryState {
+  const stayKind =
+    "stayKind" in patch ? patch.stayKind : latest.stayKind;
+  const rigLengthRaw =
+    "rigLength" in patch ? patch.rigLength : latest.rigLength;
   return {
     q: patch.q,
     sort: patch.sort,
@@ -37,6 +52,12 @@ export function withLatestCampgroundFilters(
     amps: "amps" in patch ? (patch.amps ?? []) : latest.amps,
     water: patch.water ?? latest.water,
     sewer: patch.sewer ?? latest.sewer,
+    dumpStation: patch.dumpStation ?? latest.dumpStation,
+    drivewayType:
+      "drivewayType" in patch ? patch.drivewayType : latest.drivewayType,
+    stayKind,
+    // Drop rig when lodging (issue #27).
+    rigLength: stayKindAllowsRigLength(stayKind) ? rigLengthRaw : undefined,
   };
 }
 
@@ -50,12 +71,48 @@ export function hookupsFromQueryState(
   };
 }
 
+export function siteFiltersFromQueryState(
+  state: Pick<
+    CampgroundQueryState,
+    | "amps"
+    | "water"
+    | "sewer"
+    | "dumpStation"
+    | "drivewayType"
+    | "rigLength"
+    | "stayKind"
+  >,
+): CampgroundSiteFilters {
+  return {
+    amps: state.amps,
+    water: state.water,
+    sewer: state.sewer,
+    dumpStation: state.dumpStation,
+    drivewayType: state.drivewayType,
+    rigLength: stayKindAllowsRigLength(state.stayKind)
+      ? state.rigLength
+      : undefined,
+    stayKind: state.stayKind,
+  };
+}
+
 export function hookupsKey(hookups: CampgroundHookupFilters): string {
   const amps = normalizeElectricityAmpFilters(hookups.amps).join(",");
   return [
     amps,
     hookups.water ? "1" : "0",
     hookups.sewer ? "1" : "0",
+  ].join("|");
+}
+
+/** Stable key for optimistic site-filter sync (includes dump/driveway/rig/stay). */
+export function siteFiltersKey(filters: CampgroundSiteFilters): string {
+  return [
+    hookupsKey(filters),
+    filters.dumpStation ? "1" : "0",
+    filters.drivewayType ?? "",
+    filters.rigLength != null ? String(filters.rigLength) : "",
+    filters.stayKind ?? "",
   ].join("|");
 }
 
@@ -85,6 +142,15 @@ export function buildCampgroundSearchParams(
   if (ampsParam) params.set("amps", ampsParam);
   if (next.water) params.set("water", "1");
   if (next.sewer) params.set("sewer", "1");
+  if (next.dumpStation) params.set("dump", "1");
+  const drivewayParam = formatDrivewayUrlParam(next.drivewayType);
+  if (drivewayParam) params.set("driveway", drivewayParam);
+  const stayParam = formatStayKindParam(next.stayKind);
+  if (stayParam) params.set("stay", stayParam);
+  if (stayKindAllowsRigLength(next.stayKind)) {
+    const rigParam = formatGuestRigLengthParam(next.rigLength);
+    if (rigParam) params.set("rigLength", rigParam);
+  }
   return params;
 }
 
@@ -97,5 +163,6 @@ export function clearedCampgroundQueryState(): CampgroundQueryState {
     amps: [],
     water: false,
     sewer: false,
+    dumpStation: false,
   };
 }

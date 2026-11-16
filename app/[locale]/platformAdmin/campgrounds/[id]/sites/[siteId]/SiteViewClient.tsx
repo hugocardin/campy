@@ -96,11 +96,26 @@ export default function SiteViewClient({ site, amenities }: Props) {
                 </div>
               </div>
 
+              {site.site_type_code !== "LODGING" ? (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                    {t_sites("form.maxRigLengthLabel")}
+                  </h3>
+                  <p>{site.max_rig_length ?? "—"}</p>
+                </div>
+              ) : null}
+
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  {t_sites("form.maxRigLengthLabel")}
+                  {t_sites("form.drivewayLabel")}
                 </h3>
-                <p>{site.max_rig_length}</p>
+                <p>
+                  {site.driveway_type === "PULL_THROUGH"
+                    ? t_sites("form.drivewayPullThrough")
+                    : site.driveway_type === "BACK_IN"
+                      ? t_sites("form.drivewayBackIn")
+                      : t_sites("form.drivewayPlaceholder")}
+                </p>
               </div>
 
               <div>

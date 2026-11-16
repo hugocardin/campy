@@ -20,9 +20,9 @@ import {
   CampgroundRadiusKm,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   HookupAmenityFilterKey,
-  anyHookupFilterActive,
+  anySiteFilterActive,
   parseCampgroundGeo,
-  parseCampgroundHookups,
+  parseCampgroundSiteFilters,
   parseCampgroundSort,
   roundCampgroundCoord,
 } from "@/lib/campground-search";
@@ -30,14 +30,18 @@ import {
   CampgroundQueryState,
   buildCampgroundSearchParams,
   clearedCampgroundQueryState,
-  hookupsKey,
+  siteFiltersKey,
   withLatestCampgroundFilters,
 } from "@/lib/campground-search-query";
+import type { DrivewayType } from "@/lib/driveway-type";
 import {
   ELECTRICITY_AMP_NONE,
   type ElectricityAmpFilterOption,
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
+import { parseGuestRigLength } from "@/lib/site-rig-length";
+import type { StayKind } from "@/lib/stay-kind";
+import { stayKindAllowsRigLength } from "@/lib/stay-kind";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -50,6 +54,8 @@ type Props = {
 };
 
 const ALL_PROVINCES = "__all__";
+const STAY_ANY = "__any__";
+const DRIVEWAY_ANY = "__any__";
 
 const AMP_FILTERS: {
   value: ElectricityAmpFilterOption;
@@ -86,6 +92,31 @@ function toggleAmpFilter(
   return normalizeElectricityAmpFilters([...set]);
 }
 
+function queryStateFromFilters(
+  base: Omit<
+    CampgroundQueryState,
+    | "amps"
+    | "water"
+    | "sewer"
+    | "dumpStation"
+    | "drivewayType"
+    | "rigLength"
+    | "stayKind"
+  >,
+  filters: ReturnType<typeof parseCampgroundSiteFilters>,
+): CampgroundQueryState {
+  return {
+    ...base,
+    amps: filters.amps,
+    water: filters.water,
+    sewer: filters.sewer,
+    dumpStation: filters.dumpStation,
+    drivewayType: filters.drivewayType,
+    rigLength: filters.rigLength,
+    stayKind: filters.stayKind,
+  };
+}
+
 export default function CampgroundListControls({
   resultCount,
   provinces,
@@ -109,13 +140,17 @@ export default function CampgroundListControls({
     lng: searchParams.get("lng") ?? undefined,
     radiusKm: searchParams.get("radiusKm") ?? undefined,
   });
-  const urlHookups = parseCampgroundHookups({
+  const urlFilters = parseCampgroundSiteFilters({
     amps: searchParams.get("amps") ?? undefined,
     electricity: searchParams.get("electricity") ?? undefined,
     water: searchParams.get("water") ?? undefined,
     sewer: searchParams.get("sewer") ?? undefined,
+    dump: searchParams.get("dump") ?? undefined,
+    driveway: searchParams.get("driveway") ?? undefined,
+    rigLength: searchParams.get("rigLength") ?? undefined,
+    stay: searchParams.get("stay") ?? undefined,
   });
-  const urlHookupsKey = hookupsKey(urlHookups);
+  const urlFiltersKey = siteFiltersKey(urlFilters);
   const sortParam = parseCampgroundSort(
     searchParams.get("sort") ?? undefined,
     { geoActive: Boolean(geo) },
@@ -128,25 +163,31 @@ export default function CampgroundListControls({
   const [search, setSearch] = useState(qParam);
   const [prevQParam, setPrevQParam] = useState(qParam);
   const [lastPushedQ, setLastPushedQ] = useState(qParam);
-  const [localHookups, setLocalHookups] = useState(urlHookups);
-  const [prevUrlHookupsKey, setPrevUrlHookupsKey] = useState(urlHookupsKey);
-  const [lastPushedHookupsKey, setLastPushedHookupsKey] =
-    useState(urlHookupsKey);
+  const [localFilters, setLocalFilters] = useState(urlFilters);
+  const [prevUrlFiltersKey, setPrevUrlFiltersKey] = useState(urlFiltersKey);
+  const [lastPushedFiltersKey, setLastPushedFiltersKey] =
+    useState(urlFiltersKey);
+  const [rigDraft, setRigDraft] = useState(
+    urlFilters.rigLength != null ? String(urlFilters.rigLength) : "",
+  );
 
   const debounceTimeoutRef = useRef<number | null>(null);
+  const rigDebounceRef = useRef<number | null>(null);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
-  const latestParamsRef = useRef<CampgroundQueryState>({
-    q: search,
-    sort: sortParam,
-    province: provinceParam,
-    lat: geo?.lat,
-    lng: geo?.lng,
-    radiusKm: geo?.radiusKm ?? preferredRadius,
-    amps: localHookups.amps,
-    water: localHookups.water,
-    sewer: localHookups.sewer,
-  });
+  const latestParamsRef = useRef<CampgroundQueryState>(
+    queryStateFromFilters(
+      {
+        q: search,
+        sort: sortParam,
+        province: provinceParam,
+        lat: geo?.lat,
+        lng: geo?.lng,
+        radiusKm: geo?.radiusKm ?? preferredRadius,
+      },
+      localFilters,
+    ),
+  );
 
   // Sync input from URL only for external changes (back/forward / Clear).
   if (qParam !== prevQParam) {
@@ -159,16 +200,15 @@ export default function CampgroundListControls({
     }
   }
 
-  // Sync hookup *state* from URL only for external changes (not our pending push).
-  // Ref updates happen in an effect below (react-hooks/refs forbids ref writes in render).
-  if (urlHookupsKey !== prevUrlHookupsKey) {
-    setPrevUrlHookupsKey(urlHookupsKey);
-    if (urlHookupsKey !== lastPushedHookupsKey) {
-      setLastPushedHookupsKey(urlHookupsKey);
-      setLocalHookups(urlHookups);
-    } else {
-      setLocalHookups(urlHookups);
+  if (urlFiltersKey !== prevUrlFiltersKey) {
+    setPrevUrlFiltersKey(urlFiltersKey);
+    if (urlFiltersKey !== lastPushedFiltersKey) {
+      setLastPushedFiltersKey(urlFiltersKey);
     }
+    setLocalFilters(urlFilters);
+    setRigDraft(
+      urlFilters.rigLength != null ? String(urlFilters.rigLength) : "",
+    );
   }
 
   // Keep preferred radius in sync when geo URL changes (e.g. back/forward).
@@ -179,21 +219,18 @@ export default function CampgroundListControls({
     setPrevGeoRadius(undefined);
   }
 
-  // Keep latestParamsRef aligned with URL/search + local hookups. Hookup local
-  // state is optimistic; this effect runs after render so pending toggles that
-  // already updated the ref via replaceQuery are not clobbered by stale URL.
   useEffect(() => {
-    latestParamsRef.current = {
-      q: search,
-      sort: sortParam,
-      province: provinceParam,
-      lat: geo?.lat,
-      lng: geo?.lng,
-      radiusKm: geo?.radiusKm ?? preferredRadius,
-      amps: localHookups.amps,
-      water: localHookups.water,
-      sewer: localHookups.sewer,
-    };
+    latestParamsRef.current = queryStateFromFilters(
+      {
+        q: search,
+        sort: sortParam,
+        province: provinceParam,
+        lat: geo?.lat,
+        lng: geo?.lng,
+        radiusKm: geo?.radiusKm ?? preferredRadius,
+      },
+      localFilters,
+    );
   }, [
     search,
     sortParam,
@@ -202,9 +239,7 @@ export default function CampgroundListControls({
     geo?.lng,
     geo?.radiusKm,
     preferredRadius,
-    localHookups.amps,
-    localHookups.water,
-    localHookups.sewer,
+    localFilters,
   ]);
 
   useEffect(() => {
@@ -220,6 +255,10 @@ export default function CampgroundListControls({
       window.clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
     }
+    if (rigDebounceRef.current != null) {
+      window.clearTimeout(rigDebounceRef.current);
+      rigDebounceRef.current = null;
+    }
   }
 
   function cancelGeolocation() {
@@ -230,13 +269,22 @@ export default function CampgroundListControls({
   function replaceQuery(next: CampgroundQueryState) {
     const trimmedQ = next.q.trim();
     setLastPushedQ(trimmedQ);
-    const nextHookupsKey = hookupsKey(next);
-    setLastPushedHookupsKey(nextHookupsKey);
-    setLocalHookups({
+    const nextKey = siteFiltersKey(next);
+    setLastPushedFiltersKey(nextKey);
+    setLocalFilters({
       amps: next.amps,
       water: next.water,
       sewer: next.sewer,
+      dumpStation: next.dumpStation,
+      drivewayType: next.drivewayType,
+      rigLength: next.rigLength,
+      stayKind: next.stayKind,
     });
+    if (!stayKindAllowsRigLength(next.stayKind)) {
+      setRigDraft("");
+    } else if (next.rigLength != null) {
+      setRigDraft(String(next.rigLength));
+    }
     latestParamsRef.current = next;
 
     const params = buildCampgroundSearchParams(next);
@@ -327,12 +375,13 @@ export default function CampgroundListControls({
     search ||
       provinceParam ||
       geo ||
-      anyHookupFilterActive(localHookups),
+      anySiteFilterActive(localFilters),
   );
   // Discrete controls only — keep the search input enabled during isPending so
   // typing is not blurred/lost while router.replace transitions.
   const discreteControlsDisabled = geoBusy || isPending;
-  const selectedAmps = new Set(localHookups.amps);
+  const selectedAmps = new Set(localFilters.amps);
+  const showRigLength = stayKindAllowsRigLength(localFilters.stayKind);
 
   return (
     <div
@@ -405,6 +454,32 @@ export default function CampgroundListControls({
           </SelectContent>
         </Select>
 
+        <Select
+          value={localFilters.stayKind ?? STAY_ANY}
+          disabled={discreteControlsDisabled}
+          onValueChange={(value) => {
+            clearDebounce();
+            const stayKind: StayKind | undefined =
+              value === STAY_ANY ? undefined : (value as StayKind);
+            replaceQuery(
+              withLatestCampgroundFilters(latestParamsRef.current, {
+                q: search,
+                sort: latestParamsRef.current.sort,
+                stayKind,
+              }),
+            );
+          }}
+        >
+          <SelectTrigger className="w-44" aria-label={t("stayKindLabel")}>
+            <SelectValue placeholder={t("stayKindLabel")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={STAY_ANY}>{t("stayKindAny")}</SelectItem>
+            <SelectItem value="camping">{t("stayKindCamping")}</SelectItem>
+            <SelectItem value="lodging">{t("stayKindLodging")}</SelectItem>
+          </SelectContent>
+        </Select>
+
         {geo ? (
           <Select
             value={String(geo.radiusKm)}
@@ -459,6 +534,7 @@ export default function CampgroundListControls({
               clearDebounce();
               cancelGeolocation();
               setSearch("");
+              setRigDraft("");
               setGeoError(null);
               replaceQuery(clearedCampgroundQueryState());
             }}
@@ -475,11 +551,14 @@ export default function CampgroundListControls({
       <div
         className="space-y-3"
         role="group"
-        aria-labelledby="hookups-label"
-        aria-describedby="hookups-hint"
+        aria-labelledby="site-filters-label"
+        aria-describedby="site-filters-hint"
       >
-        <p id="hookups-label" className="text-sm font-medium text-foreground">
-          {t("hookupsLabel")}
+        <p
+          id="site-filters-label"
+          className="text-sm font-medium text-foreground"
+        >
+          {t("siteFiltersLabel")}
         </p>
         <fieldset
           className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
@@ -532,7 +611,7 @@ export default function CampgroundListControls({
               <div key={key} className="flex items-center gap-2">
                 <Checkbox
                   id={id}
-                  checked={localHookups[key]}
+                  checked={localFilters[key]}
                   disabled={discreteControlsDisabled}
                   onCheckedChange={(checked) => {
                     clearDebounce();
@@ -552,8 +631,119 @@ export default function CampgroundListControls({
             );
           })}
         </fieldset>
-        <p id="hookups-hint" className="text-xs text-muted-foreground">
-          {t("hookupsHint")}
+
+        <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+          <div>
+            <Label
+              htmlFor="driveway-filter"
+              className="text-sm font-medium text-muted-foreground"
+            >
+              {t("drivewayLabel")}
+            </Label>
+            <Select
+              value={localFilters.drivewayType ?? DRIVEWAY_ANY}
+              disabled={discreteControlsDisabled}
+              onValueChange={(value) => {
+                clearDebounce();
+                const drivewayType: DrivewayType | undefined =
+                  value === DRIVEWAY_ANY
+                    ? undefined
+                    : (value as DrivewayType);
+                replaceQuery(
+                  withLatestCampgroundFilters(latestParamsRef.current, {
+                    q: search,
+                    sort: latestParamsRef.current.sort,
+                    drivewayType,
+                  }),
+                );
+              }}
+            >
+              <SelectTrigger
+                id="driveway-filter"
+                className="w-48 mt-1.5"
+                aria-label={t("drivewayLabel")}
+              >
+                <SelectValue placeholder={t("drivewayLabel")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DRIVEWAY_ANY}>
+                  {t("drivewayAny")}
+                </SelectItem>
+                <SelectItem value="PULL_THROUGH">
+                  {t("drivewayPullThrough")}
+                </SelectItem>
+                <SelectItem value="BACK_IN">{t("drivewayBackIn")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {showRigLength ? (
+            <div>
+              <Label
+                htmlFor="rig-length-filter"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                {t("rigLengthLabel")}
+              </Label>
+              <Input
+                id="rig-length-filter"
+                type="number"
+                min={1}
+                max={200}
+                inputMode="decimal"
+                className="w-36 mt-1.5"
+                placeholder={t("rigLengthPlaceholder")}
+                value={rigDraft}
+                disabled={discreteControlsDisabled}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setRigDraft(value);
+                  if (rigDebounceRef.current != null) {
+                    window.clearTimeout(rigDebounceRef.current);
+                  }
+                  rigDebounceRef.current = window.setTimeout(() => {
+                    rigDebounceRef.current = null;
+                    replaceQuery(
+                      withLatestCampgroundFilters(latestParamsRef.current, {
+                        q: search,
+                        sort: latestParamsRef.current.sort,
+                        rigLength: parseGuestRigLength(value),
+                      }),
+                    );
+                  }, 300);
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
+        <p id="site-filters-hint" className="text-xs text-muted-foreground">
+          {t("siteFiltersHint")}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="dump-station"
+            checked={localFilters.dumpStation}
+            disabled={discreteControlsDisabled}
+            onCheckedChange={(checked) => {
+              clearDebounce();
+              replaceQuery(
+                withLatestCampgroundFilters(latestParamsRef.current, {
+                  q: search,
+                  sort: latestParamsRef.current.sort,
+                  dumpStation: checked === true,
+                }),
+              );
+            }}
+          />
+          <Label htmlFor="dump-station" className="font-normal cursor-pointer">
+            {t("filterDumpStation")}
+          </Label>
+        </div>
+        <p className="text-xs text-muted-foreground w-full sm:w-auto">
+          {t("dumpStationHint")}
         </p>
       </div>
 

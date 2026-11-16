@@ -8,8 +8,11 @@ import {
 } from "@/data/campgrounds/get-campgrounds";
 import {
   formatCampgroundAmpsParam,
+  formatDrivewayUrlParam,
+  formatGuestRigLengthParam,
+  formatStayKindParam,
   parseCampgroundGeo,
-  parseCampgroundHookups,
+  parseCampgroundSiteFilters,
   parseCampgroundSort,
 } from "@/lib/campground-search";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
@@ -42,16 +45,23 @@ export default async function Home({ searchParams }: PageProps) {
     lng: firstParam(params.lng),
     radiusKm: firstParam(params.radiusKm),
   });
-  const hookups = parseCampgroundHookups({
+  const siteFilters = parseCampgroundSiteFilters({
     amps: firstParam(params.amps),
     electricity: firstParam(params.electricity),
     water: firstParam(params.water),
     sewer: firstParam(params.sewer),
+    dump: firstParam(params.dump),
+    driveway: firstParam(params.driveway),
+    rigLength: firstParam(params.rigLength),
+    stay: firstParam(params.stay),
   });
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
   });
-  const ampsKey = formatCampgroundAmpsParam(hookups.amps) ?? "";
+  const ampsKey = formatCampgroundAmpsParam(siteFilters.amps) ?? "";
+  const drivewayKey = formatDrivewayUrlParam(siteFilters.drivewayType) ?? "";
+  const rigLengthKey = formatGuestRigLengthParam(siteFilters.rigLength) ?? "";
+  const stayKey = formatStayKindParam(siteFilters.stayKind) ?? "";
 
   const [campgroundsResult, provincesResult] = await Promise.all([
     getCampgrounds(
@@ -62,8 +72,12 @@ export default async function Home({ searchParams }: PageProps) {
       geo?.lng,
       geo?.radiusKm,
       ampsKey,
-      hookups.water,
-      hookups.sewer,
+      siteFilters.water,
+      siteFilters.sewer,
+      siteFilters.dumpStation,
+      drivewayKey,
+      rigLengthKey,
+      stayKey,
     ),
     getCampgroundProvinces(),
   ]);
@@ -105,8 +119,12 @@ export default async function Home({ searchParams }: PageProps) {
     province ?? "",
     geo ? `${geo.lat},${geo.lng},${geo.radiusKm}` : "",
     ampsKey,
-    hookups.water ? "w" : "",
-    hookups.sewer ? "s" : "",
+    siteFilters.water ? "w" : "",
+    siteFilters.sewer ? "s" : "",
+    siteFilters.dumpStation ? "d" : "",
+    drivewayKey,
+    rigLengthKey,
+    stayKey,
   ].join("|");
 
   return (

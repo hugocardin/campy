@@ -2,6 +2,7 @@
 
 import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import { redirect } from "@/i18n/navigation";
+import { parseDrivewayTypeInput } from "@/lib/driveway-type";
 import { parseElectricityAmpsInput } from "@/lib/electricity-amps";
 import {
   ActionResult,
@@ -57,6 +58,13 @@ export async function updateSiteAction(
     );
   }
 
+  const drivewayParsed = parseDrivewayTypeInput(input.driveway_type);
+  if (!drivewayParsed.ok) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "driveway_type",
+    });
+  }
+
   try {
     const supabase = await createClient();
 
@@ -68,11 +76,12 @@ export async function updateSiteAction(
         .update({
           name: input.name,
           site_type_id: input.site_type_id,
-          max_rig_length: input.max_rig_length,
+          max_rig_length: input.max_rig_length ?? null,
           price_per_night_base: input.price_per_night,
           min_stay_nights: input.min_stay_nights,
           description: input.description,
           electricity_amps: ampsParsed.amps,
+          driveway_type: drivewayParsed.drivewayType,
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id)
@@ -115,6 +124,13 @@ export async function createSiteAction(
     );
   }
 
+  const drivewayParsed = parseDrivewayTypeInput(input.driveway_type);
+  if (!drivewayParsed.ok) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "driveway_type",
+    });
+  }
+
   let newSiteId;
   try {
     const supabase = await createClient();
@@ -131,6 +147,7 @@ export async function createSiteAction(
           min_stay_nights: input.min_stay_nights,
           description: input.description,
           electricity_amps: ampsParsed.amps,
+          driveway_type: drivewayParsed.drivewayType,
         })
 
         .select("id")

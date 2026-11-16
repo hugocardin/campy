@@ -6,6 +6,7 @@ import {
   DEFAULT_CAMPGROUND_RADIUS_KM,
   HOOKUP_AMENITY_CODES,
   anyHookupFilterActive,
+  anySiteFilterActive,
   campgroundRadiusMeters,
   campgroundSortQueryValue,
   formatCampgroundAmpsParam,
@@ -14,6 +15,7 @@ import {
   parseCampgroundGeo,
   parseCampgroundHookups,
   parseCampgroundRadiusKm,
+  parseCampgroundSiteFilters,
   parseCampgroundSort,
   parseHookupFlag,
   roundCampgroundCoord,
@@ -178,5 +180,62 @@ describe("hookup URL filters", () => {
   it("serializes amps for the URL", () => {
     assert.equal(formatCampgroundAmpsParam([]), undefined);
     assert.equal(formatCampgroundAmpsParam(["none", 50, 15]), "none,15,50");
+  });
+});
+
+describe("site filters (dump / driveway / rig / stay)", () => {
+  it("parses dump driveway rig stay URL params", () => {
+    assert.deepEqual(
+      parseCampgroundSiteFilters({
+        dump: "1",
+        driveway: "pull_through",
+        rigLength: "35",
+        stay: "camping",
+        water: "1",
+      }),
+      {
+        amps: [],
+        water: true,
+        sewer: false,
+        dumpStation: true,
+        drivewayType: "PULL_THROUGH",
+        rigLength: 35,
+        stayKind: "camping",
+      },
+    );
+  });
+
+  it("ignores rig length when stay is lodging", () => {
+    const filters = parseCampgroundSiteFilters({
+      rigLength: "40",
+      stay: "lodging",
+    });
+    assert.equal(filters.stayKind, "lodging");
+    assert.equal(filters.rigLength, undefined);
+  });
+
+  it("detects any site filter active", () => {
+    assert.equal(
+      anySiteFilterActive({
+        amps: [],
+        water: false,
+        sewer: false,
+        dumpStation: false,
+      }),
+      false,
+    );
+    assert.equal(
+      anySiteFilterActive({
+        amps: [],
+        water: false,
+        sewer: false,
+        dumpStation: true,
+      }),
+      true,
+    );
+    assert.equal(
+      anyHookupFilterActive({ amps: [], water: false, sewer: false }),
+      false,
+    );
   });
 });

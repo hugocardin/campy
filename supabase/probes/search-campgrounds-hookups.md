@@ -1,4 +1,4 @@
-# Probe: hookup filters on `search_campgrounds` / `search_campgrounds_near`
+# Probe: hookup / dump / driveway / rig filters on search RPCs
 
 Migrations:
 
@@ -6,6 +6,7 @@ Migrations:
 - `20261115191846_search_hookups_harden` (cleanup demo links, per-site AND, drop `province text` overload, protect codes)
 - `20261116014604_sites_electricity_amps` (site `electricity_amps`; `require_amps`; WATER/SEWER only)
 - `20261116015837_sites_electricity_amps_harden` (amp values helper; compat boolean overloads; retire ELECTRICITY amenity)
+- `20261116021437_dump_driveway_rig_search` (DUMP_STATION; `driveway_type`; `min_rig_length`; `stay_kind`; protect DUMP_STATION)
 
 ## Filters
 
@@ -15,29 +16,36 @@ Migrations:
 | `electricity=1` (legacy) | App maps to amps `15,20,30,50` (“any amp”) when `amps` absent |
 | `water=1` | same site → `site_amenities` `WATER` |
 | `sewer=1` | same site → `site_amenities` `SEWER` |
+| `driveway=pull_through\|back_in` | same site → `sites.driveway_type` |
+| `rigLength=35` | same site → `max_rig_length >= 35` (ignored when `stay=lodging`) |
+| `stay=camping\|lodging` | same site → non-LODGING / LODGING site type |
+| `dump=1` | park → `campground_amenities` `DUMP_STATION` (not same-site) |
 
-Semantics: campground matches when **one site** satisfies the amp overlap (if any) **and** every selected water/sewer amenity.
+Semantics: campground matches when **one site** satisfies the site-level filters (amps, water/sewer, driveway, rig, stay) **and** (if selected) the park has a dump station.
 
-Demo amps + water/sewer links live in `supabase/seed.sql` only (not schema migrations).
+Demo dump / driveway / amps / water/sewer links live in `supabase/seed.sql` only (not schema migrations).
 
 ## SQL
 
 ```sql
-SELECT code FROM public.amenities WHERE code IN ('ELECTRICITY','WATER','SEWER') ORDER BY 1;
-
-SELECT name, electricity_amps FROM public.sites
-WHERE cardinality(electricity_amps) > 0
+SELECT code FROM public.amenities
+WHERE code IN ('WATER','SEWER','DUMP_STATION')
 ORDER BY 1;
 
--- Empty ELECTRICITY site links after amps migration:
-SELECT count(*) FROM public.site_amenities sa
-JOIN public.amenities a ON a.id = sa.amenity_id
-WHERE a.code = 'ELECTRICITY';
+SELECT name, electricity_amps, driveway_type, max_rig_length
+FROM public.sites
+ORDER BY 1;
 
 SELECT count(*) FROM public.search_campgrounds_near(49.28, -123.12, 100000);
 
 SELECT name FROM public.search_campgrounds(
-  NULL, NULL, ARRAY[30]::smallint[], true, true
+  NULL, NULL, ARRAY[30]::smallint[], true, true,
+  false, 'PULL_THROUGH', 30, 'camping'
+);
+
+SELECT name FROM public.search_campgrounds(
+  NULL, NULL, NULL, false, false,
+  true, NULL, NULL, NULL
 );
 
 SELECT pg_get_function_identity_arguments(oid)
@@ -49,5 +57,5 @@ ORDER BY 1;
 
 Expected identities:
 
-- `search_campgrounds(q text, province_aliases text[], require_amps smallint[], require_water boolean, require_sewer boolean)`
-- `search_campgrounds_near(lat float8, lng float8, radius_m float8, q text, province_aliases text[], require_amps smallint[], require_water boolean, require_sewer boolean)`
+- `search_campgrounds(q text, province_aliases text[], require_amps smallint[], require_water boolean, require_sewer boolean, require_dump_station boolean, require_driveway_type text, min_rig_length numeric, stay_kind text)`
+- `search_campgrounds_near(lat float8, lng float8, radius_m float8, q text, province_aliases text[], require_amps smallint[], require_water boolean, require_sewer boolean, require_dump_station boolean, require_driveway_type text, min_rig_length numeric, stay_kind text)`
