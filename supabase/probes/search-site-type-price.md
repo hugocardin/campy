@@ -1,6 +1,9 @@
 # Probe: fine site type + price filter/sort (#24 leftovers)
 
-Migration: `20261116053654_search_site_type_price_filters`
+Migrations:
+
+- `20261116053654_search_site_type_price_filters`
+- `20261116054943_search_site_type_price_review_fix` (#40 review: single match predicate, post-LIMIT min_price, site_types table allow-list, CAD base-price comment)
 
 ## Design
 
