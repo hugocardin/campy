@@ -38,6 +38,12 @@ export const CAMPGROUND_PROVINCES_CACHE_TAG = "campground-provinces";
 export type { CampgroundListFilters, CampgroundSort } from "@/lib/campground-search";
 export { parseCampgroundSort } from "@/lib/campground-search";
 
+export type CampgroundSearchPayload = {
+  campgrounds: Campground[];
+  /** True when non-geo RPC returned more than SEARCH_CAMPGROUNDS_LIMIT. */
+  truncated: boolean;
+};
+
 /** Guest-safe columns — never select commission_* from v_campgrounds. */
 export const GUEST_CAMPGROUND_COLUMNS =
   "id, name, description, address, city, province, country, latitude, longitude, website, phone" as const;
@@ -242,7 +248,7 @@ export const getCampgrounds = cache(
     lng?: number,
     radiusKm?: number,
     siteFiltersKey = "",
-  ): Promise<ActionResult<Campground[]>> => {
+  ): Promise<ActionResult<CampgroundSearchPayload>> => {
     try {
       const supabase = await createClient();
       const geo = validateCampgroundGeo(lat, lng, radiusKm);
@@ -288,12 +294,12 @@ export const getCampgrounds = cache(
           return result;
         }
 
-        const rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
-        // RPC already ORDER BY distance; re-sort only when user picked another key.
-        if (resolvedSort === "distance") {
-          return resultSuccess(rows);
+        let rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
+        // Near RPC is SQL-ordered by distance; only re-sort for other keys.
+        if (resolvedSort !== "distance") {
+          rows = sortCampgrounds(rows, resolvedSort);
         }
-        return resultSuccess(sortCampgrounds(rows, resolvedSort));
+        return resultSuccess({ campgrounds: rows, truncated: false });
       }
 
       const nonGeoSort =
@@ -301,6 +307,7 @@ export const getCampgrounds = cache(
 
       // Text / province / site filters use search_campgrounds (unaccent + trigram
       // via campground_text_matches; ORDER BY + LIMIT in SQL — #24 / #25).
+      // Trust SQL order (no JS re-sort). Fetch limit+1 to detect truncation.
       if (term || provinceAliases.length > 0 || siteFiltersActive) {
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds", {
@@ -309,7 +316,7 @@ export const getCampgrounds = cache(
               provinceAliases.length > 0 ? provinceAliases : null,
             ...siteFilterRpcArgs(siteFilters),
             sort_key: nonGeoSort,
-            result_limit: SEARCH_CAMPGROUNDS_LIMIT,
+            result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
         );
 
@@ -317,9 +324,12 @@ export const getCampgrounds = cache(
           return result;
         }
 
-        const rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
-        // RPC already sorted + capped; keep JS sort as a stable tie-break.
-        return resultSuccess(sortCampgrounds(rows, nonGeoSort));
+        const mapped = (result.data as CampgroundRow[]).map(toCampgroundDomain);
+        const truncated = mapped.length > SEARCH_CAMPGROUNDS_LIMIT;
+        const campgrounds = truncated
+          ? mapped.slice(0, SEARCH_CAMPGROUNDS_LIMIT)
+          : mapped;
+        return resultSuccess({ campgrounds, truncated });
       }
 
       const { column, ascending } = CAMPGROUND_SORT_CONFIG[nonGeoSort];
@@ -339,7 +349,10 @@ export const getCampgrounds = cache(
         return result;
       }
 
-      return resultSuccess(result.data.map(toCampgroundDomain));
+      return resultSuccess({
+        campgrounds: result.data.map(toCampgroundDomain),
+        truncated: false,
+      });
     } catch (err) {
       return handleUnexpectedError(err);
     }

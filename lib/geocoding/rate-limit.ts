@@ -1,11 +1,11 @@
 import "server-only";
 
-import { getSupabaseAnon } from "@/lib/supabase/anon-server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 
 /**
- * Photon proxy fair-use limiter (#24).
- * Prefers shared Supabase token buckets (`geocode_rate_limit_take`); falls
- * back to process-local buckets when the RPC is unavailable.
+ * Photon proxy fair-use limiter (#24 / #39).
+ * Shared gate via service-role `photon_proxy_admit` (hard-coded caps in SQL).
+ * Falls back to process-local buckets when the RPC is unavailable.
  */
 
 type Bucket = {
@@ -16,19 +16,20 @@ type Bucket = {
 const buckets = new Map<string, Bucket>();
 const MAX_KEYS = 2000;
 
-/** Per-IP: ~1 req / 500 ms, burst 8. */
+/** Per-IP: ~1 req / 500 ms, burst 8 (must match SQL hard-codes). */
 export const IP_CAPACITY = 8;
 export const IP_REFILL_PER_MS = 1 / 500;
 
-/** Global upstream cap (all clients): ~10 req/s, burst 40. */
+/** Global upstream cap: ~10 req/s, burst 40 (must match SQL hard-codes). */
 export const UPSTREAM_CAPACITY = 40;
 export const UPSTREAM_REFILL_PER_MS = 1 / 100;
 
-/** Legacy alias when IP is unknown — same shape as upstream. */
 export const GLOBAL_CAPACITY = UPSTREAM_CAPACITY;
 export const GLOBAL_REFILL_PER_MS = UPSTREAM_REFILL_PER_MS;
 
 export const PHOTON_UPSTREAM_BUCKET_KEY = "photon:upstream";
+
+export type PhotonAdmitStatus = "ok" | "circuit_open" | "limited";
 
 function localAllow(
   key: string,
@@ -58,64 +59,82 @@ function localAllow(
   return true;
 }
 
-async function sharedAllow(
-  key: string,
-  capacity: number,
-  refillPerMs: number,
-): Promise<boolean | null> {
+/**
+ * Normalize client IP for bucket keys: IPv6 → /64 prefix to bound growth.
+ */
+export function photonClientBucketKey(clientIp: string | null): string | null {
+  if (!clientIp) return null;
+  const trimmed = clientIp.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes(":")) {
+    // IPv6: keep first 4 hextets (/64).
+    const parts = trimmed.split(":").filter((p) => p.length > 0);
+    if (parts.length >= 4) {
+      return `photon:ip:${parts.slice(0, 4).join(":")}:/64`;
+    }
+  }
+  return `photon:ip:${trimmed}`;
+}
+
+function localAdmitPhoton(clientIp: string | null): PhotonAdmitStatus {
+  if (clientIp) {
+    const ipKey = photonClientBucketKey(clientIp);
+    if (
+      ipKey &&
+      !localAllow(ipKey, IP_CAPACITY, IP_REFILL_PER_MS)
+    ) {
+      return "limited";
+    }
+  }
+  if (
+    !localAllow(
+      PHOTON_UPSTREAM_BUCKET_KEY,
+      UPSTREAM_CAPACITY,
+      UPSTREAM_REFILL_PER_MS,
+    )
+  ) {
+    return "limited";
+  }
+  return "ok";
+}
+
+/**
+ * One round trip: circuit + IP-first + upstream (service-role RPC).
+ * Returns null only when the shared path failed (caller may fall back locally).
+ */
+export async function photonProxyAdmit(
+  clientIp: string | null,
+): Promise<PhotonAdmitStatus | null> {
   try {
-    const supabase = getSupabaseAnon();
-    const { data, error } = await supabase.rpc("geocode_rate_limit_take", {
-      p_key: key,
-      p_capacity: capacity,
-      p_refill_per_ms: refillPerMs,
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase.rpc("photon_proxy_admit", {
+      p_client_key: photonClientBucketKey(clientIp),
     });
     if (error) {
-      console.warn("[geocode-rate-limit] shared RPC failed", error.message);
+      console.warn("[geocode-rate-limit] photon_proxy_admit failed", error.message);
       return null;
     }
-    return data === true;
+    if (data === "ok" || data === "circuit_open" || data === "limited") {
+      return data;
+    }
+    console.warn("[geocode-rate-limit] unexpected admit status", data);
+    return "limited";
   } catch (err) {
-    console.warn("[geocode-rate-limit] shared RPC threw", err);
+    console.warn("[geocode-rate-limit] photon_proxy_admit threw", err);
     return null;
   }
 }
 
 /**
- * Take one token from a named bucket. Tries shared storage first.
- */
-export async function geocodeRateLimitAllow(
-  key: string,
-  options?: { capacity?: number; refillPerMs?: number },
-): Promise<boolean> {
-  const capacity = options?.capacity ?? IP_CAPACITY;
-  const refill = options?.refillPerMs ?? IP_REFILL_PER_MS;
-
-  const shared = await sharedAllow(key, capacity, refill);
-  if (shared != null) return shared;
-  return localAllow(key, capacity, refill);
-}
-
-/**
- * Dual check: global upstream Photon cap AND per-client IP bucket.
- * When IP is unknown, only the upstream bucket is enforced (avoid stacking
- * two identical global keys).
+ * Dual check with IP before upstream. Shared admit when available.
  */
 export async function geocodeRateLimitAllowPhoton(
   clientIp: string | null,
 ): Promise<boolean> {
-  const upstreamOk = await geocodeRateLimitAllow(PHOTON_UPSTREAM_BUCKET_KEY, {
-    capacity: UPSTREAM_CAPACITY,
-    refillPerMs: UPSTREAM_REFILL_PER_MS,
-  });
-  if (!upstreamOk) return false;
-
-  if (!clientIp) return true;
-
-  return geocodeRateLimitAllow(`photon:ip:${clientIp}`, {
-    capacity: IP_CAPACITY,
-    refillPerMs: IP_REFILL_PER_MS,
-  });
+  const shared = await photonProxyAdmit(clientIp);
+  if (shared != null) return shared === "ok";
+  return localAdmitPhoton(clientIp) === "ok";
 }
 
 /** Sync process-local take — tests / emergency only. */

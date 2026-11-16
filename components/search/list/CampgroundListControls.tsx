@@ -62,6 +62,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 type Props = {
   resultCount: number;
+  /** Non-geo RPC hit the SQL LIMIT — hint to refine filters. */
+  resultsTruncated?: boolean;
   provinces: string[];
 };
 
@@ -134,6 +136,7 @@ function queryStateFromFilters(
 
 export default function CampgroundListControls({
   resultCount,
+  resultsTruncated = false,
   provinces,
 }: Props) {
   const t = useTranslations("search.controls");
@@ -773,8 +776,11 @@ export default function CampgroundListControls({
           </Button>
         ) : null}
 
-        <div className="text-sm text-muted-foreground md:ml-auto">
-          {t("resultCount", { count: resultCount })}
+        <div className="text-sm text-muted-foreground md:ml-auto space-y-0.5">
+          <p>{t("resultCount", { count: resultCount })}</p>
+          {resultsTruncated ? (
+            <p className="text-xs">{t("resultsTruncated")}</p>
+          ) : null}
         </div>
       </div>
 

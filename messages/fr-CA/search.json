@@ -66,6 +66,7 @@
     "searchCenter": "Centre de recherche",
     "searchThisArea": "Chercher dans cette zone",
     "resultCount": "{count, plural, =0 {Aucun camping} one {Affichage de # camping} many {Affichage de # campings} other {Affichage de # campings}}",
+    "resultsTruncated": "Il y a d’autres résultats — affinez votre recherche pour tous les voir.",
     "noResults": "Aucun camping ne correspond à votre recherche.",
     "noResultsFor": "Aucun camping ne correspond à « {query} ».",
     "viewCampground": "Voir le camping",

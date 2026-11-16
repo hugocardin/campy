@@ -66,6 +66,7 @@
     "searchCenter": "Search center",
     "searchThisArea": "Search this area",
     "resultCount": "{count, plural, =0 {No campgrounds} one {Showing # campground} other {Showing # campgrounds}}",
+    "resultsTruncated": "More matches exist — refine your search to see them all.",
     "noResults": "No campgrounds match your search.",
     "noResultsFor": "No campgrounds match “{query}”.",
     "viewCampground": "View campground",

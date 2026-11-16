@@ -3,8 +3,8 @@
 import { Campground } from "@/entities/campground";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import {
-  DEFAULT_CAMPGROUND_RADIUS_KM,
-  parseCampgroundRadiusKm,
+  CAMPGROUND_RADIUS_KM_PRESETS,
+  type CampgroundRadiusKm,
   roundCampgroundCoord,
 } from "@/lib/campground-search";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
@@ -14,7 +14,14 @@ import L, { type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type MutableRefObject,
+} from "react";
 import {
   Circle,
   CircleMarker,
@@ -117,12 +124,38 @@ function MapStatusLiveRegion({
 }
 
 /**
- * Notify parent when the user pans the map (map child; renders nothing).
- * dragend only — zoomend also fires on programmatic fitBounds (#24).
+ * Snap viewport half-span (center → nearest edge) up to a radius preset.
  */
-function MapUserMoveWatcher({ onUserMove }: { onUserMove: () => void }) {
+function radiusKmFromMapViewport(map: L.Map): CampgroundRadiusKm {
+  const center = map.getCenter();
+  const bounds = map.getBounds();
+  const halfHeightKm =
+    center.distanceTo(L.latLng(bounds.getNorth(), center.lng)) / 1000;
+  const halfWidthKm =
+    center.distanceTo(L.latLng(center.lat, bounds.getEast())) / 1000;
+  const km = Math.min(halfHeightKm, halfWidthKm);
+  for (const preset of CAMPGROUND_RADIUS_KM_PRESETS) {
+    if (km <= preset) return preset;
+  }
+  return CAMPGROUND_RADIUS_KM_PRESETS[CAMPGROUND_RADIUS_KM_PRESETS.length - 1];
+}
+
+/**
+ * Notify parent on user-driven map moves (pan / zoom / keyboard).
+ * Ignores programmatic fitBounds/setView via suppressRef (#39 review).
+ */
+function MapUserMoveWatcher({
+  onUserMove,
+  suppressRef,
+}: {
+  onUserMove: () => void;
+  suppressRef: MutableRefObject<boolean>;
+}) {
   useMapEvents({
-    dragend: () => onUserMove(),
+    moveend: () => {
+      if (suppressRef.current) return;
+      onUserMove();
+    },
   });
   return null;
 }
@@ -145,17 +178,29 @@ function FitMarkers({
   searchCenter,
   radiusKm,
   freezeView,
+  suppressRef,
 }: {
   positions: LatLngTuple[];
   searchCenter?: LatLngTuple;
   radiusKm?: number;
   /** When true (empty non-geo search), leave the current map view alone. */
   freezeView?: boolean;
+  suppressRef: MutableRefObject<boolean>;
 }) {
   const map = useMap();
 
   useEffect(() => {
     if (freezeView) return;
+
+    const runProgrammatic = (fn: () => void) => {
+      suppressRef.current = true;
+      fn();
+      map.once("moveend", () => {
+        requestAnimationFrame(() => {
+          suppressRef.current = false;
+        });
+      });
+    };
 
     if (
       searchCenter &&
@@ -169,21 +214,29 @@ function FitMarkers({
       for (const position of positions) {
         bounds.extend(position);
       }
-      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 10 });
+      runProgrammatic(() => {
+        map.fitBounds(bounds, { padding: [48, 48], maxZoom: 10 });
+      });
       return;
     }
 
     const all = searchCenter ? [...positions, searchCenter] : positions;
     if (all.length === 0) {
-      map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      runProgrammatic(() => {
+        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      });
       return;
     }
     if (all.length === 1) {
-      map.setView(all[0], 9);
+      runProgrammatic(() => {
+        map.setView(all[0], 9);
+      });
       return;
     }
-    map.fitBounds(all, { padding: [48, 48], maxZoom: 10 });
-  }, [map, positions, searchCenter, radiusKm, freezeView]);
+    runProgrammatic(() => {
+      map.fitBounds(all, { padding: [48, 48], maxZoom: 10 });
+    });
+  }, [map, positions, searchCenter, radiusKm, freezeView, suppressRef]);
 
   return null;
 }
@@ -265,10 +318,11 @@ export default function CampgroundsMap({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
-  /** Set to current searchKey when the user pans — clears automatically on new search. */
+  /** Set to current searchKey when the user moves the map — clears on new search. */
   const [movedForKey, setMovedForKey] = useState<string | null>(null);
   const showSearchArea = movedForKey === searchKey;
   const [pendingArea, startAreaTransition] = useTransition();
+  const suppressUserMoveRef = useRef(false);
 
   return (
     <div
@@ -295,6 +349,7 @@ export default function CampgroundsMap({
           searchCenter={centerTuple}
           radiusKm={radiusKm}
           freezeView={isEmptySearch && !centerTuple}
+          suppressRef={suppressUserMoveRef}
         />
         {centerTuple && radiusMeters != null ? (
           <Circle
@@ -352,7 +407,10 @@ export default function CampgroundsMap({
           </Marker>
         ))}
         <MapHandle onReady={setMapInstance} />
-        <MapUserMoveWatcher onUserMove={() => setMovedForKey(searchKey)} />
+        <MapUserMoveWatcher
+          suppressRef={suppressUserMoveRef}
+          onUserMove={() => setMovedForKey(searchKey)}
+        />
       </MapContainer>
 
       <MapStatusLiveRegion
@@ -382,19 +440,15 @@ export default function CampgroundsMap({
               const lng = roundCampgroundCoord(center.lng);
               if (lat === 0 && lng === 0) return;
 
+              // Keep site filters (amps/water/…) but drop place/text/province
+              // so the viewport search matches what the user sees (#39).
               const next = new URLSearchParams(searchParams.toString());
               next.set("lat", String(lat));
               next.set("lng", String(lng));
-              const radius =
-                parseCampgroundRadiusKm(
-                  radiusKm != null ? String(radiusKm) : undefined,
-                ) ??
-                parseCampgroundRadiusKm(
-                  searchParams.get("radiusKm") ?? undefined,
-                ) ??
-                DEFAULT_CAMPGROUND_RADIUS_KM;
-              next.set("radiusKm", String(radius));
+              next.set("radiusKm", String(radiusKmFromMapViewport(mapInstance)));
               next.delete("place");
+              next.delete("q");
+              next.delete("province");
               const qs = next.toString();
               startAreaTransition(() => {
                 router.replace(qs ? `${pathname}?${qs}` : pathname);

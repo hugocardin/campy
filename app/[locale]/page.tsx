@@ -104,7 +104,7 @@ export default async function Home({ searchParams }: PageProps) {
     );
   }
 
-  const campgrounds = campgroundsResult.data;
+  const { campgrounds, truncated } = campgroundsResult.data;
   const provinces = provincesResult.success ? provincesResult.data : [];
   const tControls = await getTranslations("search.controls");
   // Same axes as getCampgrounds; sort omitted — see campgroundSearchKey.
@@ -128,6 +128,7 @@ export default async function Home({ searchParams }: PageProps) {
           >
             <CampgroundListControls
               resultCount={campgrounds.length}
+              resultsTruncated={truncated}
               provinces={provinces}
             />
           </Suspense>
