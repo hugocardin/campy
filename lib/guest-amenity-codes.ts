@@ -89,17 +89,25 @@ export function guestSearchAmenityCatalog<T extends { code: string }>(
 }
 
 /**
- * Keep only codes that exist in the guest catalog (canonical key match).
- * Drops stale / renamed amenities so URL, UI, and RPC stay aligned.
+ * Checkbox options: catalog codes (deduped by canonical key) plus any
+ * URL-only selected keys so stale filters stay visible/clearable.
  */
-export function intersectGuestAmenityCodesWithCatalog(
-  codes: readonly string[] | undefined | null,
+export function guestAmenityOptionsFromCatalogAndSelection(
   catalog: readonly { code: string }[],
-): string[] {
-  const allowed = new Set(
-    guestSearchAmenityCatalog(catalog).map((a) =>
-      amenityCodeCanonicalKey(a.code),
-    ),
-  );
-  return normalizeGuestAmenityCodes(codes).filter((k) => allowed.has(k));
+  selectedKeys: readonly string[],
+): { code: string }[] {
+  const seen = new Set<string>();
+  const options: { code: string }[] = [];
+  for (const row of guestSearchAmenityCatalog(catalog)) {
+    const key = amenityCodeCanonicalKey(row.code);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    options.push({ code: row.code });
+  }
+  for (const key of normalizeGuestAmenityCodes(selectedKeys)) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    options.push({ code: key });
+  }
+  return options;
 }

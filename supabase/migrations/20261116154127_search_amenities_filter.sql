@@ -1,6 +1,11 @@
 -- Issue #24 §3: guest park-amenities multi-select (AND).
 -- require_amenity_codes text[] on both search RPCs; park-level campground_amenities.
 -- Water/sewer/dump keep dedicated params; those codes are ignored here.
+--
+-- Note (PR #47): this file was edited after the first live apply (seed INSERT
+-- removed; search_path added). Live follow-ups:
+--   20261116155256_search_amenities_review_fix
+--   20261116155730_search_amenities_review_followup
 
 CREATE OR REPLACE FUNCTION public.amenity_code_canonical_key(code text)
 RETURNS text

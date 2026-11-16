@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 import {
   amenityCodeCanonicalKey,
   formatGuestAmenityCodesParam,
+  guestAmenityOptionsFromCatalogAndSelection,
   guestSearchAmenityCatalog,
-  intersectGuestAmenityCodesWithCatalog,
   isExcludedGuestSearchAmenity,
   isGuestSearchAmenityCode,
   normalizeGuestAmenityCodes,
@@ -38,18 +38,14 @@ describe("excluded / guest-search amenity codes", () => {
   });
 });
 
-describe("intersectGuestAmenityCodesWithCatalog", () => {
-  it("drops unknown / stale codes not in the catalog", () => {
+describe("guestAmenityOptionsFromCatalogAndSelection", () => {
+  it("dedupes catalog by canonical key and keeps URL-only selections", () => {
     assert.deepEqual(
-      intersectGuestAmenityCodesWithCatalog(
-        ["WIFI", "POOL", "PET_FRIENDLY"],
-        [{ code: "WIFI" }, { code: "PET FRIENDLY" }],
+      guestAmenityOptionsFromCatalogAndSelection(
+        [{ code: "WIFI" }, { code: "PET FRIENDLY" }, { code: "WATER" }],
+        ["POOL", "WIFI"],
       ),
-      ["PET_FRIENDLY", "WIFI"],
-    );
-    assert.deepEqual(
-      intersectGuestAmenityCodesWithCatalog(["POOL"], [{ code: "WIFI" }]),
-      [],
+      [{ code: "WIFI" }, { code: "PET FRIENDLY" }, { code: "POOL" }],
     );
   });
 });

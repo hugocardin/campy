@@ -4,6 +4,7 @@ Migrations:
 
 - `20261116154127_search_amenities_filter`
 - `20261116155256_search_amenities_review_fix` (#47 review: search_path, amenity ids, fail-closed unknowns, remove migration seed rows)
+- `20261116155730_search_amenities_review_followup` (#47: unique canonical key index; drop unused `normalize_guest_amenity_codes`)
 
 ## Design
 
