@@ -1,12 +1,11 @@
 "use server";
 
-import { getCampgroundCurrencyLockReasonForClient } from "@/data/campgrounds/get-campground-currency-lock";
 import { CAMPGROUND_PROVINCES_CACHE_TAG } from "@/data/campgrounds/get-campgrounds";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { redirect } from "@/i18n/navigation";
 import {
   CAMPGROUND_CURRENCY_LOCKED_FIELD,
-  parseCampgroundCurrencyLockMessage,
+  parseCampgroundCurrencyLockError,
 } from "@/lib/campground-currency-lock";
 import {
   GUEST_PRICE_CURRENCY,
@@ -153,44 +152,13 @@ export async function updateCampgroundAction(
 
     const supabase = await createClient();
 
-    // Hard-block currency change once sites or amount-bookings exist (#24/#51).
-    // DB trigger is defense in depth; check here for a clear ActionResult.
-    const { data: currentRow, error: currentError } = await supabase
-      .from("campgrounds")
-      .select("currency")
-      .eq("id", input.id)
-      .single();
-
-    if (currentError) {
-      return mapPostgrestError(currentError);
-    }
-
-    const currentCurrency = parseGuestPriceCurrency(currentRow?.currency);
-    if (
-      currentCurrency &&
-      currencyResult.data !== currentCurrency
-    ) {
-      try {
-        const lockReason = await getCampgroundCurrencyLockReasonForClient(
-          supabase,
-          input.id,
-        );
-        if (lockReason) {
-          return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
-            field: CAMPGROUND_CURRENCY_LOCKED_FIELD,
-            reason: `currency_locked_${lockReason}`,
-          });
-        }
-      } catch (lockErr) {
-        return handleUnexpectedError(lockErr);
-      }
-    }
-
     // Build the geography point in WKT format (Well-Known Text)
     // Format: POINT(longitude latitude)
     // SRID 4326 = WGS 84 (standard for GPS coordinates)
     const locationWKT = `POINT(${input.location.lng} ${input.location.lat})`;
 
+    // Currency lock is enforced by DB trigger (campground_currency_lock_reason);
+    // map 23514 + DETAIL → clear ActionResult. No TS pre-check (#52 review).
     // .select().single() so RLS-filtered 0-row updates surface as errors
     // instead of handleDbNoData fake-success + redirect.
     const { data: updated, error: updateError } = await supabase
@@ -218,9 +186,10 @@ export async function updateCampgroundAction(
     if (updateError) {
       // Trigger protect_campground_currency_change → check_violation (23514)
       if (updateError.code === "23514") {
-        const lockReason = parseCampgroundCurrencyLockMessage(
-          updateError.message,
-        );
+        const lockReason = parseCampgroundCurrencyLockError({
+          message: updateError.message,
+          details: updateError.details,
+        });
         if (lockReason) {
           return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
             field: CAMPGROUND_CURRENCY_LOCKED_FIELD,

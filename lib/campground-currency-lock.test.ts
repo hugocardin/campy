@@ -2,19 +2,19 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  CAMPGROUND_CURRENCY_LOCK_TRIGGER_MARKER,
-  parseCampgroundCurrencyLockMessage,
+  CAMPGROUND_CURRENCY_LOCK_SQL_MESSAGES,
+  parseCampgroundCurrencyLockError,
   resolveCampgroundCurrencyLockReason,
 } from "./campground-currency-lock";
 
 describe("resolveCampgroundCurrencyLockReason", () => {
-  it("locks on sites first, then bookings", () => {
+  it("prefers bookings over sites", () => {
     assert.equal(
       resolveCampgroundCurrencyLockReason({
         hasSites: true,
         hasAmountBookings: true,
       }),
-      "sites",
+      "bookings",
     );
     assert.equal(
       resolveCampgroundCurrencyLockReason({
@@ -40,21 +40,46 @@ describe("resolveCampgroundCurrencyLockReason", () => {
   });
 });
 
-describe("parseCampgroundCurrencyLockMessage", () => {
-  it("maps trigger messages to lock reasons", () => {
+describe("parseCampgroundCurrencyLockError", () => {
+  it("reads EXCEPTION DETAIL first", () => {
     assert.equal(
-      parseCampgroundCurrencyLockMessage(
-        `${CAMPGROUND_CURRENCY_LOCK_TRIGGER_MARKER}:sites — has sites`,
-      ),
+      parseCampgroundCurrencyLockError({
+        message: "noise sites bookings",
+        details: "bookings",
+      }),
+      "bookings",
+    );
+    assert.equal(
+      parseCampgroundCurrencyLockError({
+        details: "sites",
+      }),
+      "sites",
+    );
+  });
+
+  it("matches pinned SQL message shapes exactly", () => {
+    assert.equal(
+      parseCampgroundCurrencyLockError({
+        message: CAMPGROUND_CURRENCY_LOCK_SQL_MESSAGES.sites,
+      }),
       "sites",
     );
     assert.equal(
-      parseCampgroundCurrencyLockMessage(
-        `${CAMPGROUND_CURRENCY_LOCK_TRIGGER_MARKER}:bookings — has amount bookings`,
-      ),
+      parseCampgroundCurrencyLockError({
+        message: CAMPGROUND_CURRENCY_LOCK_SQL_MESSAGES.bookings,
+      }),
       "bookings",
     );
-    assert.equal(parseCampgroundCurrencyLockMessage("unrelated check"), null);
-    assert.equal(parseCampgroundCurrencyLockMessage(null), null);
+  });
+
+  it("ignores unrelated check violations", () => {
+    assert.equal(
+      parseCampgroundCurrencyLockError({
+        message: "some other check",
+        details: "unrelated",
+      }),
+      null,
+    );
+    assert.equal(parseCampgroundCurrencyLockError({}), null);
   });
 });

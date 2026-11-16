@@ -20,7 +20,7 @@ import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update
 import { UserProfileNoRole } from "@/entities/user-profile";
 import {
   CAMPGROUND_CURRENCY_LOCKED_FIELD,
-  type CampgroundCurrencyLockReason,
+  type CampgroundCurrencyLockState,
 } from "@/lib/campground-currency-lock";
 import {
   GUEST_PRICE_CURRENCIES,
@@ -41,8 +41,26 @@ type CampgroundFormProps = {
   initialData?: CampgroundFormData;
   onSubmit: (data: CampgroundCreateUpdateInput) => Promise<ActionResult>;
   /** When set on edit, listing currency control is disabled (#24/#51). */
-  currencyLockReason?: CampgroundCurrencyLockReason | null;
+  currencyLockReason?: CampgroundCurrencyLockState | null;
 };
+
+function currencyLockErrorMessage(
+  reason: CampgroundCurrencyLockState,
+  t: (key: string) => string,
+): string {
+  if (reason === "bookings") return t("errors.currencyLockedBookings");
+  if (reason === "unknown") return t("errors.currencyLockedUnknown");
+  return t("errors.currencyLockedSites");
+}
+
+function currencyLockHintMessage(
+  reason: CampgroundCurrencyLockState,
+  t: (key: string) => string,
+): string {
+  if (reason === "bookings") return t("form.currencyLockedHintBookings");
+  if (reason === "unknown") return t("form.currencyLockedHintUnknown");
+  return t("form.currencyLockedHintSites");
+}
 
 export default function CampgroundFormClient({
   owners,
@@ -102,16 +120,14 @@ export default function CampgroundFormClient({
     if (!parseGuestPriceCurrency(form.currency))
       return setError(t_campgrounds("errors.currencyInvalid"));
 
-    // Locked parks cannot change currency (server + DB also reject).
+    // Locked parks cannot change currency (DB trigger also rejects).
     if (
       currencyLockReason &&
       initialData?.currency &&
       form.currency !== initialData.currency
     ) {
       return setError(
-        currencyLockReason === "bookings"
-          ? t_campgrounds("errors.currencyLockedBookings")
-          : t_campgrounds("errors.currencyLockedSites"),
+        currencyLockErrorMessage(currencyLockReason, t_campgrounds),
       );
     }
 
@@ -168,7 +184,9 @@ export default function CampgroundFormClient({
                   [CAMPGROUND_CURRENCY_LOCKED_FIELD]:
                     result.details?.reason === "currency_locked_bookings"
                       ? t_campgrounds("errors.currencyLockedBookings")
-                      : t_campgrounds("errors.currencyLockedSites"),
+                      : result.details?.reason === "currency_locked_sites"
+                        ? t_campgrounds("errors.currencyLockedSites")
+                        : t_campgrounds("errors.currencyLockedUnknown"),
                 },
               },
             ),
@@ -393,11 +411,12 @@ export default function CampgroundFormClient({
                   id="currency-hint"
                   className="mt-1 text-xs text-muted-foreground"
                 >
-                  {currencyLockReason === "bookings"
-                    ? t_campgrounds("form.currencyLockedHintBookings")
-                    : currencyLockReason === "sites"
-                      ? t_campgrounds("form.currencyLockedHintSites")
-                      : t_campgrounds("form.currencyHint")}
+                  {currencyLockReason
+                    ? currencyLockHintMessage(
+                        currencyLockReason,
+                        t_campgrounds,
+                      )
+                    : t_campgrounds("form.currencyHint")}
                 </p>
               </div>
             </div>

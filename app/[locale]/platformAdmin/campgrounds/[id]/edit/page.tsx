@@ -37,10 +37,10 @@ export default async function CampgroundEditPage({
 
   const campground = campgroundresult.data!;
   const owners = ownersResult.data!;
-  // Fail closed on lock probe error — demo parks have sites; safer disabled.
+  // Fail closed on probe error with neutral "unknown" (not a false "sites").
   const currencyLockReason = lockResult.success
     ? lockResult.data
-    : ("sites" as const);
+    : ("unknown" as const);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">

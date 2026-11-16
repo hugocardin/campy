@@ -64,13 +64,24 @@ Also compare anon vs authenticated `SELECT` column grants on `campgrounds.curren
 
 ## Currency lock (sites / amount-bookings)
 
-Migration: `20261116222604_campground_currency_lock` — trigger
-`trg_protect_campground_currency_change` + `updateCampgroundAction` pre-check.
-Admin edit disables the control when locked.
+Migrations:
+
+- `20261116222604_campground_currency_lock` (initial trigger)
+- `20261116223109_campground_currency_lock_review` (shared
+  `campground_currency_lock_reason` SECURITY DEFINER RPC; bookings-first;
+  `bookings.site_id` ON DELETE RESTRICT; EXCEPTION DETAIL; site-insert
+  serialization)
+
+Admin edit calls the RPC; update action maps trigger `23514` + DETAIL only
+(no TS pre-check).
 
 ```sql
 BEGIN;
--- Expect check_violation (campground_currency_locked:sites) on a park with sites
+SELECT public.campground_currency_lock_reason(
+  (SELECT campground_id FROM public.sites LIMIT 1)
+); -- expect 'sites'
+
+-- Expect check_violation, DETAIL = sites
 UPDATE public.campgrounds
 SET currency = CASE WHEN currency = 'CAD' THEN 'USD' ELSE 'CAD' END
 WHERE id = (SELECT campground_id FROM public.sites LIMIT 1);

@@ -26,6 +26,7 @@
     "currencyHint": "Currency for site nightly base prices (no conversion).",
     "currencyLockedHintSites": "Locked — this park already has sites. Changing currency would reinterpret existing prices with no conversion.",
     "currencyLockedHintBookings": "Locked — this park already has bookings with stored amounts. Changing currency would reinterpret those amounts with no conversion.",
+    "currencyLockedHintUnknown": "Couldn't verify whether currency can be changed; reload to try again. The server will still block an unsafe change.",
     "currencyChangeConfirm": "Change listing currency from {from} to {to}? Existing site prices will be read as {to} with no conversion.",
     "latitudeLabel": "Latitude",
     "latitudePlaceholder": "e.g. 45.4215",
@@ -46,7 +47,8 @@
     "websiteInvalid": "Enter a valid website URL (http or https).",
     "currencyInvalid": "Choose a valid listing currency (CAD, USD, or MXN).",
     "currencyLockedSites": "Listing currency can't be changed once this park has sites.",
-    "currencyLockedBookings": "Listing currency can't be changed once this park has bookings with stored amounts."
+    "currencyLockedBookings": "Listing currency can't be changed once this park has bookings with stored amounts.",
+    "currencyLockedUnknown": "Couldn't verify whether listing currency can be changed. Reload and try again."
   },
 
   "actions": {
