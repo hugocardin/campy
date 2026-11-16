@@ -2,10 +2,7 @@
 
 import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
 import { Input } from "@/components/ui/input";
-import {
-  maxRigLengthInUnit,
-  type RigLengthUnit,
-} from "@/lib/site-rig-length";
+import type { RigLengthUnit } from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
@@ -21,6 +18,11 @@ type Props = {
   groupLabel: string;
   placeholderFt: string;
   placeholderM: string;
+  /**
+   * Marks the field required for a11y + app validation. Does **not** set the
+   * HTML `required` attribute — callers that need browser constraint checks on
+   * sibling fields should keep native validation on the form.
+   */
   required?: boolean;
   disabled?: boolean;
   className?: string;
@@ -55,6 +57,7 @@ export default function RigLengthInput({
   autoComplete,
 }: Props) {
   const tUnits = useTranslations("common.units");
+  const hintId = hint != null ? `${id}-hint` : undefined;
 
   return (
     <div className={className}>
@@ -66,10 +69,9 @@ export default function RigLengthInput({
           inputMode="decimal"
           value={value}
           disabled={disabled}
-          required={required}
           autoComplete={autoComplete}
           aria-required={required || undefined}
-          data-max={maxRigLengthInUnit(unit)}
+          aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
           className={cn(inputClassName ?? "flex-1")}
           placeholder={unit === "m" ? placeholderM : placeholderFt}
@@ -84,7 +86,9 @@ export default function RigLengthInput({
         />
       </div>
       {hint != null ? (
-        <p className="text-xs text-muted-foreground mt-1">{hint}</p>
+        <p id={hintId} className="text-xs text-muted-foreground mt-1">
+          {hint}
+        </p>
       ) : null}
     </div>
   );

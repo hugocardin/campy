@@ -27,16 +27,13 @@ import {
   normalizeElectricityAmps,
 } from "@/lib/electricity-amps";
 import RigLengthInput from "@/components/rig-length/RigLengthInput";
+import { useRigLengthInput } from "@/components/rig-length/useRigLengthInput";
 import {
-  convertRigDraftOnUnitChange,
   isLodgingSiteType,
-  maxRigLengthInUnit,
-  parseRigLengthToFeet,
   siteTypeRequiresMaxRigLength,
-  type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   ActionResult,
   translateErrorCode,
@@ -69,10 +66,8 @@ export default function SiteFormClient({
   onSubmit,
 }: SiteFormProps) {
   const tc = useTranslations("common");
-  const tUnits = useTranslations("common.units");
   const t_errors = useTranslations("errors");
   const t_sites = useTranslations("sites");
-  const locale = useLocale();
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +85,21 @@ export default function SiteFormClient({
     ),
     driveway_type: initialData?.driveway_type ?? "",
   }));
-  const [rigUnit, setRigUnit] = useState<RigLengthUnit>("ft");
+
+  const {
+    unit: rigUnit,
+    setDraft: setRigDraft,
+    onUnitChange: handleRigUnitChange,
+    parse: parseRigDraft,
+    invalidLengthParams,
+  } = useRigLengthInput({
+    initialUnit: "ft",
+    draft: form.max_rig_length,
+    onDraftChange: (value) => {
+      setForm((prev) => ({ ...prev, max_rig_length: value }));
+      setError(null);
+    },
+  });
 
   const selectedTypeCode = useMemo(() => {
     if (!form.site_type_id) return undefined;
@@ -99,13 +108,12 @@ export default function SiteFormClient({
 
   const isLodging = isLodgingSiteType(selectedTypeCode);
   const requiresMaxRig = siteTypeRequiresMaxRigLength(selectedTypeCode);
-  const unitLabel = rigUnit === "m" ? tUnits("m") : tUnits("ft");
-  const invalidMaxLengthMessage = t_sites("errors.invalidMaxLength", {
-    max: maxRigLengthInUnit(rigUnit),
-    unit: unitLabel,
-  });
+  const invalidMaxLengthMessage = t_sites(
+    "errors.invalidMaxLength",
+    invalidLengthParams,
+  );
 
-  const maxRigParsed = parseRigLengthToFeet(form.max_rig_length, rigUnit);
+  const maxRigParsed = parseRigDraft();
   const isFormValid = Boolean(
     form.name.trim() &&
     form.site_type_id &&
@@ -119,10 +127,7 @@ export default function SiteFormClient({
     e.preventDefault();
     setError(null);
 
-    const maxRigParsedSubmit = parseRigLengthToFeet(
-      form.max_rig_length,
-      rigUnit,
-    );
+    const maxRigParsedSubmit = parseRigDraft();
     const pricePerNightNum = parseFloat(form.price_per_night);
     const minStayNightsNum = parseFloat(form.min_stay_nights);
     const siteTypeIdNum = parseInt(form.site_type_id, 10);
@@ -221,21 +226,6 @@ export default function SiteFormClient({
     setError(null);
   };
 
-  const handleRigUnitChange = (nextUnit: RigLengthUnit) => {
-    if (nextUnit === rigUnit) return;
-    setForm((prev) => ({
-      ...prev,
-      max_rig_length: convertRigDraftOnUnitChange(
-        prev.max_rig_length,
-        rigUnit,
-        nextUnit,
-        locale,
-      ),
-    }));
-    setRigUnit(nextUnit);
-    setError(null);
-  };
-
   const handleAmpToggle = (amp: ElectricityAmp, checked: boolean) => {
     setForm((prev) => {
       const set = new Set(prev.electricity_amps);
@@ -258,12 +248,7 @@ export default function SiteFormClient({
     <div className="space-y-10">
       <ErrorAlert errorMsg={error} />
 
-      <form
-        id="site-form"
-        noValidate
-        onSubmit={handleSubmit}
-        className="space-y-10"
-      >
+      <form id="site-form" onSubmit={handleSubmit} className="space-y-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
           {/* Left column */}
           <div className="space-y-6">
@@ -311,10 +296,7 @@ export default function SiteFormClient({
                   name="max_rig_length"
                   className="mt-1.5"
                   value={form.max_rig_length}
-                  onChange={(value) => {
-                    setForm((prev) => ({ ...prev, max_rig_length: value }));
-                    setError(null);
-                  }}
+                  onChange={setRigDraft}
                   unit={rigUnit}
                   onUnitChange={handleRigUnitChange}
                   groupLabel={t_sites("form.rigLengthUnitGroupLabel")}

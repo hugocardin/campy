@@ -42,16 +42,15 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
     unit: rigUnit,
     onUnitChange: handleRigUnitChange,
     parse: parseRigDraft,
-    unitLabel,
-    max: rigMax,
+    invalidLengthParams,
   } = useRigLengthInput({
     initialFeet: profile.default_rig_length,
   });
 
-  const invalidRigLengthMessage = t_profile("errors.invalidRigLength", {
-    max: rigMax,
-    unit: unitLabel,
-  });
+  const invalidRigLengthMessage = t_profile(
+    "errors.invalidRigLength",
+    invalidLengthParams,
+  );
 
   const isFormValid = normalizePersonName(fullName).length > 0;
 

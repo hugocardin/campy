@@ -16,13 +16,19 @@ export function defaultRigUnitForLocale(locale: string): RigLengthUnit {
 }
 
 type Options = {
-  /** Canonical feet already stored (profile / site); null/undefined → empty draft. */
+  /** Canonical feet already stored; null/undefined → empty draft (uncontrolled). */
   initialFeet?: number | null;
   /**
    * Starting display unit. When omitted, defaults from locale (`fr*` → m).
    * Site admin passes `"ft"` to keep feet-first editing.
    */
   initialUnit?: RigLengthUnit;
+  /**
+   * Controlled draft (e.g. `form.max_rig_length` on site admin). When set with
+   * `onDraftChange`, the hook does not own draft state.
+   */
+  draft?: string;
+  onDraftChange?: (draft: string) => void;
 };
 
 /**
@@ -32,26 +38,32 @@ type Options = {
 export function useRigLengthInput({
   initialFeet,
   initialUnit,
+  draft: controlledDraft,
+  onDraftChange,
 }: Options = {}) {
   const locale = useLocale();
   const tUnits = useTranslations("common.units");
   const startingUnit = initialUnit ?? defaultRigUnitForLocale(locale);
+  const isControlled =
+    controlledDraft !== undefined && typeof onDraftChange === "function";
 
   const [unit, setUnit] = useState<RigLengthUnit>(startingUnit);
-  const [draft, setDraft] = useState(() =>
-    formatRigLengthForDisplay(initialFeet, startingUnit, locale),
+  const [internalDraft, setInternalDraft] = useState(() =>
+    isControlled
+      ? ""
+      : formatRigLengthForDisplay(initialFeet, startingUnit, locale),
   );
 
-  const ftLabel = tUnits("ft");
-  const mLabel = tUnits("m");
-  const unitLabel = unit === "m" ? mLabel : ftLabel;
+  const draft = isControlled ? controlledDraft : internalDraft;
+  const setDraft = isControlled ? onDraftChange : setInternalDraft;
+
+  const unitLabel = unit === "m" ? tUnits("m") : tUnits("ft");
   const max = maxRigLengthInUnit(unit);
+  const invalidLengthParams = { max, unit: unitLabel };
 
   const onUnitChange = (nextUnit: RigLengthUnit) => {
     if (nextUnit === unit) return;
-    setDraft((prev) =>
-      convertRigDraftOnUnitChange(prev, unit, nextUnit, locale),
-    );
+    setDraft(convertRigDraftOnUnitChange(draft, unit, nextUnit, locale));
     setUnit(nextUnit);
   };
 
@@ -65,8 +77,8 @@ export function useRigLengthInput({
     onUnitChange,
     parse,
     unitLabel,
-    ftLabel,
-    mLabel,
     max,
+    /** ICU params for surface `errors.invalid…Length` messages. */
+    invalidLengthParams,
   };
 }
