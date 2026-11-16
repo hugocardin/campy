@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { ELECTRICITY_AMP_VALUES } from "./electricity-amps";
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
+  CAMPGROUND_SORT_KEYS,
   DEFAULT_CAMPGROUND_RADIUS_KM,
   HOOKUP_AMENITY_CODES,
   SEARCH_CAMPGROUNDS_LIMIT,
@@ -69,14 +70,6 @@ describe("parseCampgroundSort", () => {
       "price-desc",
     );
     assert.equal(parseCampgroundSort("price", { geoActive: false }), "price");
-    assert.equal(
-      campgroundSortQueryValue("price", true),
-      "price",
-    );
-    assert.equal(
-      campgroundSortQueryValue("price-desc", false),
-      "price-desc",
-    );
   });
 });
 
@@ -87,6 +80,8 @@ describe("campgroundSortQueryValue", () => {
     assert.equal(campgroundSortQueryValue("name", false), undefined);
     assert.equal(campgroundSortQueryValue("distance", false), "distance");
     assert.equal(campgroundSortQueryValue("city", true), "city");
+    assert.equal(campgroundSortQueryValue("price", true), "price");
+    assert.equal(campgroundSortQueryValue("price-desc", false), "price-desc");
 
     assert.equal(
       parseCampgroundSort(campgroundSortQueryValue("name", true), {
@@ -100,6 +95,28 @@ describe("campgroundSortQueryValue", () => {
       }),
       "distance",
     );
+  });
+});
+
+describe("CAMPGROUND_SORT_KEYS", () => {
+  it("lists every CampgroundSort the near SQL whitelist accepts", () => {
+    // Keep in sync with search_campgrounds_near v_sort IN (...).
+    assert.deepEqual([...CAMPGROUND_SORT_KEYS].sort(), [
+      "city",
+      "distance",
+      "name",
+      "name-desc",
+      "price",
+      "price-desc",
+      "province",
+    ]);
+    for (const key of CAMPGROUND_SORT_KEYS) {
+      assert.equal(parseCampgroundSort(key, { geoActive: true }), key);
+      assert.equal(
+        parseCampgroundSort(key, { geoActive: false }),
+        key === "distance" ? "name" : key,
+      );
+    }
   });
 });
 

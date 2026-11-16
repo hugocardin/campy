@@ -275,7 +275,9 @@ export const getCampgrounds = cache(
       if (geo) {
         // Near RPC ORDER BY + LIMIT via sort_key (#24 §4). Truncation means
         // more matches within the radius under the active sort (not only
-        // "more nearest"). Trust SQL order — no JS re-sort.
+        // "more nearest"). Trust SQL order — no JS re-sort. `resolvedSort`
+        // must stay inside CAMPGROUND_SORT_KEYS (SQL whitelist; unknown →
+        // distance).
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds_near", {
             lat: geo.lat,

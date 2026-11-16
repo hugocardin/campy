@@ -26,14 +26,22 @@ import {
   parseStayKind,
 } from "@/lib/stay-kind";
 
-export type CampgroundSort =
-  | "name"
-  | "name-desc"
-  | "city"
-  | "province"
-  | "distance"
-  | "price"
-  | "price-desc";
+/**
+ * Guest sort keys. Must stay in sync with `search_campgrounds` /
+ * `search_campgrounds_near` `sort_key` whitelists (near accepts all;
+ * list omits `distance` — the app maps that to `name` when geo is off).
+ */
+export const CAMPGROUND_SORT_KEYS = [
+  "name",
+  "name-desc",
+  "city",
+  "province",
+  "distance",
+  "price",
+  "price-desc",
+] as const;
+
+export type CampgroundSort = (typeof CAMPGROUND_SORT_KEYS)[number];
 
 /**
  * Guest list/near page size. SQL RPCs must allow at least this + 1 so the app
@@ -120,15 +128,7 @@ export const CAMPGROUND_COLUMN_SORT_CONFIG: Record<
   province: { column: "province", ascending: true },
 };
 
-const CAMPGROUND_SORT_VALUES = new Set<string>([
-  "name",
-  "name-desc",
-  "city",
-  "province",
-  "distance",
-  "price",
-  "price-desc",
-]);
+const CAMPGROUND_SORT_VALUES = new Set<string>(CAMPGROUND_SORT_KEYS);
 
 export function parseCampgroundSort(
   value: string | undefined,
