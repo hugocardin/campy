@@ -198,12 +198,14 @@ function FitMarkers({
       // Timeout fallback: no-op setView/fitBounds may never emit moveend.
       suppressRef.current = true;
       let cleared = false;
+      let raf = 0;
       const clear = () => {
         if (cleared) return;
         cleared = true;
         window.clearTimeout(fallback);
         map.off("moveend", clear);
-        requestAnimationFrame(() => {
+        raf = requestAnimationFrame(() => {
+          raf = 0;
           suppressRef.current = false;
         });
       };
@@ -213,8 +215,14 @@ function FitMarkers({
       return () => {
         window.clearTimeout(fallback);
         map.off("moveend", clear);
-        // Only release suppress if this run still owned it (newer run re-sets).
-        if (!cleared) {
+        const hadPendingRaf = raf !== 0;
+        if (raf) {
+          cancelAnimationFrame(raf);
+          raf = 0;
+        }
+        // Release if we still owned suppress, or if we cancelled a rAF that
+        // would have released it (newer effect re-sets suppress afterward).
+        if (!cleared || hadPendingRaf) {
           cleared = true;
           suppressRef.current = false;
         }

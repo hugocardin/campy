@@ -20,6 +20,19 @@ describe("photonClientBucketKey", () => {
     assert.equal(photonClientBucketKey("1.2.3.4:99999"), PHOTON_INVALID_CLIENT_KEY);
     assert.equal(photonClientBucketKey("gggg::1"), PHOTON_INVALID_CLIENT_KEY);
     assert.equal(photonClientBucketKey("2001:db8:xyz::1"), PHOTON_INVALID_CLIENT_KEY);
+    // Incomplete uncompressed IPv6 must not be zero-padded.
+    assert.equal(photonClientBucketKey("abc:1"), PHOTON_INVALID_CLIENT_KEY);
+    assert.equal(photonClientBucketKey("1:2:3:4"), PHOTON_INVALID_CLIENT_KEY);
+    // Bracketed form: invalid port same as IPv4:port.
+    assert.equal(
+      photonClientBucketKey("[2001:db8::1]:99999"),
+      PHOTON_INVALID_CLIENT_KEY,
+    );
+  });
+
+  it("rejects IPv4 with leading zeros (no alternate buckets)", () => {
+    assert.equal(photonClientBucketKey("01.2.3.4"), PHOTON_INVALID_CLIENT_KEY);
+    assert.equal(photonClientBucketKey("1.02.3.4"), PHOTON_INVALID_CLIENT_KEY);
   });
 
   it("expands compressed IPv6 before taking /64", () => {
