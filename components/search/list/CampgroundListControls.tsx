@@ -234,8 +234,6 @@ export default function CampgroundListControls({
       setLastPushedQ(qParam);
       setPrevPlaceLabel(placeLabel);
       setActivePlace(placeLabel);
-      // Back/forward / Clear owns the URL — don't apply a stale leave-place push.
-      leavePlacePendingRef.current = false;
       if (search !== displayFromUrl) {
         setSearch(displayFromUrl);
       }
@@ -296,6 +294,16 @@ export default function CampgroundListControls({
     localFilters,
     rigUnit,
   ]);
+
+  // URL ownership (back/forward / Clear / our own push): drop a stale leave-place
+  // rewrite. Must be an effect — refs cannot be written during render.
+  useEffect(() => {
+    leavePlacePendingRef.current = false;
+    if (debounceTimeoutRef.current != null) {
+      window.clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+  }, [placeLabel, qParam]);
 
   // Sync refs after render-time setState (external URL sync). Event handlers
   // use updateRigDraft / updateRigUnit so the ref is current before the next paint.
