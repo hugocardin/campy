@@ -1,7 +1,13 @@
 "use server";
 
+import { getCampgroundCurrencyLockReasonForClient } from "@/data/campgrounds/get-campground-currency-lock";
+import { CAMPGROUND_PROVINCES_CACHE_TAG } from "@/data/campgrounds/get-campgrounds";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { redirect } from "@/i18n/navigation";
+import {
+  CAMPGROUND_CURRENCY_LOCKED_FIELD,
+  parseCampgroundCurrencyLockMessage,
+} from "@/lib/campground-currency-lock";
 import {
   GUEST_PRICE_CURRENCY,
   parseGuestPriceCurrency,
@@ -9,19 +15,19 @@ import {
 } from "@/lib/campground-price";
 import { ActionResult, DbErrorCode, resultError, resultSuccess } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
-import { CAMPGROUND_PROVINCES_CACHE_TAG } from "@/data/campgrounds/get-campgrounds";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
-import { revalidateTag } from "next/cache";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import {
   handleDbNoData,
   handleDbResponse,
   handleDbSingle,
   handleUnexpectedError,
+  mapPostgrestError,
 } from "@/lib/supabase/db-utils";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateTag } from "next/cache";
 import { getLocale } from "next-intl/server";
 
 function normalizeWebsiteInput(
@@ -147,6 +153,39 @@ export async function updateCampgroundAction(
 
     const supabase = await createClient();
 
+    // Hard-block currency change once sites or amount-bookings exist (#24/#51).
+    // DB trigger is defense in depth; check here for a clear ActionResult.
+    const { data: currentRow, error: currentError } = await supabase
+      .from("campgrounds")
+      .select("currency")
+      .eq("id", input.id)
+      .single();
+
+    if (currentError) {
+      return mapPostgrestError(currentError);
+    }
+
+    const currentCurrency = parseGuestPriceCurrency(currentRow?.currency);
+    if (
+      currentCurrency &&
+      currencyResult.data !== currentCurrency
+    ) {
+      try {
+        const lockReason = await getCampgroundCurrencyLockReasonForClient(
+          supabase,
+          input.id,
+        );
+        if (lockReason) {
+          return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+            field: CAMPGROUND_CURRENCY_LOCKED_FIELD,
+            reason: `currency_locked_${lockReason}`,
+          });
+        }
+      } catch (lockErr) {
+        return handleUnexpectedError(lockErr);
+      }
+    }
+
     // Build the geography point in WKT format (Well-Known Text)
     // Format: POINT(longitude latitude)
     // SRID 4326 = WGS 84 (standard for GPS coordinates)
@@ -154,32 +193,46 @@ export async function updateCampgroundAction(
 
     // .select().single() so RLS-filtered 0-row updates surface as errors
     // instead of handleDbNoData fake-success + redirect.
-    const result = await handleDbSingle(
-      supabase
-        .from("campgrounds")
-        .update({
-          name: input.name,
-          owner_id: input.owner_id,
-          description: input.description || null,
-          address: input.address || null,
-          city: input.city || null,
-          province: input.province || null,
-          country: input.country || null,
-          currency: currencyResult.data,
-          website: websiteResult.data,
-          phone: input.phone || null,
-          updated_at: new Date().toISOString(),
+    const { data: updated, error: updateError } = await supabase
+      .from("campgrounds")
+      .update({
+        name: input.name,
+        owner_id: input.owner_id,
+        description: input.description || null,
+        address: input.address || null,
+        city: input.city || null,
+        province: input.province || null,
+        country: input.country || null,
+        currency: currencyResult.data,
+        website: websiteResult.data,
+        phone: input.phone || null,
+        updated_at: new Date().toISOString(),
 
-          // This is the important part: convert to geography type
-          location: `SRID=4326;${locationWKT}`,
-        })
-        .eq("id", input.id)
-        .select("id")
-        .single(),
-    );
+        // This is the important part: convert to geography type
+        location: `SRID=4326;${locationWKT}`,
+      })
+      .eq("id", input.id)
+      .select("id")
+      .single();
 
-    if (!result.success) {
-      return result;
+    if (updateError) {
+      // Trigger protect_campground_currency_change → check_violation (23514)
+      if (updateError.code === "23514") {
+        const lockReason = parseCampgroundCurrencyLockMessage(
+          updateError.message,
+        );
+        if (lockReason) {
+          return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+            field: CAMPGROUND_CURRENCY_LOCKED_FIELD,
+            reason: `currency_locked_${lockReason}`,
+          });
+        }
+      }
+      return mapPostgrestError(updateError);
+    }
+
+    if (!updated) {
+      return resultError(DbErrorCode.DB_NOT_FOUND);
     }
 
     revalidateCampgroundPublicAndAdmin(input.id);

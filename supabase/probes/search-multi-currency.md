@@ -62,8 +62,22 @@ ROLLBACK;
 
 Also compare anon vs authenticated `SELECT` column grants on `campgrounds.currency`.
 
+## Currency lock (sites / amount-bookings)
+
+Migration: `20261116222604_campground_currency_lock` — trigger
+`trg_protect_campground_currency_change` + `updateCampgroundAction` pre-check.
+Admin edit disables the control when locked.
+
+```sql
+BEGIN;
+-- Expect check_violation (campground_currency_locked:sites) on a park with sites
+UPDATE public.campgrounds
+SET currency = CASE WHEN currency = 'CAD' THEN 'USD' ELSE 'CAD' END
+WHERE id = (SELECT campground_id FROM public.sites LIMIT 1);
+ROLLBACK;
+```
+
 ## Still parked
 
 - Effective nightly price via `pricing_rules` (needs dates / Phase D)
 - FX conversion / display-only guest switch across currencies
-- Lock currency after sites/bookings exist

@@ -3,6 +3,7 @@ import { toCampgroundFormData } from "@/components/campground/campground-form-ut
 import CampgroundFormClient from "@/components/campground/CampgroundFormClient";
 import { BackHeader } from "@/components/layout/back-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCampgroundCurrencyLockReason } from "@/data/campgrounds/get-campground-currency-lock";
 import { getCampgroundAdminById } from "@/data/campgrounds/get-campgrounds-admin";
 import { getOwners } from "@/data/profile/get-owners";
 import { routes } from "@/lib/routes";
@@ -24,9 +25,10 @@ export default async function CampgroundEditPage({
 
   const params = await paramsPromise;
 
-  const [campgroundresult, ownersResult] = await Promise.all([
+  const [campgroundresult, ownersResult, lockResult] = await Promise.all([
     getCampgroundAdminById(params.id),
     getOwners(),
+    getCampgroundCurrencyLockReason(params.id),
   ]);
 
   if (!campgroundresult.success || !ownersResult.success) {
@@ -35,6 +37,10 @@ export default async function CampgroundEditPage({
 
   const campground = campgroundresult.data!;
   const owners = ownersResult.data!;
+  // Fail closed on lock probe error — demo parks have sites; safer disabled.
+  const currencyLockReason = lockResult.success
+    ? lockResult.data
+    : ("sites" as const);
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -62,6 +68,7 @@ export default async function CampgroundEditPage({
           owners={owners}
           onSubmit={updateCampgroundAction}
           initialData={toCampgroundFormData(campground)}
+          currencyLockReason={currencyLockReason}
         />
       </Suspense>
     </div>
