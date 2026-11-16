@@ -10,6 +10,7 @@ type Props = {
   searchCenter?: { lat: number; lng: number };
   radiusKm?: number;
   searchKey?: string;
+  searchQuery?: string;
   detailQuery?: CampgroundDetailQuery;
 };
 
@@ -32,6 +33,7 @@ export default function CampgroundsMapDynamic({
   searchCenter,
   radiusKm,
   searchKey,
+  searchQuery,
   detailQuery,
 }: Props) {
   return (
@@ -40,6 +42,7 @@ export default function CampgroundsMapDynamic({
       searchCenter={searchCenter}
       radiusKm={radiusKm}
       searchKey={searchKey}
+      searchQuery={searchQuery}
       detailQuery={detailQuery}
     />
   );

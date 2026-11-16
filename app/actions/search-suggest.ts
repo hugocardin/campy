@@ -9,7 +9,7 @@ import {
   photonCircuitRecordSuccess,
 } from "@/lib/geocoding/photon-circuit";
 import { searchPhotonPlaces } from "@/lib/geocoding/photon";
-import { geocodeRateLimitAllow } from "@/lib/geocoding/rate-limit";
+import { geocodeRateLimitAllowPhoton } from "@/lib/geocoding/rate-limit";
 import {
   SUGGEST_CAMPGROUND_LIMIT,
   SUGGEST_MIN_CHARS,
@@ -72,7 +72,6 @@ export async function searchSuggestAction(
 
     const headerStore = await headers();
     const ip = clientIpFromHeaders(headerStore);
-    const rateKey = ip ? `photon:ip:${ip}` : "photon:global";
 
     let places: GeocodedPlace[] = [];
     let placesUnavailable = false;
@@ -83,12 +82,12 @@ export async function searchSuggestAction(
     const campgroundsPromise = suggestCampgrounds(q, SUGGEST_CAMPGROUND_LIMIT);
 
     // Positive cache first (serve during outages); circuit/negative skip upstream
-    // only; rate-limit only when we actually call Photon.
+    // only; rate-limit only when we actually call Photon (shared upstream + IP).
     if (cached && !isNegativeCache(cached)) {
       places = cached;
-    } else if (isNegativeCache(cached) || photonCircuitIsOpen()) {
+    } else if (isNegativeCache(cached) || (await photonCircuitIsOpen())) {
       placesUnavailable = true;
-    } else if (!geocodeRateLimitAllow(rateKey, { global: !ip })) {
+    } else if (!(await geocodeRateLimitAllowPhoton(ip))) {
       placesUnavailable = true;
     } else {
       try {
@@ -97,13 +96,13 @@ export async function searchSuggestAction(
           limit: SUGGEST_PLACE_LIMIT,
         });
         geocodeCacheSet(cacheKey, places);
-        photonCircuitRecordSuccess();
+        await photonCircuitRecordSuccess();
       } catch (err) {
         console.error("[searchSuggest] Photon failed", err);
         places = [];
         placesUnavailable = true;
         geocodeCacheSet(cacheKey, NEGATIVE_SENTINEL, NEGATIVE_CACHE_TTL_MS);
-        photonCircuitRecordFailure();
+        await photonCircuitRecordFailure();
       }
     }
 

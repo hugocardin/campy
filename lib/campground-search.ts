@@ -24,6 +24,9 @@ export type CampgroundSort =
   | "province"
   | "distance";
 
+/** Cap for non-geo `search_campgrounds` (matches near RPC). */
+export const SEARCH_CAMPGROUNDS_LIMIT = 200;
+
 /** Allowed Near-me radius presets (km). */
 export const CAMPGROUND_RADIUS_KM_PRESETS = [25, 50, 100] as const;
 export type CampgroundRadiusKm = (typeof CAMPGROUND_RADIUS_KM_PRESETS)[number];

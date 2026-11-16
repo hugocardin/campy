@@ -9,6 +9,7 @@ import {
   CAMPGROUND_SORT_CONFIG,
   CampgroundSiteFilters,
   CampgroundSort,
+  SEARCH_CAMPGROUNDS_LIMIT,
   anySiteFilterActive,
   campgroundRadiusMeters,
   formatCampgroundAmpsParam,
@@ -22,12 +23,17 @@ import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
 import { formatStayKindParam } from "@/lib/stay-kind";
+import { getSupabaseAnon } from "@/lib/supabase/anon-server";
 import {
   handleDbResponse,
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
+
+/** Tag for province DISTINCT cache — revalidate on campground writes. */
+export const CAMPGROUND_PROVINCES_CACHE_TAG = "campground-provinces";
 
 export type { CampgroundListFilters, CampgroundSort } from "@/lib/campground-search";
 export { parseCampgroundSort } from "@/lib/campground-search";
@@ -109,27 +115,50 @@ function sortCampgrounds(
 }
 
 /**
- * Exact distinct province strings from the guest view (padding preserved).
+ * Cross-request DISTINCT province spellings via RPC + `unstable_cache`.
+ * Cookie-free anon client so the cache closure stays request-agnostic.
+ */
+const fetchCampgroundProvinceRawsCached = unstable_cache(
+  async (): Promise<string[]> => {
+    const supabase = getSupabaseAnon();
+    const result = await handleDbResponse(
+      supabase.rpc("list_campground_province_raws"),
+    );
+    if (!result.success) {
+      throw new Error(
+        `list_campground_province_raws failed: ${result.errorCode}`,
+      );
+    }
+    // RPC returns SETOF text — rows may be plain strings or { list_... }.
+    const values = (result.data as unknown[]).map((row) => {
+      if (typeof row === "string") return row;
+      if (row && typeof row === "object") {
+        const vals = Object.values(row as Record<string, unknown>);
+        const first = vals[0];
+        return typeof first === "string" ? first : null;
+      }
+      return null;
+    });
+    return distinctProvinceRaws(values);
+  },
+  ["campground-province-raws"],
+  { revalidate: 3600, tags: [CAMPGROUND_PROVINCES_CACHE_TAG] },
+);
+
+/**
+ * Exact distinct province strings (padding preserved).
  * Used to expand alias lists for RPCs that match with lower(btrim).
- * Demo-scale full select is fine; DISTINCT RPC/view parked (#24).
  */
 const getCampgroundProvinceRaws = cache(
   async (): Promise<ActionResult<string[]>> => {
     try {
-      const supabase = await createClient();
-
-      const result = await handleDbResponse(
-        supabase.from("v_campgrounds").select("province"),
-      );
-
-      if (!result.success) {
-        return result;
-      }
-
-      return resultSuccess(
-        distinctProvinceRaws(result.data.map((row) => row.province)),
-      );
+      const raws = await fetchCampgroundProvinceRawsCached();
+      return resultSuccess(raws);
     } catch (err) {
+      console.warn(
+        "[getCampgroundProvinceRaws] DISTINCT RPC/cache failed; static aliases only",
+        err,
+      );
       return handleUnexpectedError(err);
     }
   },
@@ -138,12 +167,14 @@ const getCampgroundProvinceRaws = cache(
 /**
  * Distinct province filter keys (canonical codes when known). Labels are
  * locale-aware in the UI; matching expands aliases — see canadian-provinces.
- * Follow-up: distinct view/RPC + `unstable_cache` / revalidate at scale.
  */
 export const getCampgroundProvinces = cache(
   async (): Promise<ActionResult<string[]>> => {
     const raws = await getCampgroundProvinceRaws();
     if (!raws.success) {
+      console.warn(
+        "[getCampgroundProvinces] falling back to empty keys after raws failure",
+      );
       return raws;
     }
     return resultSuccess(uniqueProvinceFilterKeys(raws.data));
@@ -229,6 +260,13 @@ export const getCampgrounds = cache(
         // Exact DB spellings + static aliases → RPC text[] (lower(btrim) match).
         // Never send raws through PostgREST `.in()` URL serialization.
         const raws = await getCampgroundProvinceRaws();
+        if (!raws.success) {
+          console.warn(
+            "[getCampgrounds] province raws failed; using static aliases only",
+            provinceCode,
+            raws.errorCode,
+          );
+        }
         const rawDb = raws.success ? raws.data : [];
         provinceAliases = provinceMatchValues(provinceCode, rawDb);
       }
@@ -262,8 +300,7 @@ export const getCampgrounds = cache(
         resolvedSort === "distance" ? ("name" as const) : resolvedSort;
 
       // Text / province / site filters use search_campgrounds (unaccent + trigram
-      // via campground_text_matches; guest-safe). RPC has no LIMIT / ORDER BY —
-      // sort in JS. TODO(#24): pass sort + LIMIT into the RPC (also parked from #25).
+      // via campground_text_matches; ORDER BY + LIMIT in SQL — #24 / #25).
       if (term || provinceAliases.length > 0 || siteFiltersActive) {
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds", {
@@ -271,6 +308,8 @@ export const getCampgrounds = cache(
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
             ...siteFilterRpcArgs(siteFilters),
+            sort_key: nonGeoSort,
+            result_limit: SEARCH_CAMPGROUNDS_LIMIT,
           }),
         );
 
@@ -279,6 +318,7 @@ export const getCampgrounds = cache(
         }
 
         const rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
+        // RPC already sorted + capped; keep JS sort as a stable tie-break.
         return resultSuccess(sortCampgrounds(rows, nonGeoSort));
       }
 

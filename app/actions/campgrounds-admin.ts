@@ -4,8 +4,10 @@ import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update
 import { redirect } from "@/i18n/navigation";
 import { ActionResult, DbErrorCode, resultError } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
+import { CAMPGROUND_PROVINCES_CACHE_TAG } from "@/data/campgrounds/get-campgrounds";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
+import { revalidateTag } from "next/cache";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import {
   handleDbNoData,
@@ -40,6 +42,7 @@ function revalidateCampgroundPublicAndAdmin(id: string) {
   revalidateLocalizedPath(routes.platformAdmin.campgrounds());
   revalidateLocalizedPath(routes.platformAdmin.campgroundView(id));
   revalidateLocalizedPath(routes.platformAdmin.campgroundEdit(id));
+  revalidateTag(CAMPGROUND_PROVINCES_CACHE_TAG, "max");
 }
 
 async function changeCampgroundStatus(
@@ -204,6 +207,7 @@ export async function createCampgroundAction(
     revalidateLocalizedPath(routes.campgroundDetail(newCampgroundId));
     revalidateLocalizedPath(routes.platformAdmin.root());
     revalidateLocalizedPath(routes.platformAdmin.campgrounds());
+    revalidateTag(CAMPGROUND_PROVINCES_CACHE_TAG, "max");
   } catch (err) {
     return handleUnexpectedError(err);
   }

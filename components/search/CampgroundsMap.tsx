@@ -1,14 +1,20 @@
 "use client";
 
 import { Campground } from "@/entities/campground";
-import { Link } from "@/i18n/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import {
+  DEFAULT_CAMPGROUND_RADIUS_KM,
+  parseCampgroundRadiusKm,
+  roundCampgroundCoord,
+} from "@/lib/campground-search";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes, type CampgroundDetailQuery } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import L, { type LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Circle,
   CircleMarker,
@@ -17,6 +23,7 @@ import {
   Popup,
   TileLayer,
   useMap,
+  useMapEvents,
 } from "react-leaflet";
 
 type Props = {
@@ -25,6 +32,8 @@ type Props = {
   radiusKm?: number;
   /** Changes when the active search identity changes (q/filters/geo). */
   searchKey?: string;
+  /** Free-text query for empty-state a11y copy. */
+  searchQuery?: string;
   /** Carry guest rig prefs into detail popup links (#34). */
   detailQuery?: CampgroundDetailQuery;
   className?: string;
@@ -74,8 +83,8 @@ function useStickyLocated(
 /**
  * Persistent live region that re-announces when `announcementKey` changes even
  * if the message string is identical (two consecutive empty searches).
- * Clear on key change (render-time adjust), then fill on the next frame so SRs
- * see a change — remounting with text already present is often silent.
+ * Clear on key change (render-time adjust), then set the message after a short
+ * delay so screen readers commit the empty→text transition (#24 / #28).
  */
 function MapStatusLiveRegion({
   announcementKey,
@@ -92,19 +101,43 @@ function MapStatusLiveRegion({
 
   useEffect(() => {
     if (state.text !== "") return;
-    const frame = requestAnimationFrame(() => {
+    const timer = window.setTimeout(() => {
       setState((prev) =>
         prev.key === announcementKey ? { ...prev, text: message } : prev,
       );
-    });
-    return () => cancelAnimationFrame(frame);
+    }, 50);
+    return () => window.clearTimeout(timer);
   }, [announcementKey, message, state.text]);
 
   return (
-    <p role="status" className="sr-only">
+    <p role="status" aria-live="polite" className="sr-only">
       {state.text}
     </p>
   );
+}
+
+/**
+ * Notify parent when the user pans the map (map child; renders nothing).
+ * dragend only — zoomend also fires on programmatic fitBounds (#24).
+ */
+function MapUserMoveWatcher({ onUserMove }: { onUserMove: () => void }) {
+  useMapEvents({
+    dragend: () => onUserMove(),
+  });
+  return null;
+}
+
+/** Captures map instance for "Search this area" outside the leaflet tree. */
+function MapHandle({
+  onReady,
+}: {
+  onReady: (map: L.Map) => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    onReady(map);
+  }, [map, onReady]);
+  return null;
 }
 
 function FitMarkers({
@@ -172,6 +205,7 @@ export default function CampgroundsMap({
   searchCenter,
   radiusKm,
   searchKey = "",
+  searchQuery,
   detailQuery,
   className,
 }: Props) {
@@ -216,13 +250,25 @@ export default function CampgroundsMap({
   const showMapEmptyOverlay =
     !isEmptySearch && locatedFromProps.length === 0;
 
+  const trimmedQuery = searchQuery?.trim() ?? "";
   const statusMessage = showNoResultsOverlay
-    ? t("noResults")
+    ? trimmedQuery
+      ? t("noResultsFor", { query: trimmedQuery })
+      : t("noResults")
     : showMapEmptyOverlay
       ? t("mapEmpty")
       : "";
   // Include message kind so empty↔mapEmpty transitions also re-announce.
   const statusAnnouncementKey = `${searchKey}|${statusMessage}`;
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  /** Set to current searchKey when the user pans — clears automatically on new search. */
+  const [movedForKey, setMovedForKey] = useState<string | null>(null);
+  const showSearchArea = movedForKey === searchKey;
+  const [pendingArea, startAreaTransition] = useTransition();
 
   return (
     <div
@@ -305,6 +351,8 @@ export default function CampgroundsMap({
             </Popup>
           </Marker>
         ))}
+        <MapHandle onReady={setMapInstance} />
+        <MapUserMoveWatcher onUserMove={() => setMovedForKey(searchKey)} />
       </MapContainer>
 
       <MapStatusLiveRegion
@@ -319,6 +367,43 @@ export default function CampgroundsMap({
           <p className="max-w-[calc(100%-0.5rem)] rounded-md border border-border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm">
             {statusMessage}
           </p>
+        </div>
+      ) : null}
+      {showSearchArea ? (
+        <div className="absolute inset-x-0 bottom-3 z-[500] flex justify-center pointer-events-none">
+          <button
+            type="button"
+            className="pointer-events-auto rounded-md border border-border bg-background/95 px-3 py-2 text-sm font-medium shadow-sm hover:bg-background disabled:opacity-60"
+            disabled={pendingArea || !mapInstance}
+            onClick={() => {
+              if (!mapInstance) return;
+              const center = mapInstance.getCenter();
+              const lat = roundCampgroundCoord(center.lat);
+              const lng = roundCampgroundCoord(center.lng);
+              if (lat === 0 && lng === 0) return;
+
+              const next = new URLSearchParams(searchParams.toString());
+              next.set("lat", String(lat));
+              next.set("lng", String(lng));
+              const radius =
+                parseCampgroundRadiusKm(
+                  radiusKm != null ? String(radiusKm) : undefined,
+                ) ??
+                parseCampgroundRadiusKm(
+                  searchParams.get("radiusKm") ?? undefined,
+                ) ??
+                DEFAULT_CAMPGROUND_RADIUS_KM;
+              next.set("radiusKm", String(radius));
+              next.delete("place");
+              const qs = next.toString();
+              startAreaTransition(() => {
+                router.replace(qs ? `${pathname}?${qs}` : pathname);
+                setMovedForKey(null);
+              });
+            }}
+          >
+            {t("searchThisArea")}
+          </button>
         </div>
       ) : null}
     </div>
