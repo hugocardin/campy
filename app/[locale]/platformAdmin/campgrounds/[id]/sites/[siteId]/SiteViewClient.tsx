@@ -103,7 +103,13 @@ export default function SiteViewClient({ site, amenities }: Props) {
                     <h3 className="text-sm font-medium text-muted-foreground mb-1">
                       {t_sites("form.maxRigLengthLabel")}
                     </h3>
-                    <p>{site.max_rig_length ?? "—"}</p>
+                    <p>
+                      {site.max_rig_length != null
+                        ? t_sites("rigLengthFeet", {
+                            length: Number(site.max_rig_length),
+                          })
+                        : "—"}
+                    </p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-1">

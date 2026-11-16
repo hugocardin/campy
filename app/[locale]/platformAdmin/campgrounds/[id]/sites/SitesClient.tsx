@@ -53,7 +53,13 @@ export default function SitesClient({ campground, sites }: Props) {
                 <TableCell>{site.name}</TableCell>
                 <TableCell>{site.description}</TableCell>
                 <TableCell>{site.site_type_code}</TableCell>
-                <TableCell>{site.max_rig_length}</TableCell>
+                <TableCell>
+                  {site.max_rig_length != null
+                    ? t_sites("rigLengthFeet", {
+                        length: Number(site.max_rig_length),
+                      })
+                    : "—"}
+                </TableCell>
                 <TableCell>{site.price_per_night}</TableCell>
                 <TableCell>{site.min_stay_nights}</TableCell>
               </TableRow>

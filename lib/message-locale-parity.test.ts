@@ -36,6 +36,10 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "sites.electricityAmps.amp20",
   "sites.electricityAmps.amp30",
   "sites.electricityAmps.amp50",
+  // SI metre abbreviation is identical in en-CA / fr-CA
+  "search.controls.rigLengthUnitM",
+  "sites.form.rigLengthUnitM",
+
   // Official names identical in en-CA / fr-CA
   "search.provinces.AB",
   "search.provinces.MB",

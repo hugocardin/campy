@@ -17,6 +17,9 @@ import {
   stayKindAllowsRigLength,
 } from "@/lib/stay-kind";
 
+export type { RigLengthUnit } from "@/lib/site-rig-length";
+export { parseRigLengthUnit, formatRigLengthUnitParam } from "@/lib/site-rig-length";
+
 export type CampgroundSort =
   | "name"
   | "name-desc"
@@ -51,7 +54,7 @@ export type CampgroundHookupFilters = {
 export type CampgroundSiteFilters = CampgroundHookupFilters & {
   dumpStation: boolean;
   drivewayType?: DrivewayType;
-  /** Guest rig length (feet); ignored when stay is lodging. */
+  /** Guest rig length in canonical feet; ignored when stay is lodging. */
   rigLength?: number;
   stayKind?: StayKind;
 };

@@ -39,7 +39,15 @@ import {
   type ElectricityAmpFilterOption,
   normalizeElectricityAmpFilters,
 } from "@/lib/electricity-amps";
-import { parseGuestRigLength } from "@/lib/site-rig-length";
+import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
+import {
+  convertRigLengthDisplay,
+  formatRigLengthForDisplay,
+  maxRigLengthInUnit,
+  parseGuestRigLength,
+  parseRigLengthUnit,
+  type RigLengthUnit,
+} from "@/lib/site-rig-length";
 import type { StayKind } from "@/lib/stay-kind";
 import { stayKindAllowsRigLength } from "@/lib/stay-kind";
 import { usePathname, useRouter } from "@/i18n/navigation";
@@ -101,9 +109,11 @@ function queryStateFromFilters(
     | "dumpStation"
     | "drivewayType"
     | "rigLength"
+    | "rigUnit"
     | "stayKind"
   >,
   filters: ReturnType<typeof parseCampgroundSiteFilters>,
+  rigUnit?: RigLengthUnit,
 ): CampgroundQueryState {
   return {
     ...base,
@@ -113,6 +123,7 @@ function queryStateFromFilters(
     dumpStation: filters.dumpStation,
     drivewayType: filters.drivewayType,
     rigLength: filters.rigLength,
+    rigUnit: rigUnit === "m" ? "m" : undefined,
     stayKind: filters.stayKind,
   };
 }
@@ -150,7 +161,10 @@ export default function CampgroundListControls({
     rigLength: searchParams.get("rigLength") ?? undefined,
     stay: searchParams.get("stay") ?? undefined,
   });
+  const urlRigUnit = parseRigLengthUnit(searchParams.get("rigUnit"));
   const urlFiltersKey = siteFiltersKey(urlFilters);
+  // Include unit in external-nav sync key so back/forward restores the toggle.
+  const urlRigSyncKey = `${urlFiltersKey}|${urlRigUnit}`;
   const sortParam = parseCampgroundSort(
     searchParams.get("sort") ?? undefined,
     { geoActive: Boolean(geo) },
@@ -164,14 +178,18 @@ export default function CampgroundListControls({
   const [prevQParam, setPrevQParam] = useState(qParam);
   const [lastPushedQ, setLastPushedQ] = useState(qParam);
   const [localFilters, setLocalFilters] = useState(urlFilters);
-  const [prevUrlFiltersKey, setPrevUrlFiltersKey] = useState(urlFiltersKey);
+  const [rigUnit, setRigUnit] = useState<RigLengthUnit>(urlRigUnit);
+  const [prevUrlRigSyncKey, setPrevUrlRigSyncKey] = useState(urlRigSyncKey);
   const [lastPushedFiltersKey, setLastPushedFiltersKey] =
     useState(urlFiltersKey);
+  const [lastPushedRigUnit, setLastPushedRigUnit] =
+    useState<RigLengthUnit>(urlRigUnit);
   const [rigDraft, setRigDraft] = useState(
-    urlFilters.rigLength != null ? String(urlFilters.rigLength) : "",
+    formatRigLengthForDisplay(urlFilters.rigLength, urlRigUnit),
   );
   // Ref so search debounce flush never reads a stale rigDraft closure.
   const rigDraftRef = useRef(rigDraft);
+  const rigUnitRef = useRef(rigUnit);
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const rigDebounceRef = useRef<number | null>(null);
@@ -188,6 +206,7 @@ export default function CampgroundListControls({
         radiusKm: geo?.radiusKm ?? preferredRadius,
       },
       localFilters,
+      rigUnit,
     ),
   );
 
@@ -206,14 +225,15 @@ export default function CampgroundListControls({
   // Sync filter *state* from URL only for external changes (not our pending push).
   // Always adopt URL filter values; only rewrite rigDraft on external navigations
   // so a mid-type draft ("40") is not clobbered by our own echo for "4".
-  if (urlFiltersKey !== prevUrlFiltersKey) {
-    setPrevUrlFiltersKey(urlFiltersKey);
-    const isExternal = urlFiltersKey !== lastPushedFiltersKey;
+  if (urlRigSyncKey !== prevUrlRigSyncKey) {
+    setPrevUrlRigSyncKey(urlRigSyncKey);
+    const isExternal =
+      urlFiltersKey !== lastPushedFiltersKey || urlRigUnit !== lastPushedRigUnit;
     if (isExternal) {
       setLastPushedFiltersKey(urlFiltersKey);
-      setRigDraft(
-        urlFilters.rigLength != null ? String(urlFilters.rigLength) : "",
-      );
+      setLastPushedRigUnit(urlRigUnit);
+      setRigUnit(urlRigUnit);
+      setRigDraft(formatRigLengthForDisplay(urlFilters.rigLength, urlRigUnit));
     }
     setLocalFilters(urlFilters);
   }
@@ -237,6 +257,7 @@ export default function CampgroundListControls({
         radiusKm: geo?.radiusKm ?? preferredRadius,
       },
       localFilters,
+      rigUnit,
     );
   }, [
     search,
@@ -247,6 +268,7 @@ export default function CampgroundListControls({
     geo?.radiusKm,
     preferredRadius,
     localFilters,
+    rigUnit,
   ]);
 
   // Sync ref after render-time setRigDraft (external URL sync). Event handlers
@@ -254,6 +276,10 @@ export default function CampgroundListControls({
   useEffect(() => {
     rigDraftRef.current = rigDraft;
   }, [rigDraft]);
+
+  useEffect(() => {
+    rigUnitRef.current = rigUnit;
+  }, [rigUnit]);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -275,10 +301,15 @@ export default function CampgroundListControls({
     setRigDraft(value);
   }
 
-  /** Parse the live draft; clear the field when a non-empty value is invalid. */
+  function updateRigUnit(unit: RigLengthUnit) {
+    rigUnitRef.current = unit;
+    setRigUnit(unit);
+  }
+
+  /** Parse the live draft in the active unit → canonical feet. */
   function resolveRigDraft(): number | undefined {
     const draft = rigDraftRef.current;
-    const parsed = parseGuestRigLength(draft);
+    const parsed = parseGuestRigLength(draft, rigUnitRef.current);
     if (draft.trim() !== "" && parsed == null) {
       updateRigDraft("");
     }
@@ -308,7 +339,9 @@ export default function CampgroundListControls({
     const trimmedQ = next.q.trim();
     setLastPushedQ(trimmedQ);
     const nextKey = siteFiltersKey(next);
+    const nextUnit: RigLengthUnit = next.rigUnit === "m" ? "m" : "ft";
     setLastPushedFiltersKey(nextKey);
+    setLastPushedRigUnit(nextUnit);
     setLocalFilters({
       amps: next.amps,
       water: next.water,
@@ -318,6 +351,7 @@ export default function CampgroundListControls({
       rigLength: next.rigLength,
       stayKind: next.stayKind,
     });
+    updateRigUnit(nextUnit);
     // Do not overwrite mid-typing rigDraft here — external URL sync does that.
     if (!stayKindAllowsRigLength(next.stayKind)) {
       updateRigDraft("");
@@ -329,6 +363,29 @@ export default function CampgroundListControls({
     startTransition(() => {
       router.replace(query ? `${pathname}?${query}` : pathname);
     });
+  }
+
+  function onRigUnitChange(nextUnit: RigLengthUnit) {
+    const fromUnit = rigUnitRef.current;
+    if (nextUnit === fromUnit) return;
+    // Canonical feet from the current draft before flipping the unit.
+    const feet = resolveRigDraft();
+    const draft = rigDraftRef.current.trim();
+    const n = Number(draft);
+    const converted =
+      draft !== "" && Number.isFinite(n) && n > 0
+        ? convertRigLengthDisplay(n, fromUnit, nextUnit)
+        : undefined;
+    updateRigUnit(nextUnit);
+    updateRigDraft(converted != null ? String(converted) : "");
+    replaceQuery(
+      withLatestCampgroundFilters(latestParamsRef.current, {
+        q: latestParamsRef.current.q,
+        sort: latestParamsRef.current.sort,
+        rigLength: feet,
+        rigUnit: nextUnit === "m" ? "m" : undefined,
+      }),
+    );
   }
 
   /** Apply a filter patch; flush any pending rig draft so it is not dropped. */
@@ -725,34 +782,50 @@ export default function CampgroundListControls({
               >
                 {t("rigLengthLabel")}
               </Label>
-              <Input
-                id="rig-length-filter"
-                type="number"
-                min={1}
-                max={200}
-                inputMode="decimal"
-                className="w-36 mt-1.5"
-                placeholder={t("rigLengthPlaceholder")}
-                value={rigDraft}
-                disabled={geoBusy}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  updateRigDraft(value);
-                  if (rigDebounceRef.current != null) {
-                    window.clearTimeout(rigDebounceRef.current);
+              <div className="mt-1.5 flex items-center gap-2">
+                <Input
+                  id="rig-length-filter"
+                  type="number"
+                  min={1}
+                  max={maxRigLengthInUnit(rigUnit)}
+                  step="0.1"
+                  inputMode="decimal"
+                  className="w-28"
+                  placeholder={
+                    rigUnit === "m"
+                      ? t("rigLengthPlaceholderM")
+                      : t("rigLengthPlaceholderFt")
                   }
-                  rigDebounceRef.current = window.setTimeout(() => {
-                    rigDebounceRef.current = null;
-                    replaceQuery(
-                      withLatestCampgroundFilters(latestParamsRef.current, {
-                        q: latestParamsRef.current.q,
-                        sort: latestParamsRef.current.sort,
-                        rigLength: resolveRigDraft(),
-                      }),
-                    );
-                  }, 300);
-                }}
-              />
+                  value={rigDraft}
+                  disabled={geoBusy}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    updateRigDraft(value);
+                    if (rigDebounceRef.current != null) {
+                      window.clearTimeout(rigDebounceRef.current);
+                    }
+                    rigDebounceRef.current = window.setTimeout(() => {
+                      rigDebounceRef.current = null;
+                      replaceQuery(
+                        withLatestCampgroundFilters(latestParamsRef.current, {
+                          q: latestParamsRef.current.q,
+                          sort: latestParamsRef.current.sort,
+                          rigLength: resolveRigDraft(),
+                          rigUnit: rigUnitRef.current === "m" ? "m" : undefined,
+                        }),
+                      );
+                    }, 300);
+                  }}
+                />
+                <RigLengthUnitToggle
+                  value={rigUnit}
+                  onChange={onRigUnitChange}
+                  disabled={geoBusy}
+                  groupLabel={t("rigLengthUnitGroupLabel")}
+                  ftLabel={t("rigLengthUnitFt")}
+                  mLabel={t("rigLengthUnitM")}
+                />
+              </div>
             </div>
           ) : null}
         </div>
