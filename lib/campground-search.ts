@@ -2,6 +2,12 @@ import {
   PROTECTED_HOOKUP_AMENITY_CODES,
   type ProtectedHookupAmenityCode,
 } from "@/lib/amenities/hookup-codes";
+import {
+  ELECTRICITY_AMP_NONE,
+  ELECTRICITY_AMP_VALUES,
+  type ElectricityAmpFilterOption,
+  normalizeElectricityAmpFilters,
+} from "@/lib/electricity-amps";
 
 export type CampgroundSort =
   | "name"
@@ -18,17 +24,20 @@ export const DEFAULT_CAMPGROUND_RADIUS_KM: CampgroundRadiusKm = 50;
 /** ~1 km privacy rounding for URL / logs (2 decimal degrees). */
 export const CAMPGROUND_GEO_COORD_DECIMALS = 2;
 
-/** Stable amenity `code` values mapped to guest hookup filters. */
+/** Stable amenity `code` values mapped to guest water/sewer filters. */
 export const HOOKUP_AMENITY_CODES = {
-  electricity: PROTECTED_HOOKUP_AMENITY_CODES[0],
-  water: PROTECTED_HOOKUP_AMENITY_CODES[1],
-  sewer: PROTECTED_HOOKUP_AMENITY_CODES[2],
+  water: PROTECTED_HOOKUP_AMENITY_CODES[0],
+  sewer: PROTECTED_HOOKUP_AMENITY_CODES[1],
 } as const satisfies Record<string, ProtectedHookupAmenityCode>;
 
-export type HookupFilterKey = keyof typeof HOOKUP_AMENITY_CODES;
+export type HookupAmenityFilterKey = keyof typeof HOOKUP_AMENITY_CODES;
+
+/** Legacy alias — prefer {@link HookupAmenityFilterKey}. */
+export type HookupFilterKey = HookupAmenityFilterKey;
 
 export type CampgroundHookupFilters = {
-  electricity: boolean;
+  /** Exact amp multi-select; empty = no electricity restriction. */
+  amps: ElectricityAmpFilterOption[];
   water: boolean;
   sewer: boolean;
 };
@@ -40,7 +49,7 @@ export type CampgroundListFilters = {
   lat?: number;
   lng?: number;
   radiusKm?: CampgroundRadiusKm;
-  electricity?: boolean;
+  amps?: ElectricityAmpFilterOption[];
   water?: boolean;
   sewer?: boolean;
 };
@@ -196,13 +205,34 @@ export function parseHookupFlag(value: string | undefined): boolean {
   return value === "1";
 }
 
+/**
+ * Parse `amps` URL param: comma-separated `none` / `15` / `20` / `30` / `50`.
+ * Legacy `electricity=1` (when `amps` absent) → all amp values ("any amp").
+ */
+export function parseCampgroundAmps(params: {
+  amps?: string;
+  electricity?: string;
+}): ElectricityAmpFilterOption[] {
+  if (params.amps != null && params.amps.trim() !== "") {
+    return normalizeElectricityAmpFilters(
+      params.amps.split(",").map((part) => part.trim().toLowerCase()),
+    );
+  }
+  // Legacy yes/no electricity URL → any amp (overlap with 15|20|30|50).
+  if (parseHookupFlag(params.electricity)) {
+    return [...ELECTRICITY_AMP_VALUES];
+  }
+  return [];
+}
+
 export function parseCampgroundHookups(params: {
+  amps?: string;
   electricity?: string;
   water?: string;
   sewer?: string;
 }): CampgroundHookupFilters {
   return {
-    electricity: parseHookupFlag(params.electricity),
+    amps: parseCampgroundAmps(params),
     water: parseHookupFlag(params.water),
     sewer: parseHookupFlag(params.sewer),
   };
@@ -211,5 +241,16 @@ export function parseCampgroundHookups(params: {
 export function anyHookupFilterActive(
   hookups: CampgroundHookupFilters,
 ): boolean {
-  return hookups.electricity || hookups.water || hookups.sewer;
+  return hookups.amps.length > 0 || hookups.water || hookups.sewer;
+}
+
+/** Serialize amp filters for URL (`none,15,30`). Empty → omit. */
+export function formatCampgroundAmpsParam(
+  amps: readonly ElectricityAmpFilterOption[],
+): string | undefined {
+  const normalized = normalizeElectricityAmpFilters(amps);
+  if (normalized.length === 0) return undefined;
+  return normalized
+    .map((opt) => (opt === ELECTRICITY_AMP_NONE ? ELECTRICITY_AMP_NONE : String(opt)))
+    .join(",");
 }

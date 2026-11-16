@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Amenity } from "@/entities/amenity";
+import { LEGACY_ELECTRICITY_AMENITY_CODE } from "@/lib/amenities/hookup-codes";
 import { translateErrorCode, withErrorReference } from "@/lib/errors";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 type Props = {
   campgroundId: string;
@@ -34,8 +35,18 @@ export default function SiteAmenitiesClient({
     new Set(currentAmenities.map((a) => a.id)),
   );
 
+  // Electricity is sites.electricity_amps — hide legacy ELECTRICITY amenity.
+  const selectableAmenities = useMemo(
+    () =>
+      allAmenities.filter(
+        (amenity) =>
+          amenity.code.trim().toUpperCase() !== LEGACY_ELECTRICITY_AMENITY_CODE,
+      ),
+    [allAmenities],
+  );
+
   // Group all amenities by category
-  const groupedAmenities = allAmenities.reduce(
+  const groupedAmenities = selectableAmenities.reduce(
     (acc, amenity) => {
       const category = amenity.category_code?.trim();
       if (!acc[category]) acc[category] = [];
@@ -98,7 +109,10 @@ export default function SiteAmenitiesClient({
         </CardHeader>
 
         <CardContent className="space-y-8">
-          {allAmenities.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t_amenities("errors.electricityAmpsOnSiteForm")}
+          </p>
+          {selectableAmenities.length === 0 ? (
             <p className="text-muted-foreground italic">
               {t_amenities("noResult")}
             </p>

@@ -15,6 +15,11 @@ import {
   sanitizeCampgroundSearchTerm,
   validateCampgroundGeo,
 } from "@/lib/campground-search";
+import {
+  type ElectricityAmpFilterOption,
+  electricityAmpsToRpcArg,
+  normalizeElectricityAmpFilters,
+} from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import {
   handleDbResponse,
@@ -146,13 +151,16 @@ export const getCampgroundProvinces = cache(
 
 function hookupRpcArgs(hookups: CampgroundHookupFilters) {
   return {
-    require_electricity: hookups.electricity,
+    require_amps: electricityAmpsToRpcArg(hookups.amps),
     require_water: hookups.water,
     require_sewer: hookups.sewer,
   };
 }
 
-/** Primitives (not an object) so React `cache` can dedupe by argument identity. */
+/**
+ * Primitives (not an object) so React `cache` can dedupe by argument identity.
+ * `ampsKey` is a stable serialized filter (`none,15,30` or "").
+ */
 export const getCampgrounds = cache(
   async (
     q?: string,
@@ -161,7 +169,7 @@ export const getCampgrounds = cache(
     lat?: number,
     lng?: number,
     radiusKm?: number,
-    electricity = false,
+    ampsKey = "",
     water = false,
     sewer = false,
   ): Promise<ActionResult<Campground[]>> => {
@@ -174,8 +182,13 @@ export const getCampgrounds = cache(
       const term = q ? sanitizeCampgroundSearchTerm(q) : "";
       // Unknown / malicious ?province= is ignored (All provinces).
       const provinceCode = resolveProvinceCode(province);
+      const amps = normalizeElectricityAmpFilters(
+        ampsKey
+          ? ampsKey.split(",").map((part) => part.trim().toLowerCase())
+          : [],
+      ) as ElectricityAmpFilterOption[];
       const hookups: CampgroundHookupFilters = {
-        electricity: Boolean(electricity),
+        amps,
         water: Boolean(water),
         sewer: Boolean(sewer),
       };

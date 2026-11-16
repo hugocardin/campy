@@ -42,6 +42,7 @@ export default async function Home({ searchParams }: PageProps) {
     radiusKm: firstParam(params.radiusKm),
   });
   const hookups = parseCampgroundHookups({
+    amps: firstParam(params.amps),
     electricity: firstParam(params.electricity),
     water: firstParam(params.water),
     sewer: firstParam(params.sewer),
@@ -49,6 +50,9 @@ export default async function Home({ searchParams }: PageProps) {
   const sort = parseCampgroundSort(firstParam(params.sort), {
     geoActive: Boolean(geo),
   });
+  const ampsKey = hookups.amps
+    .map((opt) => (opt === "none" ? "none" : String(opt)))
+    .join(",");
 
   const [campgroundsResult, provincesResult] = await Promise.all([
     getCampgrounds(
@@ -58,7 +62,7 @@ export default async function Home({ searchParams }: PageProps) {
       geo?.lat,
       geo?.lng,
       geo?.radiusKm,
-      hookups.electricity,
+      ampsKey,
       hookups.water,
       hookups.sewer,
     ),
@@ -101,7 +105,7 @@ export default async function Home({ searchParams }: PageProps) {
     q ?? "",
     province ?? "",
     geo ? `${geo.lat},${geo.lng},${geo.radiusKm}` : "",
-    hookups.electricity ? "e" : "",
+    ampsKey,
     hookups.water ? "w" : "",
     hookups.sewer ? "s" : "",
   ].join("|");

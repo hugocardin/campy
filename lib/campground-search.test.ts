@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { ELECTRICITY_AMP_VALUES } from "./electricity-amps";
 import {
   CAMPGROUND_RADIUS_KM_PRESETS,
   DEFAULT_CAMPGROUND_RADIUS_KM,
@@ -7,7 +8,9 @@ import {
   anyHookupFilterActive,
   campgroundRadiusMeters,
   campgroundSortQueryValue,
+  formatCampgroundAmpsParam,
   formatDistanceKm,
+  parseCampgroundAmps,
   parseCampgroundGeo,
   parseCampgroundHookups,
   parseCampgroundRadiusKm,
@@ -130,8 +133,7 @@ describe("formatDistanceKm", () => {
 });
 
 describe("hookup URL filters", () => {
-  it("maps stable amenity codes", () => {
-    assert.equal(HOOKUP_AMENITY_CODES.electricity, "ELECTRICITY");
+  it("maps stable water/sewer amenity codes", () => {
     assert.equal(HOOKUP_AMENITY_CODES.water, "WATER");
     assert.equal(HOOKUP_AMENITY_CODES.sewer, "SEWER");
   });
@@ -144,22 +146,37 @@ describe("hookup URL filters", () => {
     assert.equal(parseHookupFlag(undefined), false);
   });
 
-  it("parses electricity/water/sewer URL params", () => {
+  it("parses amps + water/sewer URL params", () => {
     assert.deepEqual(
       parseCampgroundHookups({
-        electricity: "1",
+        amps: "none,30",
         water: "true",
         sewer: "1",
       }),
-      { electricity: true, water: false, sewer: true },
+      { amps: ["none", 30], water: false, sewer: true },
     );
     assert.equal(
-      anyHookupFilterActive({ electricity: false, water: false, sewer: false }),
+      anyHookupFilterActive({ amps: [], water: false, sewer: false }),
       false,
     );
     assert.equal(
-      anyHookupFilterActive({ electricity: true, water: false, sewer: false }),
+      anyHookupFilterActive({ amps: [30], water: false, sewer: false }),
       true,
     );
+  });
+
+  it("maps legacy electricity=1 to any amp when amps absent", () => {
+    assert.deepEqual(parseCampgroundAmps({ electricity: "1" }), [
+      ...ELECTRICITY_AMP_VALUES,
+    ]);
+    assert.deepEqual(
+      parseCampgroundAmps({ amps: "30", electricity: "1" }),
+      [30],
+    );
+  });
+
+  it("serializes amps for the URL", () => {
+    assert.equal(formatCampgroundAmpsParam([]), undefined);
+    assert.equal(formatCampgroundAmpsParam(["none", 50, 15]), "none,15,50");
   });
 });

@@ -23,7 +23,18 @@
     "pricePerNightLabel": "Price per night",
     "pricePerNightPlaceholder": "e.g. 45.00",
     "minStayNightLabel": "Minimal stay nights",
-    "minStayNightPlaceholder": "e.g. 2"
+    "minStayNightPlaceholder": "e.g. 2",
+    "electricityAmpsLabel": "Electricity amps",
+    "electricityAmpsHint": "Select every plug available on this site’s pedestal. Leave all unchecked for no electricity."
+  },
+
+  "electricityAmps": {
+    "none": "None",
+    "amp15": "15 A",
+    "amp20": "20 A",
+    "amp30": "30 A",
+    "amp50": "50 A",
+    "summaryLabel": "Electricity"
   },
 
   "errors": {
@@ -32,7 +43,8 @@
     "priceRequired": "Price is required",
     "invalidMaxLength": "Invalid max rig length",
     "invalidPricePerNight": "Invalid price per night",
-    "invalidMinStayNights": "Invalid min stay nights"
+    "invalidMinStayNights": "Invalid min stay nights",
+    "invalidElectricityAmps": "Choose only from 15, 20, 30, or 50 amps"
   },
 
   "actions": {

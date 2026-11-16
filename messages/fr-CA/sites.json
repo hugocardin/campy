@@ -23,7 +23,18 @@
     "pricePerNightLabel": "Prix par nuit",
     "pricePerNightPlaceholder": "ex. 45",
     "minStayNightLabel": "Nombre minimal de nuits",
-    "minStayNightPlaceholder": "ex. 2"
+    "minStayNightPlaceholder": "ex. 2",
+    "electricityAmpsLabel": "Ampères d’électricité",
+    "electricityAmpsHint": "Cochez chaque prise disponible sur le piédestal. Laissez tout décoché s’il n’y a pas d’électricité."
+  },
+
+  "electricityAmps": {
+    "none": "Aucun",
+    "amp15": "15 A",
+    "amp20": "20 A",
+    "amp30": "30 A",
+    "amp50": "50 A",
+    "summaryLabel": "Électricité"
   },
 
   "errors": {
@@ -32,7 +43,8 @@
     "priceRequired": "Le prix est requis",
     "invalidMaxLength": "Longueur max. du véhicule invalide",
     "invalidPricePerNight": "Prix par nuit invalide",
-    "invalidMinStayNights": "Nombre minimal de nuits invalide"
+    "invalidMinStayNights": "Nombre minimal de nuits invalide",
+    "invalidElectricityAmps": "Choisissez uniquement parmi 15, 20, 30 ou 50 ampères"
   },
 
   "actions": {

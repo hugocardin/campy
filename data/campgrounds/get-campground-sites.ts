@@ -1,4 +1,5 @@
 import { Site } from "@/entities/sites";
+import { normalizeElectricityAmps } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import {
   handleDbResponse,
@@ -16,6 +17,7 @@ type SiteWithSiteTypeRow = {
   max_rig_length: number | null;
   price_per_night_base: number;
   min_stay_nights: number;
+  electricity_amps: number[] | null;
   site_types: { code: string };
 };
 
@@ -29,6 +31,7 @@ function toDomain(row: SiteWithSiteTypeRow): Site {
     max_rig_length: row.max_rig_length,
     price_per_night: row.price_per_night_base,
     min_stay_nights: row.min_stay_nights,
+    electricity_amps: normalizeElectricityAmps(row.electricity_amps ?? []),
   };
 }
 
@@ -47,6 +50,7 @@ export const getSitesOfCampground = cache(
             max_rig_length,
             price_per_night_base,
             min_stay_nights,
+            electricity_amps,
             description,
             site_types!inner (code)
           `,
@@ -84,6 +88,7 @@ export const getSiteOfCampground = cache(
             max_rig_length,
             price_per_night_base,
             min_stay_nights,
+            electricity_amps,
             description,
             site_types!inner (code)
           `,
