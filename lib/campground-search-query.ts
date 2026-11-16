@@ -70,7 +70,8 @@ export function withLatestCampgroundFilters(
     // Drop rig + driveway when lodging (cabins; issue #27).
     drivewayType: campingOk ? drivewayRaw : undefined,
     rigLength: campingOk ? rigLengthRaw : undefined,
-    // Keep unit preference even when lodging so toggling stay back restores it.
+    // Keep unit preference through lodging so camping↔lodging restores the toggle
+    // (also emitted in the URL — see buildCampgroundSearchParams).
     rigUnit: rigUnitRaw === "m" ? "m" : undefined,
   };
 }
@@ -164,10 +165,11 @@ export function buildCampgroundSearchParams(
     const rigParam = formatGuestRigLengthParam(next.rigLength);
     if (rigParam) params.set("rigLength", rigParam);
   }
-  // Persist unit preference whenever metres is selected (even with empty length),
-  // so shared links restore the toggle. Omitted when feet (default).
+  // Persist unit preference whenever metres is selected (even with empty length
+  // or lodging), so shared links / stay toggles restore the toggle. Omitted when
+  // feet (default). Harmless for lodging — RPC ignores it.
   const unitParam = formatRigLengthUnitParam(next.rigUnit);
-  if (unitParam && stayKindAllowsRigLength(next.stayKind)) {
+  if (unitParam) {
     params.set("rigUnit", unitParam);
   }
   return params;

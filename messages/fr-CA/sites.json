@@ -54,7 +54,7 @@
     "nameRequired": "Le nom est requis",
     "typeRequired": "Le type est requis",
     "priceRequired": "Le prix est requis",
-    "invalidMaxLength": "Longueur max. du véhicule invalide",
+    "invalidMaxLength": "Entrez une longueur max. jusqu’à {max} {unit}",
     "maxRigLengthRequired": "La longueur max. du véhicule est obligatoire pour les emplacements VR",
     "invalidPricePerNight": "Prix par nuit invalide",
     "invalidMinStayNights": "Nombre minimal de nuits invalide",

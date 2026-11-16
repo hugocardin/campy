@@ -31,7 +31,7 @@ import {
   convertRigLengthDisplay,
   isLodgingSiteType,
   maxRigLengthInUnit,
-  parseGuestRigLength,
+  parseRigLengthToFeet,
   siteTypeRequiresMaxRigLength,
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
@@ -98,21 +98,24 @@ export default function SiteFormClient({
   const isLodging = isLodgingSiteType(selectedTypeCode);
   const requiresMaxRig = siteTypeRequiresMaxRigLength(selectedTypeCode);
 
-  const maxRigFeet = parseGuestRigLength(form.max_rig_length, rigUnit);
+  const maxRigParsed = parseRigLengthToFeet(form.max_rig_length, rigUnit);
   const isFormValid = Boolean(
     form.name.trim() &&
     form.site_type_id &&
     form.price_per_night &&
     !isNaN(parseFloat(form.price_per_night)) &&
     !isNaN(parseFloat(form.min_stay_nights || "0")) &&
-    (!requiresMaxRig || maxRigFeet != null),
+    (!requiresMaxRig || maxRigParsed.ok),
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const maxRigLengthFeet = parseGuestRigLength(form.max_rig_length, rigUnit);
+    const maxRigParsedSubmit = parseRigLengthToFeet(
+      form.max_rig_length,
+      rigUnit,
+    );
     const pricePerNightNum = parseFloat(form.price_per_night);
     const minStayNightsNum = parseFloat(form.min_stay_nights);
     const siteTypeIdNum = parseInt(form.site_type_id, 10);
@@ -123,14 +126,30 @@ export default function SiteFormClient({
     if (isLodging) {
       // Lodging: force null max_rig_length (issue #27).
     } else if (requiresMaxRig) {
-      if (maxRigLengthFeet == null) {
+      if (!maxRigParsedSubmit.ok && maxRigParsedSubmit.reason === "empty") {
         return setError(t_sites("errors.maxRigLengthRequired"));
       }
-    } else if (
-      form.max_rig_length.trim() !== "" &&
-      maxRigLengthFeet == null
-    ) {
-      return setError(t_sites("errors.invalidMaxLength"));
+      if (!maxRigParsedSubmit.ok) {
+        return setError(
+          t_sites("errors.invalidMaxLength", {
+            max: maxRigLengthInUnit(rigUnit),
+            unit:
+              rigUnit === "m"
+                ? t_sites("form.rigLengthUnitM")
+                : t_sites("form.rigLengthUnitFt"),
+          }),
+        );
+      }
+    } else if (form.max_rig_length.trim() !== "" && !maxRigParsedSubmit.ok) {
+      return setError(
+        t_sites("errors.invalidMaxLength", {
+          max: maxRigLengthInUnit(rigUnit),
+          unit:
+            rigUnit === "m"
+              ? t_sites("form.rigLengthUnitM")
+              : t_sites("form.rigLengthUnitFt"),
+        }),
+      );
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
       return setError(t_sites("errors.invalidPricePerNight"));
@@ -153,7 +172,11 @@ export default function SiteFormClient({
       name: form.name,
       description: form.description,
       site_type_id: siteTypeIdNum,
-      max_rig_length: isLodging ? undefined : maxRigLengthFeet,
+      max_rig_length: isLodging
+        ? undefined
+        : maxRigParsedSubmit.ok
+          ? maxRigParsedSubmit.feet
+          : undefined,
       price_per_night: pricePerNightNum,
       min_stay_nights: isNaN(minStayNightsNum) ? undefined : minStayNightsNum,
       electricity_amps: normalizeElectricityAmps(form.electricity_amps),
@@ -297,7 +320,7 @@ export default function SiteFormClient({
                     type="number"
                     min={1}
                     max={maxRigLengthInUnit(rigUnit)}
-                    step="0.1"
+                    step="any"
                     value={form.max_rig_length}
                     onChange={handleChange}
                     className="flex-1"

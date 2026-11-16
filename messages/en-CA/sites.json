@@ -54,7 +54,7 @@
     "nameRequired": "Name is required",
     "typeRequired": "Type is required",
     "priceRequired": "Price is required",
-    "invalidMaxLength": "Invalid max rig length",
+    "invalidMaxLength": "Enter a max rig length up to {max} {unit}",
     "maxRigLengthRequired": "Max rig length is required for RV sites",
     "invalidPricePerNight": "Invalid price per night",
     "invalidMinStayNights": "Invalid min stay nights",

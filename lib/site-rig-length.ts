@@ -37,13 +37,25 @@ const REQUIRES_MAX_RIG = new Set<string>(SITE_TYPES_REQUIRING_MAX_RIG);
 /** International foot (exact). */
 export const METRES_PER_FOOT = 0.3048;
 
-/** Guest filter / form absurd-value caps (issue #32). */
+/** Single absurd-value / guest-filter / admin-write cap (canonical feet). */
 export const RIG_LENGTH_MAX_FT = 200;
-/** ≈ 200 ft (200 × 0.3048 = 60.96 → 61). */
-export const RIG_LENGTH_MAX_M = 61;
+
+/**
+ * Metre input max derived from {@link RIG_LENGTH_MAX_FT} (2-decimal floor),
+ * so converting max metres never exceeds the feet cap.
+ * 200 × 0.3048 = 60.96.
+ */
+export const RIG_LENGTH_MAX_M =
+  Math.floor(RIG_LENGTH_MAX_FT * METRES_PER_FOOT * 100) / 100;
 
 export const RIG_LENGTH_UNITS = ["ft", "m"] as const;
 export type RigLengthUnit = (typeof RIG_LENGTH_UNITS)[number];
+
+export type ParseRigLengthFailureReason = "empty" | "invalid" | "over_max";
+
+export type ParseRigLengthResult =
+  | { ok: true; feet: number }
+  | { ok: false; reason: ParseRigLengthFailureReason };
 
 export function isLodgingSiteType(code: string | undefined | null): boolean {
   return (code ?? "").trim().toUpperCase() === "LODGING";
@@ -93,7 +105,7 @@ export function metresToFeet(metres: number): number {
   return metres / METRES_PER_FOOT;
 }
 
-/** Round for display / storage. Metres use 2 decimals to limit ft↔m drift. */
+/** Round for display / storage. Metres use 2 decimals; feet use 1. */
 export function roundRigLength(value: number, decimals = 1): number {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
@@ -132,30 +144,56 @@ export function formatRigLengthForDisplay(
 }
 
 /**
- * Parse a display-unit value and return canonical **feet** for storage / URL /
- * RPC. Applies the cap in the chosen unit (200 ft ≈ 61 m). Invalid / over-cap
- * → undefined.
+ * Parse a display-unit value to canonical **feet**.
+ * Cap is always checked in feet after conversion (so metre max cannot exceed
+ * {@link RIG_LENGTH_MAX_FT}). Metres→feet rounds to 1 decimal to keep
+ * ft→m→ft round-trips from excluding equal-length sites.
+ */
+export function parseRigLengthToFeet(
+  value: string | number | undefined | null,
+  unit: RigLengthUnit = "ft",
+): ParseRigLengthResult {
+  if (value == null || value === "") {
+    return { ok: false, reason: "empty" };
+  }
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isFinite(n) || n <= 0) {
+    return { ok: false, reason: "invalid" };
+  }
+  const feet =
+    unit === "m" ? roundRigLength(metresToFeet(n), 1) : roundRigLength(n, 1);
+  if (feet > RIG_LENGTH_MAX_FT) {
+    return { ok: false, reason: "over_max" };
+  }
+  return { ok: true, feet };
+}
+
+/**
+ * Guest URL / filter helper: positive finite feet, else undefined.
+ * Prefer {@link parseRigLengthToFeet} when callers need empty vs over-max.
  */
 export function parseGuestRigLength(
   value: string | number | undefined | null,
   unit: RigLengthUnit = "ft",
 ): number | undefined {
-  if (value == null || value === "") return undefined;
-  const n = typeof value === "number" ? value : Number(String(value).trim());
-  if (!Number.isFinite(n) || n <= 0) return undefined;
-  if (n > maxRigLengthInUnit(unit)) return undefined;
-  if (unit === "m") {
-    // Two-decimal feet when converting from metres (keeps ~cm precision).
-    return roundRigLength(metresToFeet(n), 2);
-  }
-  return n;
+  const parsed = parseRigLengthToFeet(value, unit);
+  return parsed.ok ? parsed.feet : undefined;
+}
+
+/**
+ * Normalize a server-side feet value (already canonical). Caps / rounds like
+ * {@link parseRigLengthToFeet} with unit `ft`.
+ */
+export function normalizeStoredRigLengthFeet(
+  value: number | undefined | null,
+): ParseRigLengthResult {
+  if (value == null) return { ok: false, reason: "empty" };
+  return parseRigLengthToFeet(value, "ft");
 }
 
 export function formatGuestRigLengthParam(
   value: number | undefined,
 ): string | undefined {
   if (value == null || !Number.isFinite(value) || value <= 0) return undefined;
-  // Keep up to 2 decimals (metres→feet); strip trailing zeros via Number.
-  const rounded = roundRigLength(value, 2);
-  return String(rounded);
+  return String(roundRigLength(value, 1));
 }

@@ -10,6 +10,7 @@ import {
   isLodgingSiteType,
   metresToFeet,
   parseGuestRigLength,
+  parseRigLengthToFeet,
   parseRigLengthUnit,
   siteTypeRequiresMaxRigLength,
 } from "./site-rig-length";
@@ -24,6 +25,11 @@ describe("site-rig-length", () => {
     assert.equal(siteTypeRequiresMaxRigLength("LODGING"), false);
   });
 
+  it("derives metre max from feet so conversion never exceeds the feet cap", () => {
+    assert.equal(RIG_LENGTH_MAX_M, 60.96);
+    assert.ok(metresToFeet(RIG_LENGTH_MAX_M) <= RIG_LENGTH_MAX_FT + 1e-9);
+  });
+
   it("parses guest rig length in feet (default)", () => {
     assert.equal(parseGuestRigLength("35"), 35);
     assert.equal(parseGuestRigLength(28.5), 28.5);
@@ -35,14 +41,39 @@ describe("site-rig-length", () => {
     assert.equal(parseGuestRigLength(String(RIG_LENGTH_MAX_FT + 1)), undefined);
   });
 
-  it("parses guest rig length in metres and returns feet", () => {
+  it("parses metres after converting, with a feet cap", () => {
     const feet = parseGuestRigLength("10", "m");
     assert.ok(feet != null);
-    assert.equal(feet, Math.round(metresToFeet(10) * 100) / 100);
-    assert.equal(parseGuestRigLength(String(RIG_LENGTH_MAX_M), "m") != null, true);
-    assert.equal(parseGuestRigLength(String(RIG_LENGTH_MAX_M + 1), "m"), undefined);
-    // Cap is applied in metres before conversion (61 m ok, 62 m rejected).
+    assert.equal(feet, Math.round(metresToFeet(10) * 10) / 10);
+    const atMax = parseGuestRigLength(String(RIG_LENGTH_MAX_M), "m");
+    assert.ok(atMax != null);
+    assert.equal(atMax, RIG_LENGTH_MAX_FT);
+    // Round-trip through feet (server / URL default unit).
+    assert.equal(parseGuestRigLength(String(atMax)), atMax);
+    // Hard-coded 61 m used to exceed 200 ft after conversion.
+    assert.equal(parseGuestRigLength("61", "m"), undefined);
     assert.equal(parseGuestRigLength("62", "m"), undefined);
+  });
+
+  it("keeps ft→m→ft round-trip from excluding equal-length sites", () => {
+    const displayM = formatRigLengthForDisplay(35, "m");
+    assert.equal(displayM, "10.67");
+    const back = parseGuestRigLength(displayM, "m");
+    assert.equal(back, 35);
+    assert.ok(back != null && back <= 35);
+  });
+
+  it("distinguishes empty / invalid / over_max for admin", () => {
+    assert.deepEqual(parseRigLengthToFeet(""), { ok: false, reason: "empty" });
+    assert.deepEqual(parseRigLengthToFeet("abc"), {
+      ok: false,
+      reason: "invalid",
+    });
+    assert.deepEqual(parseRigLengthToFeet("250"), {
+      ok: false,
+      reason: "over_max",
+    });
+    assert.deepEqual(parseRigLengthToFeet("35"), { ok: true, feet: 35 });
   });
 
   it("parses and formats rigUnit URL values", () => {
@@ -63,6 +94,6 @@ describe("site-rig-length", () => {
     assert.equal(formatRigLengthForDisplay(35, "m"), "10.67");
     assert.equal(formatRigLengthForDisplay(undefined, "m"), "");
     assert.equal(formatGuestRigLengthParam(35), "35");
-    assert.equal(formatGuestRigLengthParam(35.12), "35.12");
+    assert.equal(formatGuestRigLengthParam(35.12), "35.1");
   });
 });

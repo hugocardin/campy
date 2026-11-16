@@ -17,9 +17,6 @@ import {
   stayKindAllowsRigLength,
 } from "@/lib/stay-kind";
 
-export type { RigLengthUnit } from "@/lib/site-rig-length";
-export { parseRigLengthUnit, formatRigLengthUnitParam } from "@/lib/site-rig-length";
-
 export type CampgroundSort =
   | "name"
   | "name-desc"

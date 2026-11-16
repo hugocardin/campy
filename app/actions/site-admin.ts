@@ -17,6 +17,7 @@ import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
   isLodgingSiteType,
+  normalizeStoredRigLengthFeet,
   siteTypeRequiresMaxRigLength,
 } from "@/lib/site-rig-length";
 import {
@@ -75,8 +76,23 @@ function normalizeSiteWriteFields(
   if (isLodgingSiteType(siteTypeCode)) {
     return { ok: true, max_rig_length: null, driveway_type: null };
   }
+
+  let normalizedMaxRig: number | null = null;
+  if (maxRigLength != null) {
+    const parsed = normalizeStoredRigLengthFeet(maxRigLength);
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        error: resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+          field: "max_rig_length",
+        }),
+      };
+    }
+    normalizedMaxRig = parsed.feet;
+  }
+
   if (siteTypeRequiresMaxRigLength(siteTypeCode)) {
-    if (maxRigLength == null || !(maxRigLength > 0)) {
+    if (normalizedMaxRig == null) {
       return {
         ok: false,
         error: resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
@@ -84,17 +100,10 @@ function normalizeSiteWriteFields(
         }),
       };
     }
-  } else if (maxRigLength != null && !(maxRigLength > 0)) {
-    return {
-      ok: false,
-      error: resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
-        field: "max_rig_length",
-      }),
-    };
   }
   return {
     ok: true,
-    max_rig_length: maxRigLength ?? null,
+    max_rig_length: normalizedMaxRig,
     driveway_type: drivewayType,
   };
 }

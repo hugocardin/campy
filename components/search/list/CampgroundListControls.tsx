@@ -232,6 +232,7 @@ export default function CampgroundListControls({
     if (isExternal) {
       setLastPushedFiltersKey(urlFiltersKey);
       setLastPushedRigUnit(urlRigUnit);
+      // setState only during render (react-hooks/refs); effects sync refs below.
       setRigUnit(urlRigUnit);
       setRigDraft(formatRigLengthForDisplay(urlFilters.rigLength, urlRigUnit));
     }
@@ -271,8 +272,8 @@ export default function CampgroundListControls({
     rigUnit,
   ]);
 
-  // Sync ref after render-time setRigDraft (external URL sync). Event handlers
-  // must use updateRigDraft so the ref is current before the next paint.
+  // Sync refs after render-time setState (external URL sync). Event handlers
+  // use updateRigDraft / updateRigUnit so the ref is current before the next paint.
   useEffect(() => {
     rigDraftRef.current = rigDraft;
   }, [rigDraft]);
@@ -368,8 +369,10 @@ export default function CampgroundListControls({
   function onRigUnitChange(nextUnit: RigLengthUnit) {
     const fromUnit = rigUnitRef.current;
     if (nextUnit === fromUnit) return;
-    // Canonical feet from the current draft before flipping the unit.
-    const feet = resolveRigDraft();
+    clearSearchDebounce();
+    // Cancel pending rig debounce and flush the draft in the *current* unit
+    // before flipping (avoids a stale timer re-parsing metres as a new feet value).
+    const feet = takePendingRigLength();
     const draft = rigDraftRef.current.trim();
     const n = Number(draft);
     const converted =
@@ -788,7 +791,7 @@ export default function CampgroundListControls({
                   type="number"
                   min={1}
                   max={maxRigLengthInUnit(rigUnit)}
-                  step="0.1"
+                  step="any"
                   inputMode="decimal"
                   className="w-28"
                   placeholder={
