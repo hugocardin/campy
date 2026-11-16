@@ -44,14 +44,15 @@ describe("withLatestCampgroundFilters", () => {
     assert.equal(next.province, "BC");
   });
 
-  it("clears rig length and driveway when switching to lodging", () => {
+  it("clears driveway when switching to lodging but keeps rigLength URL state", () => {
     const next = withLatestCampgroundFilters(base, {
       q: "lake",
       sort: "name",
       stayKind: "lodging",
     });
     assert.equal(next.stayKind, "lodging");
-    assert.equal(next.rigLength, undefined);
+    // Length URL state survives lodging (like unit); RPC ignores it.
+    assert.equal(next.rigLength, 35);
     assert.equal(next.drivewayType, undefined);
   });
 
@@ -110,7 +111,7 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.get("rigUnit"), "ft");
   });
 
-  it("omits rigLength when lodging but keeps rigUnit", () => {
+  it("keeps rigLength and rigUnit through lodging in the URL", () => {
     const params = buildCampgroundSearchParams({
       ...base,
       stayKind: "lodging",
@@ -120,24 +121,23 @@ describe("buildCampgroundSearchParams / clear", () => {
       radiusKm: undefined,
     });
     assert.equal(params.get("stay"), "lodging");
-    assert.equal(params.get("rigLength"), null);
+    assert.equal(params.get("rigLength"), "35");
     assert.equal(params.get("rigUnit"), "m");
   });
 
-  it("restores rigUnit after camping → lodging → camping", () => {
+  it("restores rigUnit and rigLength after camping → lodging → camping", () => {
     const lodging = withLatestCampgroundFilters(base, {
       q: "lake",
       sort: "name",
       stayKind: "lodging",
       rigUnit: "m",
     });
-    assert.equal(lodging.rigLength, undefined);
+    assert.equal(lodging.rigLength, 35);
     assert.equal(lodging.rigUnit, "m");
     const back = withLatestCampgroundFilters(lodging, {
       q: "lake",
       sort: "name",
       stayKind: "camping",
-      rigLength: 35,
     });
     assert.equal(back.rigUnit, "m");
     assert.equal(back.rigLength, 35);
@@ -159,6 +159,49 @@ describe("buildCampgroundSearchParams / clear", () => {
     });
     assert.equal(params.get("rigLength"), "");
     assert.equal(params.has("rigLength"), true);
+  });
+
+  it("keeps omit when length equals profile default (no materialize)", () => {
+    const withDefaultOmit = withLatestCampgroundFilters(
+      { ...base, rigLength: undefined, water: false },
+      { q: "lake", sort: "name", water: true, rigLength: undefined },
+    );
+    assert.equal(withDefaultOmit.rigLength, undefined);
+    assert.equal(withDefaultOmit.water, true);
+    const params = buildCampgroundSearchParams({
+      ...withDefaultOmit,
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+    });
+    assert.equal(params.get("rigLength"), null);
+    assert.equal(params.get("water"), "1");
+  });
+
+  it("keeps explicit clear through lodging round trip", () => {
+    const lodging = withLatestCampgroundFilters(base, {
+      q: "lake",
+      sort: "name",
+      stayKind: "lodging",
+      rigLength: null,
+      rigUnit: "m",
+    });
+    assert.equal(lodging.rigLength, null);
+    assert.equal(lodging.rigUnit, "m");
+    const params = buildCampgroundSearchParams({
+      ...lodging,
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+    });
+    assert.equal(params.get("rigLength"), "");
+    assert.equal(params.get("rigUnit"), "m");
+    const back = withLatestCampgroundFilters(lodging, {
+      q: "lake",
+      sort: "name",
+      stayKind: "camping",
+    });
+    assert.equal(back.rigLength, null);
   });
 
   it("emits place only with active geo", () => {
@@ -223,7 +266,7 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.deepEqual(next.siteTypes, []);
   });
 
-  it("clears rig/driveway when fine types become lodging-only", () => {
+  it("clears driveway when fine types become lodging-only; keeps rigLength", () => {
     const next = withLatestCampgroundFilters(base, {
       q: "lake",
       sort: "name",
@@ -231,7 +274,7 @@ describe("buildCampgroundSearchParams / clear", () => {
       stayKind: undefined,
     });
     assert.deepEqual(next.siteTypes, ["LODGING"]);
-    assert.equal(next.rigLength, undefined);
+    assert.equal(next.rigLength, 35);
     assert.equal(next.drivewayType, undefined);
   });
 });

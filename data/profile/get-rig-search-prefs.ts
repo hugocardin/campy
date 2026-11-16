@@ -72,11 +72,3 @@ export const getCurrentRigSearchPrefs = cache(
     }
   },
 );
-
-/** Thin alias when only the unit preference is needed. */
-export const getCurrentPreferredRigUnit = cache(
-  async (): Promise<RigLengthUnit | null> => {
-    const prefs = await getCurrentRigSearchPrefs();
-    return prefs.preferredRigUnit;
-  },
-);

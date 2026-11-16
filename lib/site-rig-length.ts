@@ -132,26 +132,96 @@ export function resolveGuestRigLengthUnit(
 }
 
 /**
+ * Guest search rig-length resolution (issue #42 step 3).
+ *
+ * - `feet` — value for the RPC / input draft (`undefined` = no filter)
+ * - `urlState` — what belongs in the URL / query tri-state:
+ *   - `number` → `rigLength=<feet>`
+ *   - `null` → explicit `?rigLength=` (suppress profile default)
+ *   - `undefined` → omit (absent → apply `defaultFeet` to `feet`)
+ *
+ * Lodging (`campingOk: false`) still tracks `urlState` so camping↔lodging
+ * round-trips keep an explicit clear / typed length, but `feet` is always
+ * undefined (RPC ignores length for lodging).
+ */
+export type GuestRigLengthResolution = {
+  feet: number | undefined;
+  urlState: number | null | undefined;
+};
+
+export function resolveGuestRigLengthState(options: {
+  raw?: string | null;
+  present: boolean;
+  defaultFeet?: number | null;
+  campingOk: boolean;
+}): GuestRigLengthResolution {
+  const { raw, present, defaultFeet, campingOk } = options;
+
+  let urlState: number | null | undefined;
+  if (present) {
+    const parsed = parseGuestRigLength(raw);
+    urlState = parsed ?? null;
+  } else if (raw != null && String(raw).trim() !== "") {
+    urlState = parseGuestRigLength(raw);
+  } else {
+    urlState = undefined;
+  }
+
+  if (!campingOk) {
+    return { feet: undefined, urlState };
+  }
+  if (urlState === null) {
+    return { feet: undefined, urlState: null };
+  }
+  if (typeof urlState === "number") {
+    return { feet: urlState, urlState };
+  }
+  if (defaultFeet == null) {
+    return { feet: undefined, urlState: undefined };
+  }
+  const parsed = normalizeStoredRigLengthFeet(defaultFeet);
+  return {
+    feet: parsed.ok ? parsed.feet : undefined,
+    // Keep omit so shared links do not materialize a personal default.
+    urlState: undefined,
+  };
+}
+
+/**
  * Resolve guest search rig length (canonical feet): explicit URL `rigLength`
  * wins; otherwise use a saved `profiles.default_rig_length`.
  *
- * Pass `urlParamPresent: true` when the query key exists (even if empty) so
- * `?rigLength=` means "no length filter" rather than "absent → profile default".
+ * Prefer {@link resolveGuestRigLengthState} when callers also need URL state.
  */
 export function resolveGuestRigLengthFeet(
   urlValue: string | undefined | null,
   defaultFeet?: number | null,
   urlParamPresent = false,
 ): number | undefined {
-  if (urlParamPresent) {
-    return parseGuestRigLength(urlValue);
+  return resolveGuestRigLengthState({
+    raw: urlValue,
+    present: urlParamPresent,
+    defaultFeet,
+    campingOk: true,
+  }).feet;
+}
+
+/**
+ * Map a draft / pending feet value to URL tri-state.
+ * Keeps omit when the value equals the profile default so unrelated filter
+ * changes do not materialize a personal default into shared links.
+ * Emits `null` (→ `?rigLength=`) only when a default would otherwise reapply.
+ */
+export function guestRigLengthToUrlState(
+  feet: number | null | undefined,
+  defaultFeet?: number | null,
+): number | null | undefined {
+  if (feet === null) {
+    return defaultFeet != null ? null : undefined;
   }
-  if (urlValue != null && String(urlValue).trim() !== "") {
-    return parseGuestRigLength(urlValue);
-  }
-  if (defaultFeet == null) return undefined;
-  const parsed = normalizeStoredRigLengthFeet(defaultFeet);
-  return parsed.ok ? parsed.feet : undefined;
+  if (feet == null) return undefined;
+  if (defaultFeet != null && feet === defaultFeet) return undefined;
+  return feet;
 }
 
 /**

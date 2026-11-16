@@ -97,10 +97,10 @@ export function withLatestCampgroundFilters(
     stayKind,
     // Drop fine types incompatible with coarse stay (#24).
     siteTypes,
-    // Drop rig + driveway when lodging stay or lodging-only fine types (#27/#40).
-    // Preserve null (explicit ?rigLength= clear) through camping.
+    // Drop driveway when lodging; keep rigLength URL state (number or null)
+    // through lodging like rigUnit so camping↔lodging restores clear/value.
     drivewayType: campingOk ? drivewayRaw : undefined,
-    rigLength: campingOk ? rigLengthRaw : undefined,
+    rigLength: rigLengthRaw,
     // Keep unit through lodging so camping↔lodging restores the toggle
     // (emitted as rigUnit=ft|m — see buildCampgroundSearchParams).
     rigUnit:
@@ -208,13 +208,18 @@ export function buildCampgroundSearchParams(
   if (campingSiteAttrsAllowed(next.stayKind, next.siteTypes)) {
     const drivewayParam = formatDrivewayUrlParam(next.drivewayType);
     if (drivewayParam) params.set("driveway", drivewayParam);
-    // null → explicit empty key so a profile default is not reapplied.
-    if (next.rigLength === null) {
-      params.set("rigLength", "");
-    } else {
-      const rigParam = formatGuestRigLengthParam(next.rigLength);
-      if (rigParam) params.set("rigLength", rigParam);
-    }
+  }
+  // Persist length URL state whenever set (including lodging), like rigUnit,
+  // so camping↔lodging and explicit clear survive. RPC ignores length for
+  // lodging via siteFiltersFromQueryState.
+  // null → explicit empty key so a profile default is not reapplied.
+  if (next.rigLength === null) {
+    params.set("rigLength", "");
+  } else {
+    const rigParam = formatGuestRigLengthParam(
+      next.rigLength ?? undefined,
+    );
+    if (rigParam) params.set("rigLength", rigParam);
   }
   // Persist unit whenever set (ft|m), including empty length / lodging, so
   // shared links and a metres preference cannot disagree. Harmless for

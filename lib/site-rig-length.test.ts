@@ -15,7 +15,9 @@ import {
   parseRigLengthToFeet,
   parseRigLengthUnit,
   parseStoredRigLengthUnit,
+  guestRigLengthToUrlState,
   resolveGuestRigLengthFeet,
+  resolveGuestRigLengthState,
   resolveGuestRigLengthUnit,
   siteTypeRequiresMaxRigLength,
 } from "./site-rig-length";
@@ -178,6 +180,42 @@ describe("site-rig-length", () => {
     assert.equal(resolveGuestRigLengthFeet(undefined, null), undefined);
     assert.equal(resolveGuestRigLengthFeet(undefined, 0), undefined);
     assert.equal(resolveGuestRigLengthFeet(undefined, 999), undefined);
+  });
+
+  it("resolveGuestRigLengthState keeps omit for profile default", () => {
+    const omitted = resolveGuestRigLengthState({
+      present: false,
+      defaultFeet: 35,
+      campingOk: true,
+    });
+    assert.equal(omitted.feet, 35);
+    assert.equal(omitted.urlState, undefined);
+
+    const cleared = resolveGuestRigLengthState({
+      raw: "",
+      present: true,
+      defaultFeet: 35,
+      campingOk: true,
+    });
+    assert.equal(cleared.feet, undefined);
+    assert.equal(cleared.urlState, null);
+
+    const lodgingClear = resolveGuestRigLengthState({
+      raw: "",
+      present: true,
+      defaultFeet: 35,
+      campingOk: false,
+    });
+    assert.equal(lodgingClear.feet, undefined);
+    assert.equal(lodgingClear.urlState, null);
+  });
+
+  it("guestRigLengthToUrlState collapses default to omit", () => {
+    assert.equal(guestRigLengthToUrlState(35, 35), undefined);
+    assert.equal(guestRigLengthToUrlState(40, 35), 40);
+    assert.equal(guestRigLengthToUrlState(null, 35), null);
+    assert.equal(guestRigLengthToUrlState(null, null), undefined);
+    assert.equal(guestRigLengthToUrlState(undefined, 35), undefined);
   });
 
   it("converts display values and formats drafts from feet", () => {
