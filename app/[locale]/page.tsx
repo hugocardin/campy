@@ -60,7 +60,6 @@ export default async function Home({ searchParams }: PageProps) {
   const siteFiltersKey = buildCampgroundSiteFiltersCacheKey(siteFilters);
   const detailQuery: CampgroundDetailQuery = {
     rigUnit: parseRigLengthUnit(firstParam(params.rigUnit)),
-    rigLength: siteFilters.rigLength,
   };
 
   const [campgroundsResult, provincesResult] = await Promise.all([
