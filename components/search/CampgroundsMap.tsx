@@ -32,6 +32,8 @@ type LocatedCampground = Campground & {
 
 const DEFAULT_CENTER: LatLngTuple = [56.1304, -106.3468]; // Canada
 const DEFAULT_ZOOM = 4;
+/** Stable empty array so FitMarkers' effect does not re-fire every render. */
+const NO_POSITIONS: LatLngTuple[] = [];
 
 function hasValidCoords(
   campground: Campground,
@@ -193,7 +195,7 @@ export default function CampgroundsMap({
         <FitMarkers
           // Empty search: don't pull the view toward leftover/stale pins;
           // geo empty still fits the circle via searchCenter + radiusKm.
-          positions={isEmptySearch ? [] : positions}
+          positions={isEmptySearch ? NO_POSITIONS : positions}
           searchCenter={centerTuple}
           radiusKm={radiusKm}
           freezeView={isEmptySearch && !centerTuple}
@@ -255,12 +257,20 @@ export default function CampgroundsMap({
         ))}
       </MapContainer>
 
+      {/* Keep status mounted so SRs announce text changes into an existing live region. */}
+      <p role="status" className="sr-only">
+        {showNoResultsOverlay
+          ? t("noResults")
+          : showMapEmptyOverlay
+            ? t("mapEmpty")
+            : ""}
+      </p>
       {showNoResultsOverlay || showMapEmptyOverlay ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] flex justify-center pl-14 pr-3 pt-3">
-          <p
-            role="status"
-            className="max-w-[calc(100%-0.5rem)] rounded-md border border-border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm"
-          >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-[500] flex justify-center pl-14 pr-3 pt-3"
+        >
+          <p className="max-w-[calc(100%-0.5rem)] rounded-md border border-border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm">
             {showNoResultsOverlay ? t("noResults") : t("mapEmpty")}
           </p>
         </div>
