@@ -472,13 +472,15 @@ export default function CampgroundListControls({
     updateRigUnit(nextUnit);
     updateRigDraft(converted != null ? String(converted) : "");
     const latest = latestParamsRef.current;
-    const leavePatch = leavePlacePending ? leavePlaceUrlPatch(latest) : {};
+    const leavePatch = leavePlacePending
+      ? leavePlaceUrlPatch(latest)
+      : undefined;
     if (leavePlacePending) setLeavePlacePending(false);
     replaceQuery(
       withLatestCampgroundFilters(latest, {
         ...leavePatch,
         q: latest.q,
-        sort: leavePatch.sort ?? latest.sort,
+        sort: leavePatch?.sort ?? latest.sort,
         rigLength: feet,
         rigUnit: nextUnit === "m" ? "m" : undefined,
       }),
@@ -495,7 +497,9 @@ export default function CampgroundListControls({
     // Finish leave-place in the same navigation unless the patch sets its own geo
     // (e.g. near-me). Never keep old place radius after the user left the label.
     const leavePatch =
-      leavePlacePending && !patchSetsGeo ? leavePlaceUrlPatch(latest) : {};
+      leavePlacePending && !patchSetsGeo
+        ? leavePlaceUrlPatch(latest)
+        : undefined;
     if (leavePlacePending) setLeavePlacePending(false);
     const rigLength = takePendingRigLength();
     replaceQuery(
@@ -503,7 +507,7 @@ export default function CampgroundListControls({
         ...leavePatch,
         ...patch,
         q: patch.q ?? latest.q,
-        sort: patch.sort ?? leavePatch.sort ?? latest.sort,
+        sort: patch.sort ?? leavePatch?.sort ?? latest.sort,
         // Flush only when camping stays allowed; lodging clears via withLatest.
         ...("rigLength" in patch ? {} : { rigLength }),
       }),
