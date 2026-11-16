@@ -1,6 +1,9 @@
 # Probe: guest park amenities filter (#24 §3)
 
-Migration: `20261116154127_search_amenities_filter`
+Migrations:
+
+- `20261116154127_search_amenities_filter`
+- `20261116155256_search_amenities_review_fix` (#47 review: search_path, amenity ids, fail-closed unknowns, remove migration seed rows)
 
 ## Design
 
@@ -9,17 +12,22 @@ Migration: `20261116154127_search_amenities_filter`
 | Semantics | **AND** — park must have every selected amenity on `campground_amenities` |
 | Scope | Park-level only (same junction as dump / guest detail). Site-only tags do not match. |
 | URL | `amenities=wifi,pet_friendly` (lowercase underscore tokens) |
-| RPC | `require_amenity_codes text[]` on `search_campgrounds` / `_near` |
-| Excluded | `WATER` / `SEWER` / `DUMP_STATION` / `ELECTRICITY` (dedicated controls) |
-| Catalog | Admin amenities via `getAllAmenities`, filtered for guest UI |
+| RPC | `require_amenity_codes text[]` → `normalize_guest_amenity_ids` |
+| Unknown codes | **Fail closed** (`NULL` ids → no parks). UI still shows URL-only chips so guests can uncheck. |
+| Excluded | `WATER` / `SEWER` / `DUMP_STATION` / `ELECTRICITY` (sync with `lib/guest-amenity-codes.ts` + `PROTECTED_HOOKUP_AMENITY_CODES`) |
+| Catalog | Admin amenities via `getAllAmenities`; sort checkboxes by translated label |
+| Demo data | `supabase/seed.sql` only — not schema migrations |
 
 ## Live smoke (anon-callable)
 
 ```sql
 SELECT public.amenity_code_canonical_key('PET FRIENDLY'); -- PET_FRIENDLY
 
-SELECT public.normalize_guest_amenity_codes(ARRAY['wifi', 'PET FRIENDLY', 'WATER']);
--- {PET_FRIENDLY,WIFI}
+SELECT public.normalize_guest_amenity_ids(ARRAY['wifi', 'PET FRIENDLY']);
+-- uuid[] of matching amenities
+
+SELECT public.normalize_guest_amenity_ids(ARRAY['POOL']);
+-- NULL (unknown → fail closed)
 
 SELECT name
 FROM search_campgrounds(
@@ -29,9 +37,8 @@ FROM search_campgrounds(
 
 SELECT name
 FROM search_campgrounds(
-  require_amenity_codes := ARRAY['WIFI', 'PET_FRIENDLY'],
+  require_amenity_codes := ARRAY['NOT_A_REAL_AMENITY'],
   result_limit := 20
 );
+-- no rows
 ```
-
-Expected after seed: Alice Lake matches WIFI+PET_FRIENDLY. Unknown codes (not in `amenities`) normalize to empty → fail-open (no amenity restriction), same abuse posture as oversized site-types.

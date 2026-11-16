@@ -4,11 +4,13 @@ import {
   amenityCodeCanonicalKey,
   formatGuestAmenityCodesParam,
   guestSearchAmenityCatalog,
+  intersectGuestAmenityCodesWithCatalog,
   isExcludedGuestSearchAmenity,
   isGuestSearchAmenityCode,
   normalizeGuestAmenityCodes,
   parseGuestAmenityCodes,
 } from "./guest-amenity-codes";
+import { PROTECTED_HOOKUP_AMENITY_CODES } from "./amenities/hookup-codes";
 
 describe("amenityCodeCanonicalKey", () => {
   it("maps spaced DB codes to underscore keys", () => {
@@ -27,6 +29,28 @@ describe("excluded / guest-search amenity codes", () => {
     assert.equal(isGuestSearchAmenityCode("WIFI"), true);
     assert.equal(isGuestSearchAmenityCode("PET FRIENDLY"), true);
     assert.equal(isGuestSearchAmenityCode("WATER"), false);
+  });
+
+  it("derives exclusions from PROTECTED_HOOKUP_AMENITY_CODES", () => {
+    for (const code of PROTECTED_HOOKUP_AMENITY_CODES) {
+      assert.equal(isExcludedGuestSearchAmenity(code), true);
+    }
+  });
+});
+
+describe("intersectGuestAmenityCodesWithCatalog", () => {
+  it("drops unknown / stale codes not in the catalog", () => {
+    assert.deepEqual(
+      intersectGuestAmenityCodesWithCatalog(
+        ["WIFI", "POOL", "PET_FRIENDLY"],
+        [{ code: "WIFI" }, { code: "PET FRIENDLY" }],
+      ),
+      ["PET_FRIENDLY", "WIFI"],
+    );
+    assert.deepEqual(
+      intersectGuestAmenityCodesWithCatalog(["POOL"], [{ code: "WIFI" }]),
+      [],
+    );
   });
 });
 

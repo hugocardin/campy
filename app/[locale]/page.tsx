@@ -16,7 +16,10 @@ import {
 } from "@/lib/campground-search";
 import { campgroundSearchKey } from "@/lib/campground-search-query";
 import { getActionErrorId, translateErrorCode } from "@/lib/errors";
-import { guestSearchAmenityCatalog } from "@/lib/guest-amenity-codes";
+import {
+  amenityCodeCanonicalKey,
+  guestSearchAmenityCatalog,
+} from "@/lib/guest-amenity-codes";
 import { campingSiteAttrsAllowed } from "@/lib/guest-site-types";
 import type { CampgroundDetailQuery } from "@/lib/routes";
 import {
@@ -79,12 +82,26 @@ export default async function Home({ searchParams }: PageProps) {
     getAllAmenities(),
   ]);
   const { preferredRigUnit, defaultRigLength } = prefs;
-  const guestAmenityOptions = amenitiesResult.success
-    ? guestSearchAmenityCatalog(amenitiesResult.data).map((a) => ({
-        code: a.code,
-        categoryCode: a.category_code,
-      }))
+  if (!amenitiesResult.success) {
+    console.warn(
+      "[Home] getAllAmenities failed; amenity checkboxes fall back to URL codes",
+      amenitiesResult.errorCode,
+    );
+  }
+  const catalogAmenities = amenitiesResult.success
+    ? guestSearchAmenityCatalog(amenitiesResult.data)
     : [];
+  const catalogKeySet = new Set(
+    catalogAmenities.map((a) => amenityCodeCanonicalKey(a.code)),
+  );
+  // Catalog checkboxes + any URL-only (stale) codes so the guest can uncheck.
+  // RPC fail-closes unknown codes so results stay honest.
+  const guestAmenityOptions = [
+    ...catalogAmenities.map((a) => ({ code: a.code })),
+    ...siteFiltersParsed.amenityCodes
+      .filter((key) => !catalogKeySet.has(key))
+      .map((key) => ({ code: key })),
+  ];
 
   const campingOk = campingSiteAttrsAllowed(
     siteFiltersParsed.stayKind,

@@ -3,18 +3,24 @@
  * URL: `amenities=wifi,pet_friendly` (lowercase underscore tokens).
  * Match is park-level AND on `campground_amenities` (not same-site).
  * Water / sewer / dump / retired electricity stay on dedicated controls.
+ *
+ * Excluded keys + max must stay in sync with
+ * `normalize_guest_amenity_ids` in
+ * `supabase/migrations/*search_amenities*`.
  */
 import { AMENITY_CODE_MAX_LENGTH } from "@/lib/amenities/code";
+import { PROTECTED_HOOKUP_AMENITY_CODES } from "@/lib/amenities/hookup-codes";
 import { codeToMessageKey } from "@/lib/translate-code";
 
-/** Cap aligned with RPC `normalize_guest_amenity_codes` (abuse / DoS). */
+/** Cap aligned with RPC `normalize_guest_amenity_ids` (abuse / DoS). */
 export const GUEST_AMENITY_CODES_MAX = 16;
 
-/** Dedicated hookup / dump / retired codes — never emitted by this filter. */
-const EXCLUDED_GUEST_AMENITY_KEYS = new Set([
-  "WATER",
-  "SEWER",
-  "DUMP_STATION",
+/**
+ * Dedicated hookup / dump / retired codes — never emitted by this filter.
+ * Hookups from {@link PROTECTED_HOOKUP_AMENITY_CODES}; ELECTRICITY retired (#26).
+ */
+const EXCLUDED_GUEST_AMENITY_KEYS = new Set<string>([
+  ...PROTECTED_HOOKUP_AMENITY_CODES,
   "ELECTRICITY",
 ]);
 
@@ -56,7 +62,7 @@ export function normalizeGuestAmenityCodes(
 
 /**
  * Parse `amenities` URL param: comma-separated tokens (case-insensitive).
- * Stores canonical keys (`PET_FRIENDLY`); RPC matches DB codes via the same key.
+ * Stores canonical keys (`PET_FRIENDLY`); RPC matches DB rows via the same key.
  */
 export function parseGuestAmenityCodes(
   value: string | undefined | null,
@@ -80,4 +86,20 @@ export function guestSearchAmenityCatalog<T extends { code: string }>(
   amenities: readonly T[],
 ): T[] {
   return amenities.filter((a) => isGuestSearchAmenityCode(a.code));
+}
+
+/**
+ * Keep only codes that exist in the guest catalog (canonical key match).
+ * Drops stale / renamed amenities so URL, UI, and RPC stay aligned.
+ */
+export function intersectGuestAmenityCodesWithCatalog(
+  codes: readonly string[] | undefined | null,
+  catalog: readonly { code: string }[],
+): string[] {
+  const allowed = new Set(
+    guestSearchAmenityCatalog(catalog).map((a) =>
+      amenityCodeCanonicalKey(a.code),
+    ),
+  );
+  return normalizeGuestAmenityCodes(codes).filter((k) => allowed.has(k));
 }

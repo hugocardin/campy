@@ -81,7 +81,6 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 export type GuestAmenityOption = {
   code: string;
-  categoryCode?: string;
 };
 
 type Props = {
@@ -89,7 +88,7 @@ type Props = {
   /** Non-geo RPC hit the SQL LIMIT — hint to refine filters. */
   resultsTruncated?: boolean;
   provinces: string[];
-  /** Admin amenity catalog minus water/sewer/dump/electricity. */
+  /** Admin amenity catalog minus water/sewer/dump/electricity (+ any URL-only codes). */
   amenityOptions?: GuestAmenityOption[];
   /**
    * Server-resolved unit for first paint / URL-absent case (issue #42 step 2).
@@ -812,6 +811,11 @@ export default function CampgroundListControls({
   const selectedAmenityKeys = new Set(
     normalizeGuestAmenityCodes(localFilters.amenityCodes),
   );
+  const sortedAmenityOptions = [...amenityOptions].sort((a, b) => {
+    const la = translateCode(tAmenities, "codes", a.code);
+    const lb = translateCode(tAmenities, "codes", b.code);
+    return la.localeCompare(lb, locale, { sensitivity: "base" });
+  });
   // Rig + driveway are camping/RV site attributes (hidden for lodging searches).
   const showCampingSiteAttrs = campingSiteAttrsAllowed(
     localFilters.stayKind,
@@ -1277,7 +1281,7 @@ export default function CampgroundListControls({
             >
               {t("amenitiesLabel")}
             </legend>
-            {amenityOptions.map((opt) => {
+            {sortedAmenityOptions.map((opt) => {
               const key = amenityCodeCanonicalKey(opt.code);
               const id = `amenity-${key}`;
               return (
