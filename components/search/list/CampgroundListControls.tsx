@@ -206,7 +206,8 @@ export default function CampgroundListControls({
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const rigDebounceRef = useRef<number | null>(null);
-  const leavePlacePendingRef = useRef(false);
+  /** True after editing away from a place label until the leave navigation lands. */
+  const [leavePlacePending, setLeavePlacePending] = useState(false);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
@@ -234,6 +235,8 @@ export default function CampgroundListControls({
       setLastPushedQ(qParam);
       setPrevPlaceLabel(placeLabel);
       setActivePlace(placeLabel);
+      // URL owns navigation — drop a stale leave-place push (setState-during-render).
+      setLeavePlacePending(false);
       if (search !== displayFromUrl) {
         setSearch(displayFromUrl);
       }
@@ -295,16 +298,6 @@ export default function CampgroundListControls({
     rigUnit,
   ]);
 
-  // URL ownership (back/forward / Clear / our own push): drop a stale leave-place
-  // rewrite. Must be an effect — refs cannot be written during render.
-  useEffect(() => {
-    leavePlacePendingRef.current = false;
-    if (debounceTimeoutRef.current != null) {
-      window.clearTimeout(debounceTimeoutRef.current);
-      debounceTimeoutRef.current = null;
-    }
-  }, [placeLabel, qParam]);
-
   // Sync refs after render-time setState (external URL sync). Event handlers
   // use updateRigDraft / updateRigUnit so the ref is current before the next paint.
   useEffect(() => {
@@ -330,9 +323,17 @@ export default function CampgroundListControls({
     }
   }
 
-  /** Drop a pending leave-place push when another navigation owns the URL. */
-  function cancelLeavePlacePending() {
-    leavePlacePendingRef.current = false;
+  /** Clear geo + remap distance sort when finishing a leave-place navigation. */
+  function leavePlaceUrlPatch(
+    latest: CampgroundQueryState,
+  ): Partial<CampgroundQueryState> & Pick<CampgroundQueryState, "sort"> {
+    return {
+      place: undefined,
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+      sort: latest.sort === "distance" ? "name" : latest.sort,
+    };
   }
 
   function updateRigDraft(value: string) {
@@ -413,7 +414,7 @@ export default function CampgroundListControls({
     // debounced replaceQuery below (single navigation; no catalog flash).
     if (activePlace && nextValue !== activePlace) {
       setActivePlace(undefined);
-      leavePlacePendingRef.current = true;
+      setLeavePlacePending(true);
     }
   }
 
@@ -421,7 +422,7 @@ export default function CampgroundListControls({
     place: Extract<SearchSuggestion, { kind: "place" }>,
   ) {
     clearSearchDebounce();
-    cancelLeavePlacePending();
+    setLeavePlacePending(false);
     const label = place.subtitle
       ? `${place.label}, ${place.subtitle}`
       : place.label;
@@ -445,7 +446,7 @@ export default function CampgroundListControls({
     campground: Extract<SearchSuggestion, { kind: "campground" }>,
   ) {
     clearSearchDebounce();
-    cancelLeavePlacePending();
+    setLeavePlacePending(false);
     startTransition(() => {
       router.push(
         routes.campgroundDetail(campground.id, {
@@ -470,10 +471,14 @@ export default function CampgroundListControls({
         : undefined;
     updateRigUnit(nextUnit);
     updateRigDraft(converted != null ? String(converted) : "");
+    const latest = latestParamsRef.current;
+    const leavePatch = leavePlacePending ? leavePlaceUrlPatch(latest) : {};
+    if (leavePlacePending) setLeavePlacePending(false);
     replaceQuery(
-      withLatestCampgroundFilters(latestParamsRef.current, {
-        q: latestParamsRef.current.q,
-        sort: latestParamsRef.current.sort,
+      withLatestCampgroundFilters(latest, {
+        ...leavePatch,
+        q: latest.q,
+        sort: leavePatch.sort ?? latest.sort,
         rigLength: feet,
         rigUnit: nextUnit === "m" ? "m" : undefined,
       }),
@@ -485,13 +490,20 @@ export default function CampgroundListControls({
     patch: Parameters<typeof withLatestCampgroundFilters>[1],
   ) {
     clearSearchDebounce();
-    cancelLeavePlacePending();
+    const latest = latestParamsRef.current;
+    const patchSetsGeo = "lat" in patch || "lng" in patch;
+    // Finish leave-place in the same navigation unless the patch sets its own geo
+    // (e.g. near-me). Never keep old place radius after the user left the label.
+    const leavePatch =
+      leavePlacePending && !patchSetsGeo ? leavePlaceUrlPatch(latest) : {};
+    if (leavePlacePending) setLeavePlacePending(false);
     const rigLength = takePendingRigLength();
     replaceQuery(
-      withLatestCampgroundFilters(latestParamsRef.current, {
+      withLatestCampgroundFilters(latest, {
+        ...leavePatch,
         ...patch,
-        q: patch.q ?? latestParamsRef.current.q,
-        sort: patch.sort ?? latestParamsRef.current.sort,
+        q: patch.q ?? latest.q,
+        sort: patch.sort ?? leavePatch.sort ?? latest.sort,
         // Flush only when camping stays allowed; lodging clears via withLatest.
         ...("rigLength" in patch ? {} : { rigLength }),
       }),
@@ -502,40 +514,30 @@ export default function CampgroundListControls({
     // Place mode owns the URL via lat/lng/place — do not debounce q.
     if (activePlace) return;
     const trimmed = search.trim();
-    const leavingPlace = leavePlacePendingRef.current;
     // When leaving place mode, always push once (even if q stays empty) so geo
     // clears in the same navigation as the typed text.
     if (
-      !leavingPlace &&
+      !leavePlacePending &&
       (trimmed === qParam || trimmed === lastPushedQ)
     ) {
       return;
     }
 
     clearSearchDebounce();
+    const leavingPlace = leavePlacePending;
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
-      leavePlacePendingRef.current = false;
+      setLeavePlacePending(false);
       const latest = latestParamsRef.current;
       const rigLength = takePendingRigLength();
       // Sync effect may have restored URL geo + distance sort into the ref;
       // when leaving place, clear those here in the same navigation as typed q.
-      const leavePlacePatch = leavingPlace
-        ? {
-            lat: undefined,
-            lng: undefined,
-            radiusKm: undefined,
-            sort:
-              latest.sort === "distance"
-                ? ("name" as const)
-                : latest.sort,
-          }
-        : {};
+      const leavePatch = leavingPlace ? leavePlaceUrlPatch(latest) : {};
       replaceQuery({
         ...latest,
         q: search,
+        ...leavePatch,
         place: undefined,
-        ...leavePlacePatch,
         rigLength: stayKindAllowsRigLength(latest.stayKind)
           ? rigLength
           : undefined,
@@ -543,8 +545,8 @@ export default function CampgroundListControls({
     }, 300);
 
     return clearSearchDebounce;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search`
-  }, [search, qParam, lastPushedQ, activePlace]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search` / leavePlacePending
+  }, [search, qParam, lastPushedQ, activePlace, leavePlacePending]);
 
   function onNearMe() {
     setGeoError(null);
@@ -750,7 +752,7 @@ export default function CampgroundListControls({
             disabled={discreteControlsDisabled}
             onClick={() => {
               clearSearchDebounce();
-              cancelLeavePlacePending();
+              setLeavePlacePending(false);
               if (rigDebounceRef.current != null) {
                 window.clearTimeout(rigDebounceRef.current);
                 rigDebounceRef.current = null;
