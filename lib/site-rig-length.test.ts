@@ -94,6 +94,25 @@ describe("site-rig-length", () => {
     assert.equal(formatRigLengthForDisplay(35, "m", "en-CA"), "10.67");
   });
 
+  it("rejects non-decimal Number() forms in string input", () => {
+    assert.deepEqual(parseRigLengthToFeet("0x1A"), {
+      ok: false,
+      reason: "invalid",
+    });
+    assert.deepEqual(parseRigLengthToFeet("1e2"), {
+      ok: false,
+      reason: "invalid",
+    });
+    assert.deepEqual(parseRigLengthToFeet("+5"), {
+      ok: false,
+      reason: "invalid",
+    });
+    assert.deepEqual(parseRigLengthToFeet("0b11"), {
+      ok: false,
+      reason: "invalid",
+    });
+  });
+
   it("rejects tiny positives that round to 0 ft", () => {
     assert.deepEqual(parseRigLengthToFeet("0.04"), {
       ok: false,

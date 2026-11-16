@@ -133,7 +133,8 @@ export function convertRigLengthDisplay(
 
 /**
  * Parse a display decimal that may use `,` or `.` as the separator
- * (fr-CA guests type `10,67`). Rejects mixed or multiple separators.
+ * (fr-CA guests type `10,67`). Rejects mixed/multiple separators and
+ * non-decimal `Number()` forms (`0x…`, `1e2`, `+5`, …).
  */
 export function parseDecimalInput(
   value: string | number | undefined | null,
@@ -144,6 +145,8 @@ export function parseDecimalInput(
   }
   const trimmed = String(value).trim();
   if (!trimmed || /\s/.test(trimmed)) return undefined;
+  // Digits with at most one decimal separator; optional trailing separator.
+  if (!/^\d*[.,]?\d+$|^\d+[.,]$/.test(trimmed)) return undefined;
 
   const commaCount = (trimmed.match(/,/g) ?? []).length;
   const dotCount = (trimmed.match(/\./g) ?? []).length;
