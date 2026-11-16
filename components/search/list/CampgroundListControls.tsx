@@ -472,8 +472,15 @@ export default function CampgroundListControls({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <p className="text-sm font-medium text-foreground">{t("hookupsLabel")}</p>
+      <div
+        className="space-y-3"
+        role="group"
+        aria-labelledby="hookups-label"
+        aria-describedby="hookups-hint"
+      >
+        <p id="hookups-label" className="text-sm font-medium text-foreground">
+          {t("hookupsLabel")}
+        </p>
         <fieldset
           className="flex flex-wrap items-center gap-x-5 gap-y-2 border-0 p-0 m-0"
           disabled={discreteControlsDisabled}
@@ -545,7 +552,9 @@ export default function CampgroundListControls({
             );
           })}
         </fieldset>
-        <p className="text-xs text-muted-foreground">{t("hookupsHint")}</p>
+        <p id="hookups-hint" className="text-xs text-muted-foreground">
+          {t("hookupsHint")}
+        </p>
       </div>
 
       {geoError ? (
