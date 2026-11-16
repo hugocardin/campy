@@ -1,6 +1,9 @@
 import "server-only";
 
+import { photonClientBucketKey } from "@/lib/geocoding/photon-client-key";
 import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
+
+export { photonClientBucketKey } from "@/lib/geocoding/photon-client-key";
 
 /**
  * Photon proxy fair-use limiter (#24 / #39).
@@ -57,24 +60,6 @@ function localAllow(
   }
   bucket.tokens -= 1;
   return true;
-}
-
-/**
- * Normalize client IP for bucket keys: IPv6 → /64 prefix to bound growth.
- */
-export function photonClientBucketKey(clientIp: string | null): string | null {
-  if (!clientIp) return null;
-  const trimmed = clientIp.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.includes(":")) {
-    // IPv6: keep first 4 hextets (/64).
-    const parts = trimmed.split(":").filter((p) => p.length > 0);
-    if (parts.length >= 4) {
-      return `photon:ip:${parts.slice(0, 4).join(":")}:/64`;
-    }
-  }
-  return `photon:ip:${trimmed}`;
 }
 
 function localAdmitPhoton(clientIp: string | null): PhotonAdmitStatus {

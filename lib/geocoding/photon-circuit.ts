@@ -1,11 +1,12 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
+import { after } from "next/server";
 
 /**
  * Photon circuit breaker (#24 / #39).
  * Shared state via service-role RPCs; process-local fallback.
- * Success/failure recording is fire-and-forget from the suggest path.
+ * Success/failure recording uses `after()` so serverless runtimes finish it.
  */
 
 const FAILURE_THRESHOLD = 3;
@@ -38,7 +39,7 @@ export function photonCircuitIsOpenLocal(now = Date.now()): boolean {
 
 export function photonCircuitRecordSuccess(): void {
   localRecordSuccess();
-  void (async () => {
+  after(async () => {
     try {
       const supabase = getSupabaseAdmin();
       const { error } = await supabase.rpc("photon_circuit_record_success");
@@ -48,12 +49,12 @@ export function photonCircuitRecordSuccess(): void {
     } catch (err) {
       console.warn("[photon-circuit] success threw", err);
     }
-  })();
+  });
 }
 
 export function photonCircuitRecordFailure(): void {
   localRecordFailure();
-  void (async () => {
+  after(async () => {
     try {
       const supabase = getSupabaseAdmin();
       const { error } = await supabase.rpc("photon_circuit_record_failure");
@@ -63,5 +64,5 @@ export function photonCircuitRecordFailure(): void {
     } catch (err) {
       console.warn("[photon-circuit] failure threw", err);
     }
-  })();
+  });
 }

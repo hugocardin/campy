@@ -287,6 +287,10 @@ export const getCampgrounds = cache(
             province_aliases:
               provinceAliases.length > 0 ? provinceAliases : null,
             ...siteFilterRpcArgs(siteFilters),
+            // Always distance-ordered in SQL (cap after that). App may
+            // re-sort the capped set for other keys — truncation still means
+            // "more within radius", not "more in name order".
+            result_limit: SEARCH_CAMPGROUNDS_LIMIT + 1,
           }),
         );
 
@@ -295,11 +299,16 @@ export const getCampgrounds = cache(
         }
 
         let rows = (result.data as CampgroundRow[]).map(toCampgroundDomain);
-        // Near RPC is SQL-ordered by distance; only re-sort for other keys.
+        const truncated = rows.length > SEARCH_CAMPGROUNDS_LIMIT;
+        if (truncated) {
+          rows = rows.slice(0, SEARCH_CAMPGROUNDS_LIMIT);
+        }
+        // Near RPC is SQL-ordered by distance; only re-sort for other keys
+        // (on the already-capped nearest set).
         if (resolvedSort !== "distance") {
           rows = sortCampgrounds(rows, resolvedSort);
         }
-        return resultSuccess({ campgrounds: rows, truncated: false });
+        return resultSuccess({ campgrounds: rows, truncated });
       }
 
       const nonGeoSort =
@@ -342,6 +351,8 @@ export const getCampgrounds = cache(
       if (column !== "name") {
         query = query.order("name", { ascending: true });
       }
+      // Cap like the RPC path (don't rely solely on PostgREST max_rows).
+      query = query.limit(SEARCH_CAMPGROUNDS_LIMIT + 1);
 
       const result = await handleDbResponse(query);
 
@@ -349,9 +360,13 @@ export const getCampgrounds = cache(
         return result;
       }
 
+      const mapped = result.data.map(toCampgroundDomain);
+      const truncated = mapped.length > SEARCH_CAMPGROUNDS_LIMIT;
       return resultSuccess({
-        campgrounds: result.data.map(toCampgroundDomain),
-        truncated: false,
+        campgrounds: truncated
+          ? mapped.slice(0, SEARCH_CAMPGROUNDS_LIMIT)
+          : mapped,
+        truncated,
       });
     } catch (err) {
       return handleUnexpectedError(err);
