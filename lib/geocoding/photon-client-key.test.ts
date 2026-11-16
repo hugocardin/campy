@@ -20,6 +20,22 @@ describe("photonClientBucketKey", () => {
       photonClientBucketKey("2001:db8::1"),
       "photon:ip:2001:db8:0:0:/64",
     );
+    // Mid-prefix compression — last hextet must not shift into /64.
+    assert.equal(
+      photonClientBucketKey("2001:db8:1::abcd"),
+      "photon:ip:2001:db8:1:0:/64",
+    );
+    assert.notEqual(
+      photonClientBucketKey("2001:db8::5:6"),
+      photonClientBucketKey("2001:db8:5:6::"),
+    );
+  });
+
+  it("strips IPv6 zone ids", () => {
+    assert.equal(
+      photonClientBucketKey("fe80::1%eth0"),
+      "photon:ip:fe80:0:0:0:/64",
+    );
   });
 
   it("unwraps IPv4-mapped IPv6 to the same bucket as plain IPv4", () => {

@@ -193,13 +193,22 @@ function FitMarkers({
     if (freezeView) return;
 
     const runProgrammatic = (fn: () => void) => {
+      // Register before fn(): Leaflet can fire moveend synchronously inside
+      // setView/fitBounds (same view, large jump, zero-size container).
+      // Timeout fallback: no-op setView/fitBounds may never emit moveend.
       suppressRef.current = true;
-      fn();
-      map.once("moveend", () => {
+      let cleared = false;
+      const clear = () => {
+        if (cleared) return;
+        cleared = true;
+        window.clearTimeout(fallback);
         requestAnimationFrame(() => {
           suppressRef.current = false;
         });
-      });
+      };
+      const fallback = window.setTimeout(clear, 500);
+      map.once("moveend", clear);
+      fn();
     };
 
     if (

@@ -24,8 +24,13 @@ export type CampgroundSort =
   | "province"
   | "distance";
 
-/** Cap for non-geo `search_campgrounds` (matches near RPC). */
+/**
+ * Guest list/near page size. SQL RPCs must allow at least this + 1 so the app
+ * can detect truncation (`result_limit` capped at SEARCH_CAMPGROUNDS_RPC_MAX).
+ */
 export const SEARCH_CAMPGROUNDS_LIMIT = 200;
+/** Must stay ≥ SEARCH_CAMPGROUNDS_LIMIT + 1 (see search_* RPC LIMIT clamps). */
+export const SEARCH_CAMPGROUNDS_RPC_MAX = 500;
 
 /** Allowed Near-me radius presets (km). */
 export const CAMPGROUND_RADIUS_KM_PRESETS = [25, 50, 100] as const;
