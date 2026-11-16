@@ -76,6 +76,19 @@ describe("site-rig-length", () => {
     assert.deepEqual(parseRigLengthToFeet("35"), { ok: true, feet: 35 });
   });
 
+  it("rejects tiny positives that round to 0 ft", () => {
+    assert.deepEqual(parseRigLengthToFeet("0.04"), {
+      ok: false,
+      reason: "invalid",
+    });
+    assert.deepEqual(parseRigLengthToFeet("0.01", "m"), {
+      ok: false,
+      reason: "invalid",
+    });
+    assert.equal(parseGuestRigLength("0.04"), undefined);
+    assert.equal(parseGuestRigLength(0.04), undefined);
+  });
+
   it("parses and formats rigUnit URL values", () => {
     assert.equal(parseRigLengthUnit(undefined), "ft");
     assert.equal(parseRigLengthUnit("ft"), "ft");

@@ -162,6 +162,11 @@ export function parseRigLengthToFeet(
   }
   const feet =
     unit === "m" ? roundRigLength(metresToFeet(n), 1) : roundRigLength(n, 1);
+  // Reject values that round to 0 (e.g. 0.04 ft) — positivity must hold after
+  // the 1-decimal round, not only on the raw input.
+  if (feet <= 0) {
+    return { ok: false, reason: "invalid" };
+  }
   if (feet > RIG_LENGTH_MAX_FT) {
     return { ok: false, reason: "over_max" };
   }
