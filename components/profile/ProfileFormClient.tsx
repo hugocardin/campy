@@ -23,6 +23,7 @@ import {
   convertRigLengthDisplay,
   formatRigLengthForDisplay,
   maxRigLengthInUnit,
+  parseDecimalInput,
   parseRigLengthToFeet,
   type RigLengthUnit,
 } from "@/lib/site-rig-length";
@@ -54,6 +55,7 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
     formatRigLengthForDisplay(
       profile.default_rig_length,
       defaultRigUnitForLocale(locale),
+      locale,
     ),
   );
 
@@ -74,10 +76,14 @@ export default function ProfileFormClient({ profile, onSubmit }: Props) {
     setRigDraft((prev) => {
       const trimmed = prev.trim();
       if (trimmed === "") return prev;
-      const n = Number(trimmed);
-      if (!Number.isFinite(n) || n <= 0) return prev;
+      const n = parseDecimalInput(trimmed);
+      if (n == null || n <= 0) return prev;
       const converted = convertRigLengthDisplay(n, rigUnit, nextUnit);
-      return converted != null ? String(converted) : prev;
+      if (converted == null) return prev;
+      return new Intl.NumberFormat(locale, {
+        maximumFractionDigits: nextUnit === "m" ? 2 : 1,
+        useGrouping: false,
+      }).format(converted);
     });
     setRigUnit(nextUnit);
     setError(null);

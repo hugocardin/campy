@@ -77,6 +77,23 @@ describe("site-rig-length", () => {
     assert.deepEqual(parseRigLengthToFeet("35"), { ok: true, feet: 35 });
   });
 
+  it("accepts a single locale decimal comma and rejects mixed separators", () => {
+    assert.deepEqual(parseRigLengthToFeet("10,67", "m"), {
+      ok: true,
+      feet: 35,
+    });
+    assert.deepEqual(parseRigLengthToFeet("1,2,3", "m"), {
+      ok: false,
+      reason: "invalid",
+    });
+    assert.deepEqual(parseRigLengthToFeet("10.67,1", "m"), {
+      ok: false,
+      reason: "invalid",
+    });
+    assert.equal(formatRigLengthForDisplay(35, "m", "fr-CA"), "10,67");
+    assert.equal(formatRigLengthForDisplay(35, "m", "en-CA"), "10.67");
+  });
+
   it("rejects tiny positives that round to 0 ft", () => {
     assert.deepEqual(parseRigLengthToFeet("0.04"), {
       ok: false,

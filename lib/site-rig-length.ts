@@ -132,16 +132,51 @@ export function convertRigLengthDisplay(
 }
 
 /**
+ * Parse a display decimal that may use `,` or `.` as the separator
+ * (fr-CA guests type `10,67`). Rejects mixed or multiple separators.
+ */
+export function parseDecimalInput(
+  value: string | number | undefined | null,
+): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed || /\s/.test(trimmed)) return undefined;
+
+  const commaCount = (trimmed.match(/,/g) ?? []).length;
+  const dotCount = (trimmed.match(/\./g) ?? []).length;
+  if (commaCount + dotCount > 1) return undefined;
+  if (commaCount > 0 && dotCount > 0) return undefined;
+
+  const normalized = commaCount === 1 ? trimmed.replace(",", ".") : trimmed;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
  * Format a canonical feet value for an input in the chosen unit.
  * Empty when feet is missing / invalid.
+ * Pass `locale` so fr-CA drafts use a decimal comma (matches typed input).
  */
 export function formatRigLengthForDisplay(
   feet: number | undefined | null,
   unit: RigLengthUnit,
+  locale?: string,
 ): string {
   if (feet == null || !Number.isFinite(feet) || feet <= 0) return "";
-  if (unit === "ft") return String(roundRigLength(feet, 1));
-  return String(roundRigLength(feetToMetres(feet), 2));
+  const value =
+    unit === "ft"
+      ? roundRigLength(feet, 1)
+      : roundRigLength(feetToMetres(feet), 2);
+  if (locale) {
+    return new Intl.NumberFormat(locale, {
+      maximumFractionDigits: unit === "m" ? 2 : 1,
+      useGrouping: false,
+    }).format(value);
+  }
+  return String(value);
 }
 
 export type FormatRigLengthLabels = {
@@ -210,8 +245,11 @@ export function parseRigLengthToFeet(
   if (value == null || value === "") {
     return { ok: false, reason: "empty" };
   }
-  const n = typeof value === "number" ? value : Number(String(value).trim());
-  if (!Number.isFinite(n) || n <= 0) {
+  if (typeof value === "string" && value.trim() === "") {
+    return { ok: false, reason: "empty" };
+  }
+  const n = parseDecimalInput(value);
+  if (n == null || n <= 0) {
     return { ok: false, reason: "invalid" };
   }
   const feet =

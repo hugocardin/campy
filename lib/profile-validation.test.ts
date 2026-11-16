@@ -15,6 +15,11 @@ describe("normalizePersonName", () => {
     assert.equal(normalizePersonName("\u200B\u200D\uFEFF"), "");
   });
 
+  it("keeps ZWJ/ZWNJ when other visible characters remain", () => {
+    assert.equal(normalizePersonName("فا\u200Cرسی"), "فا\u200Cرسی");
+    assert.equal(normalizePersonName("A\u200DB"), "A\u200DB");
+  });
+
   it("NFC-normalizes combining characters", () => {
     // e + combining acute → é
     assert.equal(normalizePersonName("e\u0301"), "é");
