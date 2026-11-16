@@ -1,3 +1,6 @@
+-- NOTE: Edited after live apply for fresh `db reset` consistency (near-only
+-- drop/create + grants; list compat lives in 20261116022503). Live never
+-- re-runs this file; later harden migrations rewrite RPC bodies.
 -- Near search expand/contract (paired with 20261116022503 list expand).
 DROP FUNCTION IF EXISTS public.search_campgrounds_near(
   double precision, double precision, double precision, text, text[],

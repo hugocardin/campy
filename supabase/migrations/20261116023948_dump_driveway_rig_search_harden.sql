@@ -1,8 +1,10 @@
 -- Follow-up to dump/driveway/rig search (#27 / PR #31 review):
+-- Applied live as version 20261116023948.
 -- 1) Replace sites_max_rig_length_by_type CHECK (reads site_types) with a trigger
 -- 2) Revoke EXECUTE on site_max_rig_length_valid from API roles
 -- 3) Shared campground_has_matching_site helper (list + near stay in sync)
 -- 4) Null driveway_type on LODGING sites (cabins; guest filter ignores driveway)
+-- Further: 20261116024448 extends trigger for lodging driveway + params helper.
 
 -- ---------------------------------------------------------------------------
 -- max_rig: CHECK → trigger

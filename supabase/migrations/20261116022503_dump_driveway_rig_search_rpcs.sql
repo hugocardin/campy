@@ -1,3 +1,6 @@
+-- NOTE: Edited after live apply for fresh `db reset` consistency (list-only
+-- drop/create + grants). Live never re-runs this file; near expand is
+-- 20261116022628; later harden migrations rewrite RPC bodies.
 -- ---------------------------------------------------------------------------
 -- Expand/contract search RPCs
 -- ---------------------------------------------------------------------------

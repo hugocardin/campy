@@ -67,6 +67,9 @@ ALTER TABLE public.sites
 COMMENT ON COLUMN public.sites.driveway_type IS
   'Site driveway: PULL_THROUGH | BACK_IN | NULL (unknown). Guest search same-site filter.';
 
+-- NOTE: Edited after live apply for fresh `db reset` consistency. Live never
+-- re-runs this file; deltas that changed post-apply live in
+-- 20261116023948 / 20261116024448 harden migrations.
 -- ---------------------------------------------------------------------------
 -- max_rig_length by site type (issue #27)
 -- LODGING → must be null; RV / RV_AND_TENT → required (> 0); TENT optional.
@@ -136,7 +139,7 @@ COMMENT ON FUNCTION public.site_max_rig_length_valid(integer, numeric) IS
 REVOKE ALL ON FUNCTION public.site_max_rig_length_valid(integer, numeric) FROM PUBLIC;
 
 -- CHECK that reads site_types is unsupported long-term (restore/restore issues).
--- Kept briefly for the initial apply; 20261116023721 replaces with a trigger.
+-- Kept briefly for the initial apply; 20261116023948 replaces with a trigger.
 ALTER TABLE public.sites
   DROP CONSTRAINT IF EXISTS sites_max_rig_length_by_type;
 

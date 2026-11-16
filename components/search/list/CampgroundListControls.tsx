@@ -170,6 +170,8 @@ export default function CampgroundListControls({
   const [rigDraft, setRigDraft] = useState(
     urlFilters.rigLength != null ? String(urlFilters.rigLength) : "",
   );
+  // Ref so search debounce flush never reads a stale rigDraft closure.
+  const rigDraftRef = useRef(rigDraft);
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const rigDebounceRef = useRef<number | null>(null);
@@ -248,6 +250,10 @@ export default function CampgroundListControls({
   ]);
 
   useEffect(() => {
+    rigDraftRef.current = rigDraft;
+  }, [rigDraft]);
+
+  useEffect(() => {
     cancelledRef.current = false;
     return () => {
       cancelledRef.current = true;
@@ -262,14 +268,23 @@ export default function CampgroundListControls({
     }
   }
 
-  /** Cancel a pending rig debounce and return the draft value (flush into next patch). */
-  function takePendingRigLength(
-    draft: string = rigDraft,
-  ): number | undefined {
+  /**
+   * Cancel a pending rig debounce and return the draft value (flush into next patch).
+   * Always reads `rigDraftRef` so timers started on an older search render still see
+   * the latest typed length.
+   */
+  function takePendingRigLength(): number | undefined {
+    const draft = rigDraftRef.current;
     if (rigDebounceRef.current != null) {
       window.clearTimeout(rigDebounceRef.current);
       rigDebounceRef.current = null;
-      return parseGuestRigLength(draft);
+      const parsed = parseGuestRigLength(draft);
+      // Dropped/invalid draft (e.g. >200) — clear the field so UI matches the URL.
+      if (draft.trim() !== "" && parsed == null) {
+        setRigDraft("");
+        rigDraftRef.current = "";
+      }
+      return parsed;
     }
     return latestParamsRef.current.rigLength;
   }
@@ -296,6 +311,7 @@ export default function CampgroundListControls({
     // Do not overwrite mid-typing rigDraft here — external URL sync does that.
     if (!stayKindAllowsRigLength(next.stayKind)) {
       setRigDraft("");
+      rigDraftRef.current = "";
     }
     latestParamsRef.current = next;
 
@@ -309,10 +325,9 @@ export default function CampgroundListControls({
   /** Apply a filter patch; flush any pending rig draft so it is not dropped. */
   function replaceWithFilters(
     patch: Parameters<typeof withLatestCampgroundFilters>[1],
-    draft: string = rigDraft,
   ) {
     clearSearchDebounce();
-    const rigLength = takePendingRigLength(draft);
+    const rigLength = takePendingRigLength();
     replaceQuery(
       withLatestCampgroundFilters(latestParamsRef.current, {
         ...patch,
@@ -558,6 +573,7 @@ export default function CampgroundListControls({
               cancelGeolocation();
               setSearch("");
               setRigDraft("");
+              rigDraftRef.current = "";
               setGeoError(null);
               replaceQuery(clearedCampgroundQueryState());
             }}
@@ -714,16 +730,25 @@ export default function CampgroundListControls({
                 onChange={(e) => {
                   const value = e.target.value;
                   setRigDraft(value);
+                  rigDraftRef.current = value;
                   if (rigDebounceRef.current != null) {
                     window.clearTimeout(rigDebounceRef.current);
                   }
                   rigDebounceRef.current = window.setTimeout(() => {
                     rigDebounceRef.current = null;
+                    const parsed = parseGuestRigLength(rigDraftRef.current);
+                    if (
+                      rigDraftRef.current.trim() !== "" &&
+                      parsed == null
+                    ) {
+                      setRigDraft("");
+                      rigDraftRef.current = "";
+                    }
                     replaceQuery(
                       withLatestCampgroundFilters(latestParamsRef.current, {
                         q: latestParamsRef.current.q,
                         sort: latestParamsRef.current.sort,
-                        rigLength: parseGuestRigLength(value),
+                        rigLength: parsed,
                       }),
                     );
                   }, 300);

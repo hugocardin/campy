@@ -2,8 +2,12 @@
  * Site-type rules for `max_rig_length` (issue #27).
  * Keep in sync with SQL `site_max_rig_length_valid`
  * (`supabase/migrations/20261116022329_dump_driveway_rig_search.sql`
- * + trigger follow-up). Codes are duplicated in SQL/TS intentionally for now;
+ * + `20261116023948` / `20261116024448` trigger follow-ups).
+ * Codes are duplicated in SQL/TS intentionally for now;
  * a `site_types` flag column can centralize later.
+ *
+ * Guest `min_rig` matching a TENT site that has optional max_rig_length set is
+ * intentional (same-site capacity), not limited to RV / RV_AND_TENT.
  */
 export const SITE_TYPE_CODES = [
   "TENT",
