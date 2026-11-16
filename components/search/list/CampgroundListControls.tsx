@@ -392,22 +392,21 @@ export default function CampgroundListControls({
 
   function onSearchInputChange(nextValue: string) {
     setSearch(nextValue);
-    // Editing away from a selected place drops place + geo → free-text mode.
+    // Leaving place mode: clear place/geo immediately (q stays empty), then let
+    // the normal debounced effect push the typed text — avoids a junk RPC on
+    // the first keystroke of a long place label.
     if (activePlace && nextValue !== activePlace) {
       setActivePlace(undefined);
-      clearSearchDebounce();
-      const rigLength = takePendingRigLength();
+      const latest = latestParamsRef.current;
+      const nextSort = latest.sort === "distance" ? "name" : latest.sort;
       replaceQuery(
-        withLatestCampgroundFilters(latestParamsRef.current, {
-          q: nextValue,
-          sort: "name",
+        withLatestCampgroundFilters(latest, {
+          q: "",
+          sort: nextSort,
           place: undefined,
           lat: undefined,
           lng: undefined,
           radiusKm: undefined,
-          rigLength: stayKindAllowsRigLength(latestParamsRef.current.stayKind)
-            ? rigLength
-            : undefined,
         }),
       );
     }

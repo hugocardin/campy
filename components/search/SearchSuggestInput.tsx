@@ -22,6 +22,8 @@ type Props = {
   disabled?: boolean;
 };
 
+type SuggestErrorKind = "places" | "all" | null;
+
 export default function SearchSuggestInput({
   value,
   onChange,
@@ -33,24 +35,28 @@ export default function SearchSuggestInput({
   const locale = useLocale();
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  /** True after the user types; false after choose / URL-driven value. */
+  const [userTyped, setUserTyped] = useState(false);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [highlight, setHighlight] = useState(-1);
-  const [placesUnavailable, setPlacesUnavailable] = useState(false);
+  const [errorKind, setErrorKind] = useState<SuggestErrorKind>(null);
   const [fetchedFor, setFetchedFor] = useState("");
   const requestIdRef = useRef(0);
 
   const trimmed = value.trim();
   const canSuggest = trimmed.length >= SUGGEST_MIN_CHARS;
-  // Ignore stale fetch results when the box drops below the min length.
-  const visibleSuggestions = canSuggest && fetchedFor === trimmed ? suggestions : [];
-  const visiblePlacesUnavailable =
-    canSuggest && fetchedFor === trimmed ? placesUnavailable : false;
-  const visibleLoading = canSuggest && loading;
+  const visibleSuggestions =
+    canSuggest && fetchedFor === trimmed ? suggestions : [];
+  const visibleError =
+    canSuggest && fetchedFor === trimmed ? errorKind : null;
+  const visibleLoading = canSuggest && loading && userTyped;
 
   useEffect(() => {
-    if (!canSuggest) {
+    // Only fetch after the user typed — skip mount / place-label / URL sync.
+    if (!canSuggest || !userTyped) {
       return;
     }
 
@@ -59,26 +65,44 @@ export default function SearchSuggestInput({
     const timer = window.setTimeout(() => {
       setLoading(true);
       void (async () => {
-        const result = await searchSuggestAction(query, locale);
-        if (requestId !== requestIdRef.current) return;
-        setLoading(false);
-        setFetchedFor(query);
-        if (!result.success) {
+        try {
+          const result = await searchSuggestAction(query, locale);
+          if (requestId !== requestIdRef.current) return;
+          setFetchedFor(query);
+          if (!result.success) {
+            setSuggestions([]);
+            setErrorKind("all");
+            if (document.activeElement === inputRef.current) {
+              setOpen(true);
+            }
+            return;
+          }
+          setSuggestions(result.data.suggestions);
+          setErrorKind(result.data.placesUnavailable ? "places" : null);
+          setHighlight(-1);
+          if (document.activeElement === inputRef.current) {
+            setOpen(true);
+          }
+        } catch {
+          if (requestId !== requestIdRef.current) return;
+          setFetchedFor(query);
           setSuggestions([]);
-          setPlacesUnavailable(true);
-          return;
+          setErrorKind("all");
+          if (document.activeElement === inputRef.current) {
+            setOpen(true);
+          }
+        } finally {
+          if (requestId === requestIdRef.current) {
+            setLoading(false);
+          }
         }
-        setSuggestions(result.data.suggestions);
-        setPlacesUnavailable(Boolean(result.data.placesUnavailable));
-        setHighlight(-1);
-        setOpen(true);
       })();
     }, SUGGEST_DEBOUNCE_MS);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [canSuggest, trimmed, locale]);
+  }, [canSuggest, trimmed, locale, userTyped]);
 
   useEffect(() => {
     function onDocPointer(event: MouseEvent) {
@@ -91,9 +115,13 @@ export default function SearchSuggestInput({
   }, []);
 
   function choose(suggestion: SearchSuggestion) {
+    setUserTyped(false);
     setOpen(false);
     setSuggestions([]);
     setFetchedFor("");
+    setErrorKind(null);
+    setHighlight(-1);
+    requestIdRef.current += 1;
     if (suggestion.kind === "place") {
       onSelectPlace(suggestion);
     } else {
@@ -135,27 +163,41 @@ export default function SearchSuggestInput({
     canSuggest &&
     (visibleLoading ||
       visibleSuggestions.length > 0 ||
-      visiblePlacesUnavailable);
+      visibleError != null);
+
+  const activeDescendant =
+    showList && highlight >= 0 ? `${listId}-opt-${highlight}` : undefined;
 
   return (
     <div ref={rootRef} className="relative flex-1 min-w-48">
       <Search className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
+        ref={inputRef}
         placeholder={t("searchPlaceholder")}
         className="pl-10"
         value={value}
         onChange={(e) => {
+          setUserTyped(true);
           onChange(e.target.value);
           setOpen(true);
         }}
         onFocus={() => {
-          if (canSuggest) setOpen(true);
+          if (canSuggest && userTyped) setOpen(true);
+        }}
+        onBlur={() => {
+          // Defer so option mousedown can choose before close.
+          window.setTimeout(() => {
+            if (!rootRef.current?.contains(document.activeElement)) {
+              setOpen(false);
+            }
+          }, 0);
         }}
         onKeyDown={onKeyDown}
         aria-label={t("searchPlaceholder")}
         aria-autocomplete="list"
         aria-controls={listId}
         aria-expanded={showList}
+        aria-activedescendant={activeDescendant}
         role="combobox"
         disabled={disabled}
         autoComplete="off"
@@ -177,51 +219,44 @@ export default function SearchSuggestInput({
           ) : null}
           {visibleSuggestions.map((suggestion, index) => {
             const selected = index === highlight;
-            if (suggestion.kind === "place") {
-              return (
-                <li key={suggestion.id} role="option" aria-selected={selected}>
-                  <button
-                    type="button"
-                    className={`flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted ${
-                      selected ? "bg-muted" : ""
-                    }`}
-                    onMouseEnter={() => setHighlight(index)}
-                    onClick={() => choose(suggestion)}
-                  >
-                    <span className="font-medium">{suggestion.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {suggestion.subtitle
-                        ? `${t("suggestionPlace")} · ${suggestion.subtitle}`
-                        : t("suggestionPlace")}
-                    </span>
-                  </button>
-                </li>
-              );
-            }
-            return (
-              <li key={suggestion.id} role="option" aria-selected={selected}>
-                <button
-                  type="button"
-                  className={`flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted ${
-                    selected ? "bg-muted" : ""
-                  }`}
-                  onMouseEnter={() => setHighlight(index)}
-                  onClick={() => choose(suggestion)}
-                >
-                  <span className="font-medium">{suggestion.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("suggestionCampground")}
-                    {suggestion.city || suggestion.province
+            const optionId = `${listId}-opt-${index}`;
+            const title =
+              suggestion.kind === "place"
+                ? suggestion.label
+                : suggestion.name;
+            const subtitle =
+              suggestion.kind === "place"
+                ? suggestion.subtitle
+                  ? `${t("suggestionPlace")} · ${suggestion.subtitle}`
+                  : t("suggestionPlace")
+                : `${t("suggestionCampground")}${
+                    suggestion.city || suggestion.province
                       ? ` · ${formatCampgroundLocation(suggestion.city, suggestion.province)}`
-                      : ""}
-                  </span>
-                </button>
+                      : ""
+                  }`;
+            return (
+              <li
+                key={suggestion.id}
+                id={optionId}
+                role="option"
+                aria-selected={selected}
+                className={`flex cursor-pointer flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted ${
+                  selected ? "bg-muted" : ""
+                }`}
+                onMouseEnter={() => setHighlight(index)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  choose(suggestion);
+                }}
+              >
+                <span className="font-medium">{title}</span>
+                <span className="text-xs text-muted-foreground">{subtitle}</span>
               </li>
             );
           })}
           {!visibleLoading &&
           visibleSuggestions.length === 0 &&
-          visiblePlacesUnavailable ? (
+          visibleError === "places" ? (
             <li
               className="px-3 py-2 text-sm text-muted-foreground"
               role="presentation"
@@ -231,7 +266,17 @@ export default function SearchSuggestInput({
           ) : null}
           {!visibleLoading &&
           visibleSuggestions.length === 0 &&
-          !visiblePlacesUnavailable &&
+          visibleError === "all" ? (
+            <li
+              className="px-3 py-2 text-sm text-muted-foreground"
+              role="presentation"
+            >
+              {t("suggestionsError")}
+            </li>
+          ) : null}
+          {!visibleLoading &&
+          visibleSuggestions.length === 0 &&
+          visibleError == null &&
           canSuggest ? (
             <li
               className="px-3 py-2 text-sm text-muted-foreground"

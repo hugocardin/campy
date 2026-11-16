@@ -28,10 +28,16 @@ Swap path later: Mapbox / Geoapify / LocationIQ behind the same `GeocodedPlace` 
 SELECT extname FROM pg_extension WHERE extname IN ('unaccent', 'pg_trgm');
 
 SELECT name FROM public.search_campgrounds(q := 'emerald');
-SELECT name FROM public.suggest_campgrounds('emerld', 5);
+SELECT name FROM public.suggest_campgrounds('emerld', 5);  -- typo → Emerald
 SELECT name FROM public.suggest_campgrounds('alice', 5);
 
 SELECT public.campground_text_matches(
   'Québec Campground', 'Québec', 'QC', 'quebec', 'quebec'
 );
+
+-- Negative probes (should not flood unrelated parks)
+SELECT count(*) FROM public.suggest_campgrounds('zzzz', 5);  -- expect 0
+SELECT name FROM public.suggest_campgrounds('park', 5);     -- may match; note noise risk
 ```
+
+Photon: `bbox=-170,14,-50,84` + locality layers; 3s timeout; locale normalized to `en`/`fr` before cache key; per-IP token bucket + 30s negative cache.

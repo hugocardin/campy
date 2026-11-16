@@ -17,7 +17,7 @@ export { photonLangFromLocale } from "@/lib/geocoding/types";
  * - Designed for as-you-type suggestions (Nominatim discourages that).
  * - French / English via `lang` (Québec keeps accents).
  * - No key for demo / CI; swap later for Mapbox/Geoapify/LocationIQ if needed.
- * - We filter to CA / US / MX client-side (Photon has no countrycodes param).
+ * - Rank inside North America via `bbox`, then filter CA / US / MX.
  *
  * Usage: identify as Campy, cache responses (see `geocode-cache.ts`), debounce UI.
  * Env override: `PHOTON_API_URL` (default https://photon.komoot.io).
@@ -45,6 +45,11 @@ type PhotonResponse = {
 
 const ALLOWED = new Set<string>(GEOCODE_COUNTRY_ALLOWLIST);
 
+/** Rough North America box so Photon ranks inside CA/US/MX (issue #24 review). */
+const NORTH_AMERICA_BBOX = "-170,14,-50,84";
+
+const PHOTON_TIMEOUT_MS = 3000;
+
 function photonBaseUrl(): string {
   const raw = process.env.PHOTON_API_URL?.trim();
   if (raw) return raw.replace(/\/$/, "");
@@ -53,26 +58,17 @@ function photonBaseUrl(): string {
 
 function formatLabel(
   props: NonNullable<PhotonFeature["properties"]>,
-  localeLang: "en" | "fr",
-): { label: string; subtitle?: string } {
+): { label: string; subtitle?: string } | null {
   const name = props.name?.trim() || props.city?.trim() || "";
+  if (!name) return null;
   const parts: string[] = [];
   if (props.state?.trim() && props.state !== name) parts.push(props.state.trim());
   if (props.country?.trim()) parts.push(props.country.trim());
   const subtitle = parts.length > 0 ? parts.join(", ") : undefined;
-  if (!name) {
-    return {
-      label: subtitle ?? (localeLang === "fr" ? "Lieu" : "Place"),
-      subtitle: undefined,
-    };
-  }
   return { label: name, subtitle };
 }
 
-function toPlace(
-  feature: PhotonFeature,
-  localeLang: "en" | "fr",
-): GeocodedPlace | null {
+function toPlace(feature: PhotonFeature): GeocodedPlace | null {
   const coords = feature.geometry?.coordinates;
   const props = feature.properties;
   if (!coords || !props) return null;
@@ -84,22 +80,25 @@ function toPlace(
   const cc = props.countrycode?.toUpperCase();
   if (!cc || !ALLOWED.has(cc)) return null;
 
+  const formatted = formatLabel(props);
+  if (!formatted) return null;
+
   const osmType = props.osm_type ?? "x";
   const osmId = props.osm_id ?? `${lat},${lng}`;
-  const { label, subtitle } = formatLabel(props, localeLang);
 
   return {
     id: `photon:${osmType}:${osmId}`,
-    label,
+    label: formatted.label,
     lat,
     lng,
     countryCode: cc as GeocodeCountryCode,
-    subtitle,
+    subtitle: formatted.subtitle,
   };
 }
 
 /**
  * Query Photon for place suggestions. Caller must debounce + cache.
+ * Default 3s timeout when no signal is passed.
  */
 export async function searchPhotonPlaces(
   query: string,
@@ -114,16 +113,25 @@ export async function searchPhotonPlaces(
   const url = new URL(`${photonBaseUrl()}/api/`);
   url.searchParams.set("q", q);
   url.searchParams.set("lang", lang);
-  // Fetch extra then filter by country — Photon has no countrycodes filter.
-  url.searchParams.set("limit", String(Math.min(limit * 3, 15)));
+  url.searchParams.set("limit", String(Math.min(limit * 2, 10)));
+  url.searchParams.set("bbox", NORTH_AMERICA_BBOX);
+  // Locality-ish layers for radius search (not streets / POIs).
+  for (const layer of ["city", "locality", "district", "county", "state"]) {
+    url.searchParams.append("layer", layer);
+  }
+
+  const signal =
+    options?.signal ??
+    (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(PHOTON_TIMEOUT_MS)
+      : undefined);
 
   const res = await fetch(url, {
-    signal: options?.signal,
+    signal,
     headers: {
       Accept: "application/json",
       "User-Agent": "Campy/0.1 (https://github.com/hugocardin/campy; search-suggest)",
     },
-    // Photon is public; avoid Next fetch cache dumping unbounded keys.
     cache: "no-store",
   });
 
@@ -136,7 +144,7 @@ export async function searchPhotonPlaces(
   const seen = new Set<string>();
 
   for (const feature of body.features ?? []) {
-    const place = toPlace(feature, lang);
+    const place = toPlace(feature);
     if (!place || seen.has(place.id)) continue;
     seen.add(place.id);
     places.push(place);

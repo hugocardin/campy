@@ -263,7 +263,7 @@ export const getCampgrounds = cache(
 
       // Text / province / site filters use search_campgrounds (unaccent + trigram
       // via campground_text_matches; guest-safe). RPC has no LIMIT / ORDER BY —
-      // sort in JS (LIMIT+ORDER parked in #24 scale follow-up).
+      // sort in JS. TODO(#24): pass sort + LIMIT into the RPC (also parked from #25).
       if (term || provinceAliases.length > 0 || siteFiltersActive) {
         const result = await handleDbResponse(
           supabase.rpc("search_campgrounds", {
