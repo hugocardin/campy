@@ -5,10 +5,11 @@ Migrations:
 - `20261115191024_search_campgrounds_hookup_filters` (codes + initial RPCs; demo `site_amenities` removed by follow-up)
 - `20261115191846_search_hookups_harden` (cleanup demo links, per-site AND, drop `province text` overload, protect codes)
 - `20261116014604_sites_electricity_amps` (site `electricity_amps`; `require_amps`; WATER/SEWER only)
-- `20261116015837_sites_electricity_amps_harden` (amp values helper; compat boolean overloads; retire ELECTRICITY amenity)
+- `20261116015837_sites_electricity_amps_harden` (amp values helper; temporary `require_electricity` boolean overloads; retire ELECTRICITY amenity)
 - `20261116022329_dump_driveway_rig_search` (DUMP_STATION; `driveway_type`; max_rig rules; protect DUMP_STATION)
-- `20261116022503_dump_driveway_rig_search_rpcs` / `20261116022628_*` (`min_rig_length`; `stay_kind`; near+compat)
+- `20261116022503_dump_driveway_rig_search_rpcs` / `20261116022628_*` (`min_rig_length`; `stay_kind`; near + temporary boolean compat, dropped in `20261116034908`)
 - follow-up hardens CHECK→trigger + shared site-filter helper
+- `20261116034908_drop_require_electricity_search_overloads` (issue #30 — drop boolean compat wrappers; `require_amps` only)
 
 ## Filters
 
