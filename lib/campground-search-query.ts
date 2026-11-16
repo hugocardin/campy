@@ -12,7 +12,11 @@ import type { DrivewayType } from "@/lib/driveway-type";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
 import type { ElectricityAmpFilterOption } from "@/lib/electricity-amps";
 import { normalizeElectricityAmpFilters } from "@/lib/electricity-amps";
-import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
+import {
+  formatGuestRigLengthParam,
+  formatRigLengthUnitParam,
+  type RigLengthUnit,
+} from "@/lib/site-rig-length";
 import type { StayKind } from "@/lib/stay-kind";
 import { formatStayKindParam, stayKindAllowsRigLength } from "@/lib/stay-kind";
 
@@ -28,7 +32,13 @@ export type CampgroundQueryState = {
   sewer: boolean;
   dumpStation: boolean;
   drivewayType?: DrivewayType;
+  /** Canonical feet (matches URL `rigLength` / RPC). */
   rigLength?: number;
+  /**
+   * Display/input unit for the guest rig-length field.
+   * URL: `rigUnit=m` when metres; omit for feet (default).
+   */
+  rigUnit?: RigLengthUnit;
   stayKind?: StayKind;
 };
 
@@ -42,6 +52,7 @@ export function withLatestCampgroundFilters(
   const campingOk = stayKindAllowsRigLength(stayKind);
   const rigLengthRaw =
     "rigLength" in patch ? patch.rigLength : latest.rigLength;
+  const rigUnitRaw = "rigUnit" in patch ? patch.rigUnit : latest.rigUnit;
   const drivewayRaw =
     "drivewayType" in patch ? patch.drivewayType : latest.drivewayType;
   return {
@@ -59,6 +70,9 @@ export function withLatestCampgroundFilters(
     // Drop rig + driveway when lodging (cabins; issue #27).
     drivewayType: campingOk ? drivewayRaw : undefined,
     rigLength: campingOk ? rigLengthRaw : undefined,
+    // Keep unit preference through lodging so camping↔lodging restores the toggle
+    // (also emitted in the URL — see buildCampgroundSearchParams).
+    rigUnit: rigUnitRaw === "m" ? "m" : undefined,
   };
 }
 
@@ -150,6 +164,13 @@ export function buildCampgroundSearchParams(
   if (stayKindAllowsRigLength(next.stayKind)) {
     const rigParam = formatGuestRigLengthParam(next.rigLength);
     if (rigParam) params.set("rigLength", rigParam);
+  }
+  // Persist unit preference whenever metres is selected (even with empty length
+  // or lodging), so shared links / stay toggles restore the toggle. Omitted when
+  // feet (default). Harmless for lodging — RPC ignores it.
+  const unitParam = formatRigLengthUnitParam(next.rigUnit);
+  if (unitParam) {
+    params.set("rigUnit", unitParam);
   }
   return params;
 }

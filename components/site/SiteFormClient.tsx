@@ -26,9 +26,14 @@ import {
   type ElectricityAmp,
   normalizeElectricityAmps,
 } from "@/lib/electricity-amps";
+import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
 import {
+  convertRigLengthDisplay,
   isLodgingSiteType,
+  maxRigLengthInUnit,
+  parseRigLengthToFeet,
   siteTypeRequiresMaxRigLength,
+  type RigLengthUnit,
 } from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
@@ -70,6 +75,7 @@ export default function SiteFormClient({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // initialData.max_rig_length is canonical feet (string from site-form-utils).
   const [form, setForm] = useState<SiteFormData>(() => ({
     name: initialData?.name ?? "",
     description: initialData?.description ?? "",
@@ -82,6 +88,7 @@ export default function SiteFormClient({
     ),
     driveway_type: initialData?.driveway_type ?? "",
   }));
+  const [rigUnit, setRigUnit] = useState<RigLengthUnit>("ft");
 
   const selectedTypeCode = useMemo(() => {
     if (!form.site_type_id) return undefined;
@@ -91,22 +98,24 @@ export default function SiteFormClient({
   const isLodging = isLodgingSiteType(selectedTypeCode);
   const requiresMaxRig = siteTypeRequiresMaxRigLength(selectedTypeCode);
 
+  const maxRigParsed = parseRigLengthToFeet(form.max_rig_length, rigUnit);
   const isFormValid = Boolean(
     form.name.trim() &&
     form.site_type_id &&
     form.price_per_night &&
     !isNaN(parseFloat(form.price_per_night)) &&
     !isNaN(parseFloat(form.min_stay_nights || "0")) &&
-    (!requiresMaxRig ||
-      (!isNaN(parseFloat(form.max_rig_length)) &&
-        parseFloat(form.max_rig_length) > 0)),
+    (!requiresMaxRig || maxRigParsed.ok),
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const maxRigLengthNum = parseFloat(form.max_rig_length);
+    const maxRigParsedSubmit = parseRigLengthToFeet(
+      form.max_rig_length,
+      rigUnit,
+    );
     const pricePerNightNum = parseFloat(form.price_per_night);
     const minStayNightsNum = parseFloat(form.min_stay_nights);
     const siteTypeIdNum = parseInt(form.site_type_id, 10);
@@ -117,11 +126,30 @@ export default function SiteFormClient({
     if (isLodging) {
       // Lodging: force null max_rig_length (issue #27).
     } else if (requiresMaxRig) {
-      if (isNaN(maxRigLengthNum) || maxRigLengthNum <= 0) {
+      if (!maxRigParsedSubmit.ok && maxRigParsedSubmit.reason === "empty") {
         return setError(t_sites("errors.maxRigLengthRequired"));
       }
-    } else if (!isNaN(maxRigLengthNum) && maxRigLengthNum <= 0) {
-      return setError(t_sites("errors.invalidMaxLength"));
+      if (!maxRigParsedSubmit.ok) {
+        return setError(
+          t_sites("errors.invalidMaxLength", {
+            max: maxRigLengthInUnit(rigUnit),
+            unit:
+              rigUnit === "m"
+                ? t_sites("form.rigLengthUnitM")
+                : t_sites("form.rigLengthUnitFt"),
+          }),
+        );
+      }
+    } else if (form.max_rig_length.trim() !== "" && !maxRigParsedSubmit.ok) {
+      return setError(
+        t_sites("errors.invalidMaxLength", {
+          max: maxRigLengthInUnit(rigUnit),
+          unit:
+            rigUnit === "m"
+              ? t_sites("form.rigLengthUnitM")
+              : t_sites("form.rigLengthUnitFt"),
+        }),
+      );
     }
     if (isNaN(pricePerNightNum) || pricePerNightNum < 0) {
       return setError(t_sites("errors.invalidPricePerNight"));
@@ -146,9 +174,9 @@ export default function SiteFormClient({
       site_type_id: siteTypeIdNum,
       max_rig_length: isLodging
         ? undefined
-        : isNaN(maxRigLengthNum)
-          ? undefined
-          : maxRigLengthNum,
+        : maxRigParsedSubmit.ok
+          ? maxRigParsedSubmit.feet
+          : undefined,
       price_per_night: pricePerNightNum,
       min_stay_nights: isNaN(minStayNightsNum) ? undefined : minStayNightsNum,
       electricity_amps: normalizeElectricityAmps(form.electricity_amps),
@@ -199,6 +227,24 @@ export default function SiteFormClient({
       max_rig_length: isLodgingSiteType(nextCode) ? "" : prev.max_rig_length,
       driveway_type: isLodgingSiteType(nextCode) ? "" : prev.driveway_type,
     }));
+    setError(null);
+  };
+
+  const handleRigUnitChange = (nextUnit: RigLengthUnit) => {
+    if (nextUnit === rigUnit) return;
+    setForm((prev) => {
+      const trimmed = prev.max_rig_length.trim();
+      if (trimmed === "") return prev;
+      const n = Number(trimmed);
+      if (!Number.isFinite(n) || n <= 0) return prev;
+      const converted = convertRigLengthDisplay(n, rigUnit, nextUnit);
+      return {
+        ...prev,
+        max_rig_length:
+          converted != null ? String(converted) : prev.max_rig_length,
+      };
+    });
+    setRigUnit(nextUnit);
     setError(null);
   };
 
@@ -267,22 +313,39 @@ export default function SiteFormClient({
                     <span className="text-red-500"> *</span>
                   ) : null}
                 </Label>
-                <Input
-                  id="max_rig_length"
-                  name="max_rig_length"
-                  type="number"
-                  min={1}
-                  value={form.max_rig_length}
-                  onChange={handleChange}
-                  className="mt-1.5"
-                  placeholder={t_sites("form.maxRigLengthPlaceholder")}
-                  required={requiresMaxRig}
-                />
-                {requiresMaxRig ? (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t_sites("form.maxRigLengthRequiredHint")}
-                  </p>
-                ) : null}
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Input
+                    id="max_rig_length"
+                    name="max_rig_length"
+                    type="number"
+                    min={1}
+                    max={maxRigLengthInUnit(rigUnit)}
+                    step="any"
+                    value={form.max_rig_length}
+                    onChange={handleChange}
+                    className="flex-1"
+                    placeholder={
+                      rigUnit === "m"
+                        ? t_sites("form.maxRigLengthPlaceholderM")
+                        : t_sites("form.maxRigLengthPlaceholderFt")
+                    }
+                    required={requiresMaxRig}
+                  />
+                  <RigLengthUnitToggle
+                    value={rigUnit}
+                    onChange={handleRigUnitChange}
+                    groupLabel={t_sites("form.rigLengthUnitGroupLabel")}
+                    ftLabel={t_sites("form.rigLengthUnitFt")}
+                    mLabel={t_sites("form.rigLengthUnitM")}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {requiresMaxRig
+                    ? t_sites("form.maxRigLengthRequiredHint")
+                    : null}
+                  {requiresMaxRig ? " " : null}
+                  {t_sites("form.maxRigLengthStoredHint")}
+                </p>
               </div>
             ) : null}
           </div>

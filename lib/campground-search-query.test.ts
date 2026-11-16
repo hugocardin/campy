@@ -77,19 +77,54 @@ describe("buildCampgroundSearchParams / clear", () => {
     assert.equal(params.get("dump"), "1");
     assert.equal(params.get("driveway"), "pull_through");
     assert.equal(params.get("rigLength"), "35");
+    assert.equal(params.get("rigUnit"), null);
     assert.equal(params.get("stay"), "camping");
   });
 
-  it("omits rigLength when lodging", () => {
+  it("emits rigUnit=m when metres selected (rigLength stays feet)", () => {
+    const params = buildCampgroundSearchParams({
+      ...base,
+      rigUnit: "m",
+      lat: undefined,
+      lng: undefined,
+      radiusKm: undefined,
+    });
+    assert.equal(params.get("rigLength"), "35");
+    assert.equal(params.get("rigUnit"), "m");
+  });
+
+  it("omits rigLength when lodging but keeps rigUnit", () => {
     const params = buildCampgroundSearchParams({
       ...base,
       stayKind: "lodging",
+      rigUnit: "m",
       lat: undefined,
       lng: undefined,
       radiusKm: undefined,
     });
     assert.equal(params.get("stay"), "lodging");
     assert.equal(params.get("rigLength"), null);
+    assert.equal(params.get("rigUnit"), "m");
+  });
+
+  it("restores rigUnit after camping → lodging → camping", () => {
+    const lodging = withLatestCampgroundFilters(base, {
+      q: "lake",
+      sort: "name",
+      stayKind: "lodging",
+      rigUnit: "m",
+    });
+    assert.equal(lodging.rigLength, undefined);
+    assert.equal(lodging.rigUnit, "m");
+    const back = withLatestCampgroundFilters(lodging, {
+      q: "lake",
+      sort: "name",
+      stayKind: "camping",
+      rigLength: 35,
+    });
+    assert.equal(back.rigUnit, "m");
+    assert.equal(back.rigLength, 35);
+    assert.equal(buildCampgroundSearchParams(back).get("rigUnit"), "m");
   });
 
   it("Clear removes filters and geo", () => {

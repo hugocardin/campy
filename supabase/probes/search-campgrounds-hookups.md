@@ -19,7 +19,8 @@ Migrations:
 | `water=1` | same site → `site_amenities` `WATER` |
 | `sewer=1` | same site → `site_amenities` `SEWER` |
 | `driveway=pull_through\|back_in` | same site → `sites.driveway_type` |
-| `rigLength=35` | same site → `max_rig_length >= 35` (ignored when `stay=lodging`) |
+| `rigLength=35` | same site → `max_rig_length >= 35` **feet** (ignored when `stay=lodging`) |
+| `rigUnit=m` | display/input unit for the guest filter (`ft` default when omitted; kept even when `stay=lodging`). Does **not** change `rigLength` meaning — that param is always feet. Cap: 200 ft (metre max derived ≈ 60.96 m). |
 | `stay=camping\|lodging` | same site → non-LODGING / LODGING site type |
 | `dump=1` | park → `campground_amenities` `DUMP_STATION` (not same-site) |
 
