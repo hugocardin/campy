@@ -12,6 +12,8 @@ type Props = {
   searchKey?: string;
   searchQuery?: string;
   detailQuery?: CampgroundDetailQuery;
+  highlightedId?: string | null;
+  onHoverCampground?: (id: string | null) => void;
 };
 
 const CampgroundsMap = dynamic(() => import("./CampgroundsMap"), {
@@ -35,6 +37,8 @@ export default function CampgroundsMapDynamic({
   searchKey,
   searchQuery,
   detailQuery,
+  highlightedId,
+  onHoverCampground,
 }: Props) {
   return (
     <CampgroundsMap
@@ -44,6 +48,8 @@ export default function CampgroundsMapDynamic({
       searchKey={searchKey}
       searchQuery={searchQuery}
       detailQuery={detailQuery}
+      highlightedId={highlightedId}
+      onHoverCampground={onHoverCampground}
     />
   );
 }

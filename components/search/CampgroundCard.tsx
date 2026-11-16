@@ -2,6 +2,7 @@
 
 import { MapPin } from "lucide-react";
 import Image from "next/image";
+import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -11,15 +12,27 @@ import { formatDistanceKm } from "@/lib/campground-search";
 import { formatCampgroundPricePerNight } from "@/lib/campground-price";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { routes, type CampgroundDetailQuery } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 import { useLocale, useTranslations } from "next-intl";
 
 interface Props {
   campground: Campground;
   /** Carry guest rig prefs into the detail URL (#34). */
   detailQuery?: CampgroundDetailQuery;
+  /** Shared list ↔ map hover highlight (#24 §4). */
+  highlighted?: boolean;
+  /** Scroll into view when the map drives the highlight. */
+  scrollIntoViewOnHighlight?: boolean;
+  onHover?: (id: string | null) => void;
 }
 
-export default function CampgroundCard({ campground, detailQuery }: Props) {
+export default function CampgroundCard({
+  campground,
+  detailQuery,
+  highlighted = false,
+  scrollIntoViewOnHighlight = false,
+  onHover,
+}: Props) {
   const t = useTranslations("search.controls");
   const locale = useLocale();
   const distanceLabel = formatDistanceKm(campground.distanceMeters);
@@ -27,9 +40,33 @@ export default function CampgroundCard({ campground, detailQuery }: Props) {
     campground.minPricePerNight,
     locale,
   );
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!highlighted || !scrollIntoViewOnHighlight) return;
+    cardRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlighted, scrollIntoViewOnHighlight]);
 
   return (
-    <Card className="overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
+    <Card
+      ref={cardRef}
+      data-campground-id={campground.id}
+      data-highlighted={highlighted ? "true" : undefined}
+      className={cn(
+        "overflow-hidden flex flex-col h-full transition-shadow",
+        highlighted
+          ? "shadow-md ring-2 ring-primary ring-offset-2 ring-offset-background"
+          : "hover:shadow-md",
+      )}
+      onMouseEnter={() => onHover?.(campground.id)}
+      onMouseLeave={() => onHover?.(null)}
+      onFocusCapture={() => onHover?.(campground.id)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          onHover?.(null);
+        }
+      }}
+    >
       <div className="relative aspect-4/3 md:aspect-video">
         <Image
           src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop"

@@ -43,6 +43,9 @@ type Props = {
   searchQuery?: string;
   /** Carry guest rig prefs into detail popup links (#34). */
   detailQuery?: CampgroundDetailQuery;
+  /** Shared list ↔ map hover highlight (#24 §4). */
+  highlightedId?: string | null;
+  onHoverCampground?: (id: string | null) => void;
   className?: string;
 };
 
@@ -284,6 +287,8 @@ export default function CampgroundsMap({
   searchKey = "",
   searchQuery,
   detailQuery,
+  highlightedId = null,
+  onHoverCampground,
   className,
 }: Props) {
   const t = useTranslations("search.controls");
@@ -305,6 +310,13 @@ export default function CampgroundsMap({
       displayedCampgrounds.map((c) => [c.location.lat, c.location.lng]),
     [displayedCampgrounds],
   );
+
+  const highlightedCampground = useMemo(() => {
+    if (showingStalePins || !highlightedId) return null;
+    return (
+      displayedCampgrounds.find((c) => c.id === highlightedId) ?? null
+    );
+  }, [displayedCampgrounds, highlightedId, showingStalePins]);
 
   const centerLat = searchCenter?.lat;
   const centerLng = searchCenter?.lng;
@@ -403,33 +415,68 @@ export default function CampgroundsMap({
             </Popup>
           </CircleMarker>
         ) : null}
-        {displayedCampgrounds.map((campground) => (
-          <Marker
-            key={campground.id}
-            position={[campground.location.lat, campground.location.lng]}
-            opacity={showingStalePins ? 0.5 : 1}
-          >
-            <Popup>
-              <div className="space-y-1 min-w-40">
-                <p className="font-medium text-sm leading-tight">
-                  {campground.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatCampgroundLocation(
-                    campground.city,
-                    campground.province,
-                  )}
-                </p>
-                <Link
-                  href={routes.campgroundDetail(campground.id, detailQuery)}
-                  className="text-xs text-primary hover:underline"
-                >
-                  {t("viewCampground")}
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {displayedCampgrounds.map((campground) => {
+          const isHighlighted = highlightedId === campground.id;
+          return (
+            <Marker
+              key={campground.id}
+              position={[campground.location.lat, campground.location.lng]}
+              opacity={showingStalePins ? 0.5 : 1}
+              // Keep DefaultIcon always — swapping icons on hover remounts the
+              // marker DOM and can flicker mouseout/mouseover (#24 §4).
+              icon={DefaultIcon}
+              zIndexOffset={isHighlighted ? 1000 : 0}
+              eventHandlers={{
+                mouseover: () => {
+                  if (showingStalePins) return;
+                  onHoverCampground?.(campground.id);
+                },
+                mouseout: () => {
+                  if (showingStalePins) return;
+                  onHoverCampground?.(null);
+                },
+              }}
+            >
+              <Popup>
+                <div className="space-y-1 min-w-40">
+                  <p className="font-medium text-sm leading-tight">
+                    {campground.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCampgroundLocation(
+                      campground.city,
+                      campground.province,
+                    )}
+                  </p>
+                  <Link
+                    href={routes.campgroundDetail(campground.id, detailQuery)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {t("viewCampground")}
+                  </Link>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
+        {/* Halo under the pin — visual highlight without remounting the marker. */}
+        {highlightedCampground ? (
+          <CircleMarker
+            key={`highlight-${highlightedCampground.id}`}
+            center={[
+              highlightedCampground.location.lat,
+              highlightedCampground.location.lng,
+            ]}
+            radius={16}
+            pathOptions={{
+              color: "#0f766e",
+              fillColor: "#14b8a6",
+              fillOpacity: 0.35,
+              weight: 2,
+            }}
+            interactive={false}
+          />
+        ) : null}
         <MapHandle onReady={setMapInstance} />
         <MapUserMoveWatcher
           suppressRef={suppressUserMoveRef}
