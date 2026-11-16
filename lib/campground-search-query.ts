@@ -27,6 +27,11 @@ export type CampgroundQueryState = {
   lat?: number;
   lng?: number;
   radiusKm?: CampgroundRadiusKm;
+  /**
+   * Display label for a selected place (URL `place`). Not sent to text RPCs —
+   * geo lat/lng/radiusKm drive the search. Cleared when the user edits the box.
+   */
+  place?: string;
   amps: ElectricityAmpFilterOption[];
   water: boolean;
   sewer: boolean;
@@ -62,6 +67,7 @@ export function withLatestCampgroundFilters(
     lat: "lat" in patch ? patch.lat : latest.lat,
     lng: "lng" in patch ? patch.lng : latest.lng,
     radiusKm: "radiusKm" in patch ? patch.radiusKm : latest.radiusKm,
+    place: "place" in patch ? patch.place : latest.place,
     amps: "amps" in patch ? (patch.amps ?? []) : latest.amps,
     water: patch.water ?? latest.water,
     sewer: patch.sewer ?? latest.sewer,
@@ -152,6 +158,11 @@ export function buildCampgroundSearchParams(
     params.set("lng", String(geo.lng));
     params.set("radiusKm", String(geo.radiusKm));
   }
+  const placeLabel = next.place?.trim().slice(0, 120);
+  // Only keep place label when geo is active (place without coords is meaningless).
+  if (geo && placeLabel) {
+    params.set("place", placeLabel);
+  }
   const ampsParam = formatCampgroundAmpsParam(next.amps);
   if (ampsParam) params.set("amps", ampsParam);
   if (next.water) params.set("water", "1");
@@ -181,9 +192,36 @@ export function clearedCampgroundQueryState(): CampgroundQueryState {
     q: "",
     sort: "name",
     province: "",
+    place: undefined,
     amps: [],
     water: false,
     sewer: false,
     dumpStation: false,
   };
+}
+
+/**
+ * Stable identity for empty-map live-region re-announcement.
+ * Built from the same filter axes passed to `getCampgrounds` (not display-only
+ * `place`). `sort` is excluded: reordering without changing the result set
+ * should not re-announce “no results”.
+ */
+export function campgroundSearchKey(filters: {
+  q?: string;
+  province?: string;
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  siteFiltersKey?: string;
+}): string {
+  const geo =
+    filters.lat != null && filters.lng != null && filters.radiusKm != null
+      ? `${filters.lat},${filters.lng},${filters.radiusKm}`
+      : "";
+  return [
+    filters.q ?? "",
+    filters.province ?? "",
+    geo,
+    filters.siteFiltersKey ?? "",
+  ].join("|");
 }

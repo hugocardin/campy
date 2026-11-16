@@ -72,9 +72,9 @@ function useStickyLocated(
 }
 
 /**
- * Persistent live region that re-announces when `announcementKey` changes even
- * if the message string is identical (e.g. two consecutive empty searches).
- * Clears on key change, then fills on the next render so SRs see a change.
+ * Live region that re-announces when `announcementKey` changes even if the
+ * message string is identical (two consecutive empty searches). Remount via
+ * `key` so screen readers see a DOM change without setState-during-render.
  */
 function MapStatusLiveRegion({
   announcementKey,
@@ -83,19 +83,9 @@ function MapStatusLiveRegion({
   announcementKey: string;
   message: string;
 }) {
-  const [seenKey, setSeenKey] = useState(announcementKey);
-  const [text, setText] = useState("");
-
-  if (announcementKey !== seenKey) {
-    setSeenKey(announcementKey);
-    setText("");
-  } else if (text !== message) {
-    setText(message);
-  }
-
   return (
-    <p role="status" className="sr-only">
-      {text}
+    <p key={announcementKey} role="status" className="sr-only">
+      {message}
     </p>
   );
 }
