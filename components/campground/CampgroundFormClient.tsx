@@ -19,6 +19,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { UserProfileNoRole } from "@/entities/user-profile";
 import {
+  CAMPGROUND_CURRENCY_LOCKED_FIELD,
+  type CampgroundCurrencyLockState,
+} from "@/lib/campground-currency-lock";
+import {
   GUEST_PRICE_CURRENCIES,
   GUEST_PRICE_CURRENCY,
   parseGuestPriceCurrency,
@@ -36,12 +40,33 @@ type CampgroundFormProps = {
   owners: UserProfileNoRole[];
   initialData?: CampgroundFormData;
   onSubmit: (data: CampgroundCreateUpdateInput) => Promise<ActionResult>;
+  /** When set on edit, listing currency control is disabled (#24/#51). */
+  currencyLockReason?: CampgroundCurrencyLockState | null;
 };
+
+function currencyLockErrorMessage(
+  reason: CampgroundCurrencyLockState,
+  t: (key: string) => string,
+): string {
+  if (reason === "bookings") return t("errors.currencyLockedBookings");
+  if (reason === "unknown") return t("errors.currencyLockedUnknown");
+  return t("errors.currencyLockedSites");
+}
+
+function currencyLockHintMessage(
+  reason: CampgroundCurrencyLockState,
+  t: (key: string) => string,
+): string {
+  if (reason === "bookings") return t("form.currencyLockedHintBookings");
+  if (reason === "unknown") return t("form.currencyLockedHintUnknown");
+  return t("form.currencyLockedHintSites");
+}
 
 export default function CampgroundFormClient({
   owners,
   initialData,
   onSubmit,
+  currencyLockReason = null,
 }: CampgroundFormProps) {
   const tc = useTranslations("common");
   const t_errors = useTranslations("errors");
@@ -95,8 +120,21 @@ export default function CampgroundFormClient({
     if (!parseGuestPriceCurrency(form.currency))
       return setError(t_campgrounds("errors.currencyInvalid"));
 
-    // Changing currency reinterprets existing site base prices (no FX) — #51.
+    // Locked parks cannot change currency (DB trigger also rejects).
     if (
+      currencyLockReason &&
+      initialData?.currency &&
+      form.currency !== initialData.currency
+    ) {
+      return setError(
+        currencyLockErrorMessage(currencyLockReason, t_campgrounds),
+      );
+    }
+
+    // Changing currency reinterprets existing site base prices (no FX) — #51.
+    // Only offered when unlocked (no sites / amount-bookings yet).
+    if (
+      !currencyLockReason &&
       initialData?.id &&
       initialData.currency &&
       form.currency !== initialData.currency
@@ -143,6 +181,12 @@ export default function CampgroundFormClient({
                 fieldMessages: {
                   "campground.website": t_campgrounds("errors.websiteInvalid"),
                   "campground.currency": t_campgrounds("errors.currencyInvalid"),
+                  [CAMPGROUND_CURRENCY_LOCKED_FIELD]:
+                    result.details?.reason === "currency_locked_bookings"
+                      ? t_campgrounds("errors.currencyLockedBookings")
+                      : result.details?.reason === "currency_locked_sites"
+                        ? t_campgrounds("errors.currencyLockedSites")
+                        : t_campgrounds("errors.currencyLockedUnknown"),
                 },
               },
             ),
@@ -341,6 +385,7 @@ export default function CampgroundFormClient({
                 </Label>
                 <Select
                   value={form.currency || GUEST_PRICE_CURRENCY}
+                  disabled={Boolean(currencyLockReason)}
                   onValueChange={(value) => {
                     const currency =
                       parseGuestPriceCurrency(value) ?? GUEST_PRICE_CURRENCY;
@@ -366,7 +411,12 @@ export default function CampgroundFormClient({
                   id="currency-hint"
                   className="mt-1 text-xs text-muted-foreground"
                 >
-                  {t_campgrounds("form.currencyHint")}
+                  {currencyLockReason
+                    ? currencyLockHintMessage(
+                        currencyLockReason,
+                        t_campgrounds,
+                      )
+                    : t_campgrounds("form.currencyHint")}
                 </p>
               </div>
             </div>

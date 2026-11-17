@@ -62,8 +62,39 @@ ROLLBACK;
 
 Also compare anon vs authenticated `SELECT` column grants on `campgrounds.currency`.
 
+## Currency lock (sites / amount-bookings)
+
+Migrations:
+
+- `20261116222604_campground_currency_lock` (initial trigger)
+- `20261116223109_campground_currency_lock_review` (bookings-first;
+  `bookings.site_id` ON DELETE RESTRICT; EXCEPTION DETAIL; site-insert lock)
+- `20261116223419_campground_currency_lock_admin_rpc` (private DEFINER
+  rule; public RPC requires `is_platform_admin`; site `campground_id` moves)
+- `20261116223726_campground_currency_lock_rpc_definer` (public probe
+  SECURITY DEFINER so it can call private without granting private USAGE)
+- `20261116224004_campground_currency_lock_grant_trim` (EXECUTE authenticated
+  only — service_role always fails `is_platform_admin`)
+
+Admin edit calls the public RPC (platform_admin JWT). SQL Editor has no JWT,
+so probe the private helper instead. Update action maps trigger `23514` +
+DETAIL only (no TS pre-check).
+
+```sql
+BEGIN;
+-- SQL Editor / postgres: use private (public RPC needs admin JWT)
+SELECT private.campground_currency_lock_reason(
+  (SELECT campground_id FROM public.sites LIMIT 1)
+); -- expect 'sites'
+
+-- Expect check_violation, DETAIL = sites
+UPDATE public.campgrounds
+SET currency = CASE WHEN currency = 'CAD' THEN 'USD' ELSE 'CAD' END
+WHERE id = (SELECT campground_id FROM public.sites LIMIT 1);
+ROLLBACK;
+```
+
 ## Still parked
 
 - Effective nightly price via `pricing_rules` (needs dates / Phase D)
 - FX conversion / display-only guest switch across currencies
-- Lock currency after sites/bookings exist
