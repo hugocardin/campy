@@ -4,7 +4,10 @@ import { Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
-import { SiteFormData } from "@/components/site/site-form-utils";
+import {
+  resolvePricingRulesFormState,
+  type SiteFormData,
+} from "@/components/site/site-form-utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -46,7 +49,6 @@ import {
   PRICING_RULES_MAX_DEPTH,
   type ParsePricingRulesReason,
   isParsePricingRulesReason,
-  parsePricingRulesInput,
   pricingRulesErrorMessageKey,
 } from "@/lib/site-pricing-rules";
 
@@ -133,20 +135,29 @@ export default function SiteFormClient({
   );
 
   const maxRigParsed = parseRigDraft();
-  const pricingRulesParsed = useMemo(
-    () => parsePricingRulesInput(form.pricing_rules),
-    [form.pricing_rules],
-  );
-
   const initialPricingRulesText = initialData?.pricing_rules ?? "";
   const isEdit = Boolean(initialData?.id);
-  // Unexpected legacy shapes are treated as dirty so Save repairs to {}.
-  const pricingRulesDirty =
-    form.pricing_rules !== initialPricingRulesText ||
-    Boolean(form.pricing_rules_unexpected);
-  // Unchanged invalid stored text must not block editing other fields.
-  const pricingRulesBlocking =
-    (!isEdit || pricingRulesDirty) && !pricingRulesParsed.ok;
+  const pricingRulesState = useMemo(
+    () =>
+      resolvePricingRulesFormState({
+        isEdit,
+        text: form.pricing_rules,
+        initialText: initialPricingRulesText,
+        unexpected: form.pricing_rules_unexpected,
+      }),
+    [
+      isEdit,
+      form.pricing_rules,
+      form.pricing_rules_unexpected,
+      initialPricingRulesText,
+    ],
+  );
+  const {
+    blocking: pricingRulesBlocking,
+    storedOutOfBounds: pricingRulesStoredOutOfBounds,
+    payload: pricingRulesForPayload,
+    parsed: pricingRulesParsed,
+  } = pricingRulesState;
 
   const pricingRulesErrorText = (
     reason: ParsePricingRulesReason,
@@ -210,18 +221,10 @@ export default function SiteFormClient({
       return setError(t_sites("errors.typeRequired"));
     }
 
-    if (pricingRulesBlocking && !pricingRulesParsed.ok) {
+    // blocking ⇒ !parsed.ok (resolvePricingRulesFormState invariant)
+    if (!pricingRulesParsed.ok && pricingRulesBlocking) {
       return setError(pricingRulesErrorText(pricingRulesParsed.reason));
     }
-
-    // Edit: omit unchanged column (avoids lost updates / JS round-trip drift).
-    // Unexpected → dirty → send {} to repair. Create always sends parsed object.
-    const pricingRulesForPayload =
-      isEdit && !pricingRulesDirty
-        ? undefined
-        : pricingRulesParsed.ok
-          ? pricingRulesParsed.data
-          : undefined;
 
     const driveway: DrivewayType | null = isLodging
       ? null
@@ -473,6 +476,16 @@ export default function SiteFormClient({
                   {t_sites("form.pricingRulesUnexpected")}
                 </p>
               ) : null}
+              {pricingRulesStoredOutOfBounds && !pricingRulesParsed.ok ? (
+                <p
+                  id="pricing-rules-stored-warning"
+                  className="mt-1 text-xs text-amber-700 dark:text-amber-400"
+                >
+                  {t_sites("form.pricingRulesStoredOutOfBounds", {
+                    detail: pricingRulesErrorText(pricingRulesParsed.reason),
+                  })}
+                </p>
+              ) : null}
               <Textarea
                 id="pricing_rules"
                 name="pricing_rules"
@@ -483,11 +496,15 @@ export default function SiteFormClient({
                 spellCheck={false}
                 className="mt-1.5 font-mono text-sm resize-y"
                 placeholder={t_sites("form.pricingRulesPlaceholder")}
-                aria-describedby={
-                  showPricingRulesInlineError
-                    ? "pricing-rules-hint pricing-rules-error"
-                    : "pricing-rules-hint"
-                }
+                aria-describedby={[
+                  "pricing-rules-hint",
+                  pricingRulesStoredOutOfBounds
+                    ? "pricing-rules-stored-warning"
+                    : null,
+                  showPricingRulesInlineError ? "pricing-rules-error" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 aria-invalid={showPricingRulesInlineError}
               />
               <p

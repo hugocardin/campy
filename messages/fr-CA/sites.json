@@ -41,6 +41,7 @@
     "pricingRulesHint": "Objet JSON facultatif (max. {max, number} caractères une fois minifié). La mise en forme n’est pas conservée. Doit être un objet, pas un tableau. La recherche utilise encore le prix de base par nuit jusqu’à ce que la réservation gère les règles selon les dates.",
     "pricingRulesEmpty": "Aucune (objet vide)",
     "pricingRulesUnexpected": "La valeur enregistrée n’était pas un objet JSON et a été remplacée par un objet vide pour l’édition. L’enregistrement l’écrasera.",
+    "pricingRulesStoredOutOfBounds": "La valeur enregistrée dépasse les limites autorisées; elle sera conservée telle quelle sauf si vous modifiez ce champ. {detail}",
     "pricingRulesViewHint": "JSON opaque pour une tarification dynamique future — pas encore appliqué à la recherche."
   },
 

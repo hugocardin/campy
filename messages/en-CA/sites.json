@@ -41,6 +41,7 @@
     "pricingRulesHint": "Optional JSON object (max {max, number} characters when minified). Formatting is not preserved. Must be an object, not an array. Guest search still uses the base nightly price until booking supports date-aware rules.",
     "pricingRulesEmpty": "None (empty object)",
     "pricingRulesUnexpected": "Stored value was not a JSON object and was replaced with an empty object for editing. Saving will overwrite it.",
+    "pricingRulesStoredOutOfBounds": "Stored value is outside the allowed limits; it will be kept unchanged unless you edit it. {detail}",
     "pricingRulesViewHint": "Opaque JSON for future dynamic pricing — not applied to guest search yet."
   },
 

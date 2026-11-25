@@ -2,7 +2,12 @@ import { Site } from "@/entities/sites";
 import type { DrivewayType } from "@/lib/driveway-type";
 import type { ElectricityAmp } from "@/lib/electricity-amps";
 import { normalizeElectricityAmps } from "@/lib/electricity-amps";
-import { formatPricingRulesForEditor } from "@/lib/site-pricing-rules";
+import {
+  formatPricingRulesForEditor,
+  parsePricingRulesInput,
+  type ParsePricingRulesResult,
+  type PricingRulesObject,
+} from "@/lib/site-pricing-rules";
 
 export type SiteFormData = {
   id?: string;
@@ -19,6 +24,77 @@ export type SiteFormData = {
   /** Loaded column had a non-object shape (pre-CHECK legacy). */
   pricing_rules_unexpected?: boolean;
 };
+
+export type ResolvePricingRulesFormStateInput = {
+  isEdit: boolean;
+  text: string;
+  initialText: string;
+  unexpected?: boolean;
+};
+
+export type ResolvePricingRulesFormStateResult = {
+  dirty: boolean;
+  /** True when create/dirty edit has invalid JSON — blocks Save. */
+  blocking: boolean;
+  /**
+   * Edit with unchanged out-of-bounds stored text: do not block Save, but
+   * surface a non-blocking amber warning.
+   */
+  storedOutOfBounds: boolean;
+  /** Omit (`undefined`) when edit && !dirty; otherwise the parsed object. */
+  payload: PricingRulesObject | undefined;
+  parsed: ParsePricingRulesResult;
+};
+
+/**
+ * Pure dirty / blocking / omit / warning rules for the pricing_rules editor.
+ * Callers must abort submit when `blocking` is true before reading `payload`.
+ */
+export function resolvePricingRulesFormState(
+  input: ResolvePricingRulesFormStateInput,
+): ResolvePricingRulesFormStateResult {
+  const parsed = parsePricingRulesInput(input.text);
+  const dirty =
+    input.text !== input.initialText || Boolean(input.unexpected);
+  const blocking = (!input.isEdit || dirty) && !parsed.ok;
+  const storedOutOfBounds = input.isEdit && !dirty && !parsed.ok;
+
+  if (blocking) {
+    return {
+      dirty,
+      blocking: true,
+      storedOutOfBounds: false,
+      payload: undefined,
+      parsed,
+    };
+  }
+
+  // Unchanged edit: omit column (keeps stored value, even if out of bounds).
+  if (input.isEdit && !dirty) {
+    return {
+      dirty: false,
+      blocking: false,
+      storedOutOfBounds,
+      payload: undefined,
+      parsed,
+    };
+  }
+
+  // Create or dirty edit and not blocking ⇒ parse succeeded.
+  if (!parsed.ok) {
+    throw new Error(
+      "resolvePricingRulesFormState: expected valid parse when not blocking",
+    );
+  }
+
+  return {
+    dirty,
+    blocking: false,
+    storedOutOfBounds: false,
+    payload: parsed.data,
+    parsed,
+  };
+}
 
 /**
  * Converts a Site entity (or null for create) into the shape expected by SiteFormClient's initialData prop.
