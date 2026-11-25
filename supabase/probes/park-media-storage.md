@@ -31,6 +31,18 @@ Expect: no `cover_photo`, no bucket, no `park_media%` policies.
 6. `append_site_photo(uuid,uuid,text)` uses a fixed 12-photo cap
    (`20261125032045_park_media_append_cap.sql`); browser uploads to Storage, then
    Server Actions only commit URLs (no raised `serverActions.bodySizeLimit`).
+7. Guest search RPCs return `cover_photo` (`20261125033810_search_rpc_cover_photo.sql`,
+   [#57](https://github.com/hugocardin/campy/issues/57)) — no `enrichCampgroundCovers`.
+
+```sql
+SELECT cover_photo IS NOT NULL AS has_cover
+FROM search_campgrounds(result_limit := 5)
+LIMIT 5;
+
+SELECT cover_photo IS NOT NULL AS has_cover
+FROM search_campgrounds_near(49.28, -123.12, 100000, result_limit := 5)
+LIMIT 5;
+```
 
 ## Manual smoke
 

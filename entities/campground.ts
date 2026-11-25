@@ -29,7 +29,7 @@ export interface Campground {
   phone: string;
   /**
    * Public park-media cover URL when set; null → guest UI uses placeholder.
-   * Enriched from `v_campgrounds.cover_photo` / search enrichment.
+   * From `v_campgrounds.cover_photo` / search RPC `cover_photo` (#57).
    */
   coverPhoto: string | null;
 }

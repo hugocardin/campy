@@ -36,7 +36,6 @@ import {
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 
@@ -116,46 +115,6 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
     phone: row.phone ?? "",
     coverPhoto: normalizeParkMediaUrl(row.cover_photo),
   };
-}
-
-/**
- * Search RPCs do not return cover_photo yet — batch-enrich from v_campgrounds
- * so guest cards can render real covers without rewriting search SQL.
- *
- * TODO(#57): return cover_photo from search_campgrounds_* and remove this enrichment.
- */
-async function enrichCampgroundCovers(
-  supabase: SupabaseClient,
-  campgrounds: Campground[],
-): Promise<Campground[]> {
-  if (campgrounds.length === 0) return campgrounds;
-
-  const ids = campgrounds.map((c) => c.id);
-  const result = await handleDbResponse(
-    supabase
-      .from("v_campgrounds")
-      .select("id, cover_photo")
-      .in("id", ids),
-  );
-
-  if (!result.success) {
-    console.warn(
-      "[getCampgrounds] cover enrich failed",
-      result.errorCode,
-      result.details,
-    );
-    return campgrounds;
-  }
-
-  const byId = new Map<string, string | null>();
-  for (const row of result.data as { id: string; cover_photo: string | null }[]) {
-    byId.set(row.id, normalizeParkMediaUrl(row.cover_photo));
-  }
-
-  return campgrounds.map((c) => ({
-    ...c,
-    coverPhoto: byId.get(c.id) ?? c.coverPhoto,
-  }));
 }
 
 /**
@@ -369,8 +328,7 @@ export const getCampgrounds = cache(
         if (truncated) {
           rows = rows.slice(0, SEARCH_CAMPGROUNDS_LIMIT);
         }
-        const withCovers = await enrichCampgroundCovers(supabase, rows);
-        return resultSuccess({ campgrounds: withCovers, truncated });
+        return resultSuccess({ campgrounds: rows, truncated });
       }
 
       const nonGeoSort =
@@ -398,10 +356,9 @@ export const getCampgrounds = cache(
 
       const mapped = (result.data as CampgroundRow[]).map(toCampgroundDomain);
       const truncated = mapped.length > SEARCH_CAMPGROUNDS_LIMIT;
-      const sliced = truncated
+      const campgrounds = truncated
         ? mapped.slice(0, SEARCH_CAMPGROUNDS_LIMIT)
         : mapped;
-      const campgrounds = await enrichCampgroundCovers(supabase, sliced);
       return resultSuccess({ campgrounds, truncated });
     } catch (err) {
       return handleUnexpectedError(err);
