@@ -43,8 +43,11 @@ const SITE_PHOTO_CAP_MARKER = "park_media_site_photos_at_cap";
 
 /** Cap orphan deletes per RPC page (matches SQL default). */
 const ORPHAN_SWEEP_LIMIT = 1000;
-/** Safety cap on keyset pages per admin click. */
-const ORPHAN_SWEEP_MAX_PAGES = 50;
+/**
+ * Keyset pages per admin click. Keep small: each page re-scans the whole
+ * bucket + storage.remove, and serverless maxDuration is tight.
+ */
+const ORPHAN_SWEEP_MAX_PAGES = 5;
 
 /** True when supabase-js surfaced a Postgres/PostgREST SQLSTATE (not a transport drop). */
 function isPostgresRejection(error: {
@@ -527,8 +530,10 @@ export async function removeSitePhotoAction(
  * errors. Skips objects younger than the grace window (upload→commit race)
  * and NULL `created_at` (counted separately). Keyset-batched via `p_limit` /
  * `p_after` / `next_after` (auto-advances; stuck pages skip ahead via
- * `nextAfter` and count as `notRemoved`). Storage remove failures are
- * `notRemoved`. No cron yet — manual admin only.
+ * `nextAfter` and count as `notRemoved`). `scanned` / skipped counts are
+ * pinned from page 0 (bucket at start). A failure after page 0 returns
+ * success with totals so far + `stoppedEarly` instead of discarding deletes.
+ * Storage remove failures are `notRemoved`. No cron yet — manual admin only.
  */
 export async function sweepOrphanParkMediaAction(): Promise<
   ActionResult<{
@@ -538,6 +543,7 @@ export async function sweepOrphanParkMediaAction(): Promise<
     skippedYoung: number;
     skippedUnknownAge: number;
     hasMore: boolean;
+    stoppedEarly: string | null;
   }>
 > {
   const auth = await requirePlatformAdmin();
@@ -564,6 +570,22 @@ export async function sweepOrphanParkMediaAction(): Promise<
     let removed = 0;
     let notRemoved = 0;
     let hasMore = false;
+    let stoppedEarly: string | null = null;
+
+    const logPartialAndStop = (reason: string, page: number) => {
+      console.warn(
+        "[park-media] orphan sweep stopped early after partial deletes",
+        `page=${page}`,
+        `reason=${reason}`,
+        `scanned=${scanned}`,
+        `removed=${removed}`,
+        `notRemoved=${notRemoved}`,
+        `skippedYoung=${skippedYoung}`,
+        `skippedUnknownAge=${skippedUnknownAge}`,
+      );
+      stoppedEarly = reason;
+      hasMore = true;
+    };
 
     for (let page = 0; page < ORPHAN_SWEEP_MAX_PAGES; page += 1) {
       const { data, error } = await supabase.rpc("list_orphan_park_media", {
@@ -572,10 +594,23 @@ export async function sweepOrphanParkMediaAction(): Promise<
         p_limit: ORPHAN_SWEEP_LIMIT,
         p_after: after,
       });
-      if (error) return mapPostgrestError(error);
+      if (error) {
+        if (page > 0) {
+          logPartialAndStop(
+            error.code?.trim() || error.message || "rpc_error",
+            page,
+          );
+          break;
+        }
+        return mapPostgrestError(error);
+      }
 
       const listed = parseOrphanParkMediaRpc(data);
       if (!listed) {
+        if (page > 0) {
+          logPartialAndStop("invalid_orphan_rpc_payload", page);
+          break;
+        }
         console.warn("[park-media] orphan sweep aborted — invalid RPC payload");
         return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
           reason: "invalid_orphan_rpc_payload",
@@ -587,6 +622,10 @@ export async function sweepOrphanParkMediaAction(): Promise<
           typeof listed.reason === "string" && listed.reason
             ? listed.reason
             : "orphan_rpc_aborted";
+        if (page > 0) {
+          logPartialAndStop(reason, page);
+          break;
+        }
         console.warn(
           "[park-media] orphan sweep aborted —",
           reason,
@@ -602,15 +641,22 @@ export async function sweepOrphanParkMediaAction(): Promise<
 
       const parsed = orphanPathsFromRpcResult(listed);
       if (!parsed) {
+        if (page > 0) {
+          logPartialAndStop("invalid_orphan_rpc_payload", page);
+          break;
+        }
         console.warn("[park-media] orphan sweep aborted — invalid ok payload");
         return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
           reason: "invalid_orphan_rpc_payload",
         });
       }
 
-      scanned = parsed.scanned;
-      skippedYoung = parsed.skippedYoung;
-      skippedUnknownAge = parsed.skippedUnknownAge;
+      // Bucket totals from the first page only (later pages shrink after deletes).
+      if (page === 0) {
+        scanned = parsed.scanned;
+        skippedYoung = parsed.skippedYoung;
+        skippedUnknownAge = parsed.skippedUnknownAge;
+      }
       hasMore = parsed.hasMore;
 
       if (parsed.paths.length === 0) {
@@ -631,8 +677,8 @@ export async function sweepOrphanParkMediaAction(): Promise<
       after = parsed.nextAfter;
     }
 
-    // Invite another click when more remain (including after page-cap).
-    const inviteMore = hasMore;
+    // Invite another click when more remain (page-cap or mid-loop stop).
+    const inviteMore = hasMore || stoppedEarly != null;
 
     if (notRemoved > 0 || inviteMore) {
       console.warn(
@@ -643,6 +689,7 @@ export async function sweepOrphanParkMediaAction(): Promise<
         `skippedYoung=${skippedYoung}`,
         `skippedUnknownAge=${skippedUnknownAge}`,
         `hasMore=${hasMore}`,
+        `stoppedEarly=${stoppedEarly ?? ""}`,
         `inviteMore=${inviteMore}`,
       );
     }
@@ -654,6 +701,7 @@ export async function sweepOrphanParkMediaAction(): Promise<
       skippedYoung,
       skippedUnknownAge,
       hasMore: inviteMore,
+      stoppedEarly,
     });
   } catch (err) {
     return handleUnexpectedError(err);

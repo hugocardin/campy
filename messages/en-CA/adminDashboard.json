@@ -13,6 +13,7 @@
     "confirm": "Delete park-media objects that are not referenced by any cover or site photo and are older than 24 hours? Referenced media is kept. The sweep aborts if checks look incomplete.",
     "result": "Scanned {scanned, plural, one {# object} other {# objects}}. Removed {removed, number}. Not removed {notRemoved, number}. Skipped recent {skippedYoung, number}.",
     "skippedUnknownAgeHint": "Skipped unknown age {skippedUnknownAge, number}.",
+    "stoppedEarlyHint": "Stopped early after a mid-sweep listing error; removals so far are kept — run again.",
     "hasMoreHint": "More orphans remain — run again."
   },
 

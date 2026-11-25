@@ -59,7 +59,9 @@ export function ParkMediaSweepCard() {
           skippedUnknownAge: result.data.skippedUnknownAge,
         })}`;
       }
-      // Only when more remain and this run deleted something (avoids stuck-page loop).
+      if (result.data.stoppedEarly) {
+        summary = `${summary} ${t("stoppedEarlyHint")}`;
+      }
       if (result.data.hasMore) {
         summary = `${summary} ${t("hasMoreHint")}`;
       }
