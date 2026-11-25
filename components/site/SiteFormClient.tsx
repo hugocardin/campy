@@ -4,7 +4,10 @@ import { Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
-import { SiteFormData } from "@/components/site/site-form-utils";
+import {
+  resolvePricingRulesFormState,
+  type SiteFormData,
+} from "@/components/site/site-form-utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -41,6 +44,13 @@ import {
 } from "@/lib/errors";
 import type { GuestPriceCurrency } from "@/lib/campground-price";
 import { GUEST_PRICE_CURRENCY } from "@/lib/campground-price";
+import {
+  PRICING_RULES_MAX_CHARS,
+  PRICING_RULES_MAX_DEPTH,
+  type ParsePricingRulesReason,
+  isParsePricingRulesReason,
+  pricingRulesErrorMessageKey,
+} from "@/lib/site-pricing-rules";
 
 const AMP_LABEL_KEYS = {
   15: "amp15",
@@ -76,8 +86,12 @@ export default function SiteFormClient({
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [pricingRulesTouched, setPricingRulesTouched] = useState(false);
+  const [pricingRulesSubmitAttempted, setPricingRulesSubmitAttempted] =
+    useState(false);
 
   // initialData.max_rig_length is canonical feet (string from site-form-utils).
+  // Create mode starts blank (parses to {}); edit loads pretty/compact text.
   const [form, setForm] = useState<SiteFormData>(() => ({
     name: initialData?.name ?? "",
     description: initialData?.description ?? "",
@@ -89,6 +103,8 @@ export default function SiteFormClient({
       initialData?.electricity_amps ?? [],
     ),
     driveway_type: initialData?.driveway_type ?? "",
+    pricing_rules: initialData?.pricing_rules ?? "",
+    pricing_rules_unexpected: initialData?.pricing_rules_unexpected,
   }));
 
   const {
@@ -119,18 +135,61 @@ export default function SiteFormClient({
   );
 
   const maxRigParsed = parseRigDraft();
+  const initialPricingRulesText = initialData?.pricing_rules ?? "";
+  const isEdit = Boolean(initialData?.id);
+  const pricingRulesState = useMemo(
+    () =>
+      resolvePricingRulesFormState({
+        isEdit,
+        text: form.pricing_rules,
+        initialText: initialPricingRulesText,
+        unexpected: form.pricing_rules_unexpected,
+      }),
+    [
+      isEdit,
+      form.pricing_rules,
+      form.pricing_rules_unexpected,
+      initialPricingRulesText,
+    ],
+  );
+  const {
+    blocking: pricingRulesBlocking,
+    storedOutOfBounds: pricingRulesStoredOutOfBounds,
+    payload: pricingRulesForPayload,
+    parsed: pricingRulesParsed,
+  } = pricingRulesState;
+
+  const pricingRulesErrorText = (
+    reason: ParsePricingRulesReason,
+  ): string => {
+    const key = pricingRulesErrorMessageKey(reason);
+    if (key === "pricingRulesTooLong") {
+      return t_sites(`errors.${key}`, { max: PRICING_RULES_MAX_CHARS });
+    }
+    if (key === "pricingRulesTooDeep") {
+      return t_sites(`errors.${key}`, { max: PRICING_RULES_MAX_DEPTH });
+    }
+    return t_sites(`errors.${key}`);
+  };
+
+  const showPricingRulesInlineError =
+    (pricingRulesTouched || pricingRulesSubmitAttempted) &&
+    pricingRulesBlocking;
+
   const isFormValid = Boolean(
     form.name.trim() &&
     form.site_type_id &&
     form.price_per_night &&
     !isNaN(parseFloat(form.price_per_night)) &&
     !isNaN(parseFloat(form.min_stay_nights || "0")) &&
-    (!requiresMaxRig || maxRigParsed.ok),
+    (!requiresMaxRig || maxRigParsed.ok) &&
+    !pricingRulesBlocking,
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setPricingRulesSubmitAttempted(true);
 
     const maxRigParsedSubmit = parseRigDraft();
     const pricePerNightNum = parseFloat(form.price_per_night);
@@ -162,6 +221,11 @@ export default function SiteFormClient({
       return setError(t_sites("errors.typeRequired"));
     }
 
+    // blocking ⇒ !parsed.ok (resolvePricingRulesFormState invariant)
+    if (!pricingRulesParsed.ok && pricingRulesBlocking) {
+      return setError(pricingRulesErrorText(pricingRulesParsed.reason));
+    }
+
     const driveway: DrivewayType | null = isLodging
       ? null
       : form.driveway_type === ""
@@ -182,12 +246,18 @@ export default function SiteFormClient({
       min_stay_nights: isNaN(minStayNightsNum) ? undefined : minStayNightsNum,
       electricity_amps: normalizeElectricityAmps(form.electricity_amps),
       driveway_type: driveway,
+      pricing_rules: pricingRulesForPayload,
     };
 
     startTransition(async () => {
       const result = await onSubmit(campgroundId, payload);
 
       if (!result.success) {
+        const serverReason = result.details?.reason;
+        const pricingFieldMessage = isParsePricingRulesReason(serverReason)
+          ? pricingRulesErrorText(serverReason)
+          : t_sites("errors.pricingRulesInvalidJson");
+
         setError(
           withErrorReference(
             translateErrorCode(
@@ -200,6 +270,12 @@ export default function SiteFormClient({
                   electricity_amps: t_sites("errors.invalidElectricityAmps"),
                   driveway_type: t_sites("errors.invalidDrivewayType"),
                   max_rig_length: t_sites("errors.maxRigLengthRequired"),
+                  pricing_rules: pricingFieldMessage,
+                },
+                fieldTooLongMessages: {
+                  pricing_rules: t_sites("errors.pricingRulesTooLong", {
+                    max: PRICING_RULES_MAX_CHARS,
+                  }),
                 },
               },
             ),
@@ -389,6 +465,64 @@ export default function SiteFormClient({
                 className="mt-1.5"
                 placeholder={t_sites("form.minStayNightPlaceholder")}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="pricing_rules">
+                {t_sites("form.pricingRulesLabel")}
+              </Label>
+              {form.pricing_rules_unexpected ? (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                  {t_sites("form.pricingRulesUnexpected")}
+                </p>
+              ) : null}
+              {pricingRulesStoredOutOfBounds && !pricingRulesParsed.ok ? (
+                <p
+                  id="pricing-rules-stored-warning"
+                  className="mt-1 text-xs text-amber-700 dark:text-amber-400"
+                >
+                  {t_sites("form.pricingRulesStoredOutOfBounds", {
+                    detail: pricingRulesErrorText(pricingRulesParsed.reason),
+                  })}
+                </p>
+              ) : null}
+              <Textarea
+                id="pricing_rules"
+                name="pricing_rules"
+                value={form.pricing_rules}
+                onChange={handleChange}
+                onBlur={() => setPricingRulesTouched(true)}
+                rows={8}
+                spellCheck={false}
+                className="mt-1.5 font-mono text-sm resize-y"
+                placeholder={t_sites("form.pricingRulesPlaceholder")}
+                aria-describedby={[
+                  "pricing-rules-hint",
+                  pricingRulesStoredOutOfBounds
+                    ? "pricing-rules-stored-warning"
+                    : null,
+                  showPricingRulesInlineError ? "pricing-rules-error" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-invalid={showPricingRulesInlineError}
+              />
+              <p
+                id="pricing-rules-hint"
+                className="mt-1 text-xs text-muted-foreground"
+              >
+                {t_sites("form.pricingRulesHint", {
+                  max: PRICING_RULES_MAX_CHARS,
+                })}
+              </p>
+              {showPricingRulesInlineError && !pricingRulesParsed.ok ? (
+                <p
+                  id="pricing-rules-error"
+                  className="mt-1 text-xs text-destructive"
+                >
+                  {pricingRulesErrorText(pricingRulesParsed.reason)}
+                </p>
+              ) : null}
             </div>
 
             {!isLodging ? (

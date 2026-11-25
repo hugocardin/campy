@@ -35,7 +35,14 @@
     "drivewayPlaceholder": "Inconnu / non défini",
     "drivewayPullThrough": "Traversante",
     "drivewayBackIn": "En marche arrière",
-    "drivewayHint": "Facultatif. Utilisé dans la recherche lorsque les visiteurs filtrent par allée."
+    "drivewayHint": "Facultatif. Utilisé dans la recherche lorsque les visiteurs filtrent par allée.",
+    "pricingRulesLabel": "Règles de prix (JSON)",
+    "pricingRulesPlaceholder": "Objet vide, ou clés comme weekend / season / per-person",
+    "pricingRulesHint": "Objet JSON facultatif (max. {max, number} caractères une fois minifié). La mise en forme n’est pas conservée. Doit être un objet, pas un tableau. La recherche utilise encore le prix de base par nuit jusqu’à ce que la réservation gère les règles selon les dates.",
+    "pricingRulesEmpty": "Aucune (objet vide)",
+    "pricingRulesUnexpected": "La valeur enregistrée n’était pas un objet JSON et a été remplacée par un objet vide pour l’édition. L’enregistrement l’écrasera.",
+    "pricingRulesStoredOutOfBounds": "La valeur enregistrée dépasse les limites autorisées; elle sera conservée telle quelle sauf si vous modifiez ce champ. {detail}",
+    "pricingRulesViewHint": "JSON opaque pour une tarification dynamique future — pas encore appliqué à la recherche."
   },
 
   "electricityAmps": {
@@ -57,7 +64,14 @@
     "invalidPricePerNight": "Prix par nuit invalide",
     "invalidMinStayNights": "Nombre minimal de nuits invalide",
     "invalidElectricityAmps": "Choisissez uniquement parmi 15, 20, 30 ou 50 ampères",
-    "invalidDrivewayType": "Choisissez traversante, marche arrière, ou laissez vide"
+    "invalidDrivewayType": "Choisissez traversante, marche arrière, ou laissez vide",
+    "pricingRulesInvalidJson": "Les règles de prix doivent être un JSON valide",
+    "pricingRulesNotObject": "Les règles de prix doivent être un objet JSON (pas un tableau ni une valeur seule)",
+    "pricingRulesTooLong": "Les règles de prix doivent compter au plus {max, number} caractères une fois minifiées",
+    "pricingRulesForbiddenKey": "Les règles de prix ne peuvent pas utiliser les clés __proto__, constructor ou prototype",
+    "pricingRulesNonFiniteNumber": "Les règles de prix ne peuvent pas contenir Infinity ni NaN",
+    "pricingRulesTooDeep": "Les règles de prix peuvent être imbriquées sur au plus {max, number} niveaux",
+    "pricingRulesSharedRef": "Les règles de prix ne peuvent pas réutiliser le même objet à plusieurs endroits"
   },
 
   "actions": {
