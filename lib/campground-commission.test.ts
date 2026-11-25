@@ -373,19 +373,27 @@ describe("commission DB guard migration pins", () => {
     assert.ok(
       sql.includes(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.typeMissing),
     );
-    // Rename-refuse DETAIL is admin/SQL-only; intentionally not in GUARD_RESULTS.
+  });
+
+  it("pins rename-lock DETAIL on latest refuse-rename function", () => {
+    // Intentionally unmapped in GUARD_RESULTS (admin/SQL-only path).
+    const sql = latestMigrationMatching(
+      /CREATE OR REPLACE FUNCTION\s+public\.commission_types_refuse_name_rename\s*\(/i,
+    );
     assert.ok(sql.includes(COMMISSION_TYPES_NAME_LOCKED_DETAIL));
   });
 
   it("pins NaN clause on latest nonneg CHECK redefine", () => {
     const sql = latestMigrationMatching(
-      /campgrounds_commission_value_nonneg_chk/i,
+      /ADD CONSTRAINT\s+campgrounds_commission_value_nonneg_chk/i,
     );
     assert.match(sql, /commission_value <> 'NaN'::numeric/);
   });
 
   it("pins commission_types.name CHECK to COMMISSION_TYPE_NAMES", () => {
-    const sql = latestMigrationMatching(/commission_types_name_chk/i);
+    const sql = latestMigrationMatching(
+      /ADD CONSTRAINT\s+commission_types_name_chk/i,
+    );
     const expected = [...COMMISSION_TYPE_NAMES]
       .map((n) => `'${n}'`)
       .join(",\\s*");

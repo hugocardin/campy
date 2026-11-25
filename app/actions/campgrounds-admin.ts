@@ -75,8 +75,9 @@ function mapCampgroundWriteError(error: PostgrestError): ActionResult<never> {
     });
   }
 
-  // numeric_value_out_of_range from numeric(p,s) overflow only (not integer
-  // overflow / other columns). Message is Postgres: "numeric field overflow".
+  // Postgres "numeric field overflow" (any numeric(p,s) overflow — not integer
+  // out of range). Assumes commission_value is the only numeric(p,s) column in
+  // campground writes; revisit if another is added.
   if (
     error.code === "22003" &&
     /numeric field overflow/i.test(error.message)
