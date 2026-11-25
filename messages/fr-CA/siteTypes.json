@@ -1,0 +1,32 @@
+{
+  "singular": "Type d'emplacement",
+  "plural": "Types d'emplacement",
+  "noResult": "Aucun type d'emplacement",
+
+  "form": {
+    "codeLabel": "Code du type d'emplacement",
+    "createCodePlaceholder": "ex. TENT, RV, LODGING"
+  },
+
+  "errors": {
+    "codeRequired": "Le code du type d'emplacement est obligatoire, mais n'a pas été fourni.",
+    "codeTooLong": "Le code du type d'emplacement doit comporter au plus {max} caractères.",
+    "systemCodeProtected": "TENT, RV, RV_AND_TENT et LODGING sont utilisés par les formulaires d'emplacement, la recherche invitée et les règles de la base de données, et ne peuvent pas être supprimés."
+  },
+
+  "actions": {
+    "deleteSiteTypeTitle": "Supprimer le type d'emplacement",
+    "confirmSiteTypeDeletion": "Supprimer le type d'emplacement «\u00A0{code}\u00A0»? Cette action est irréversible."
+  },
+
+  "AdminSiteTypesPage": {
+    "pageHeader": {
+      "title": "Gérer les types d'emplacement",
+      "description": "Ajouter, modifier ou retirer des types d'emplacement"
+    },
+    "meta": {
+      "title": "Types d'emplacement | Administration | Campy",
+      "description": "Gérer les types d'emplacement disponibles."
+    }
+  }
+}

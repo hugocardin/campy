@@ -22,6 +22,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     profile,
     search,
     sites,
+    siteTypes,
   ] = await Promise.all([
     import(`../messages/${locale}/adminDashboard.json`).then((m) => m.default),
     import(`../messages/${locale}/amenities.json`).then((m) => m.default),
@@ -35,6 +36,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../messages/${locale}/profile.json`).then((m) => m.default),
     import(`../messages/${locale}/search.json`).then((m) => m.default),
     import(`../messages/${locale}/sites.json`).then((m) => m.default),
+    import(`../messages/${locale}/siteTypes.json`).then((m) => m.default),
   ]);
 
   return {
@@ -50,6 +52,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       profile,
       search,
       sites,
+      siteTypes,
     },
   };
 });
