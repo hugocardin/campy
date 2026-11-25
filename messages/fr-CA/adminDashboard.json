@@ -3,6 +3,15 @@
   "amenityCategoriesDescription": "Organiser les commodités en groupes (Services, Installations, etc.)",
   "campgroundDescription": "Organiser les campings",
 
+  "parkMediaSweep": {
+    "title": "Nettoyage des médias park-media",
+    "description": "Supprimer les objets Storage park-media qui ne sont référencés par aucune couverture de camping ni photo d'emplacement. Sans danger à relancer; ne supprime pas les médias en usage.",
+    "run": "Balayer les orphelins",
+    "running": "Balayage…",
+    "confirm": "Analyser park-media et supprimer les objets non référencés? Les couvertures et photos d'emplacement en usage sont conservées.",
+    "result": "{scanned, number} objets analysés. {removed, number} supprimés. {failed, number} échecs."
+  },
+
   "AdminDashboardPage": {
     "pageHeader": {
       "title": "Tableau de bord administrateur",

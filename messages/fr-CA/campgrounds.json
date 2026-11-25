@@ -55,7 +55,9 @@
     "createCampground": "Créer un camping",
     "confirmDeActivateAction": "{action, select, activate {Voulez-vous vraiment activer «\u00A0{name}\u00A0»?} other {Voulez-vous vraiment désactiver «\u00A0{name}\u00A0»?}}",
     "activate": "Activer",
-    "deactivate": "Désactiver"
+    "deactivate": "Désactiver",
+    "deleteCampgroundTitle": "Supprimer le camping ?",
+    "deleteCampgroundDescription": "Supprimer définitivement «\u00A0{name}\u00A0», ses emplacements et les médias park-media du stockage. Préférez désactiver si vous pourriez réutiliser le camping. Les campings avec des réservations ne peuvent pas être supprimés."
   },
 
   "AdminCampgroundsPage": {

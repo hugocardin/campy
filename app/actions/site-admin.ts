@@ -12,7 +12,11 @@ import {
   CommonErrorCode,
   DbErrorCode,
   resultError,
+  resultSuccess,
 } from "@/lib/errors";
+import { isUuid } from "@/lib/is-uuid";
+import { sitePhotoPathPrefix } from "@/lib/park-media";
+import { removeParkMediaByPrefix } from "@/lib/park-media-storage";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import {
@@ -25,6 +29,7 @@ import {
   handleDbResponse,
   handleDbSingle,
   handleUnexpectedError,
+  mapPostgrestError,
 } from "@/lib/supabase/db-utils";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
@@ -271,6 +276,72 @@ export async function createSiteAction(
     href: routes.platformAdmin.campgroundSiteView(campgroundId, newSiteId),
     locale,
   });
+}
+
+/**
+ * Hard-delete a site. Storage under `{campgroundId}/sites/{siteId}/` is
+ * cleaned best-effort after the row delete (failures are logged only — #57).
+ * Bookings FK is ON DELETE RESTRICT → DB_RESOURCE_IN_USE when booked.
+ */
+export async function deleteSiteAction(
+  campgroundId: string,
+  siteId: string,
+): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
+  if (!isUuid(campgroundId) || !isUuid(siteId)) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: !isUuid(campgroundId) ? "campgroundId" : "siteId",
+    });
+  }
+
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("sites")
+      .delete()
+      .eq("id", siteId)
+      .eq("campground_id", campgroundId)
+      .select("id");
+
+    if (error) {
+      if (error.code === "23503") {
+        return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
+          reason: "resource_in_use",
+        });
+      }
+      return mapPostgrestError(error);
+    }
+
+    if (!data || data.length === 0) {
+      return resultError(DbErrorCode.DB_NOT_FOUND, {
+        reason: "not_deleted",
+      });
+    }
+
+    // Row gone — Storage cleanup must not fail the action.
+    try {
+      await removeParkMediaByPrefix(
+        supabase,
+        sitePhotoPathPrefix(campgroundId, siteId),
+      );
+    } catch (err) {
+      console.warn("[park-media] site delete storage cleanup threw", err);
+    }
+
+    revalidateLocalizedPath(routes.platformAdmin.campgroundSites(campgroundId));
+    revalidateLocalizedPath(routes.platformAdmin.campgroundView(campgroundId));
+    revalidateLocalizedPath(routes.campgroundDetail(campgroundId));
+    revalidateLocalizedPath(routes.home());
+
+    return resultSuccess();
+  } catch (err) {
+    return handleUnexpectedError(err);
+  }
 }
 
 export async function updateSiteAmenitiesAction({

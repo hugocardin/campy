@@ -15,9 +15,15 @@ import {
   PARK_MEDIA_BUCKET,
   PARK_MEDIA_MAX_SITE_PHOTOS,
   parkMediaObjectPathFromPublicUrl,
+  parkMediaOrphanObjectPaths,
   parkMediaUrlMatchesPrefix,
+  referencedParkMediaObjectPaths,
   sitePhotoPathPrefix,
 } from "@/lib/park-media";
+import {
+  listParkMediaObjectPaths,
+  removeParkMediaObjectPaths,
+} from "@/lib/park-media-storage";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import { isUuid } from "@/lib/is-uuid";
@@ -496,6 +502,72 @@ export async function removeSitePhotoAction(
     safeRevalidateSiteMedia(campgroundId, siteId);
     return resultSuccess({
       photos: coerceSitePhotoEntries(data),
+    });
+  } catch (err) {
+    return handleUnexpectedError(err);
+  }
+}
+
+/**
+ * Admin orphan sweep (#57): remove park-media objects not referenced by
+ * `campgrounds.cover_photo` or `sites.photos`. Best-effort — never fails the
+ * action solely because a Storage delete failed (counts are returned).
+ * No cron/job runner yet; call manually from platform admin when needed.
+ */
+export async function sweepOrphanParkMediaAction(): Promise<
+  ActionResult<{ scanned: number; removed: number; failed: number }>
+> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) return auth;
+
+  try {
+    const supabase = await createClient();
+
+    const [coversRes, sitesRes] = await Promise.all([
+      supabase.from("campgrounds").select("cover_photo"),
+      supabase.from("sites").select("photos"),
+    ]);
+
+    if (coversRes.error) return mapPostgrestError(coversRes.error);
+    if (sitesRes.error) return mapPostgrestError(sitesRes.error);
+
+    const referenced = referencedParkMediaObjectPaths(
+      (coversRes.data ?? []).map(
+        (row) => (row as { cover_photo?: string | null }).cover_photo,
+      ),
+      (sitesRes.data ?? []).map((row) => (row as { photos?: unknown }).photos),
+    );
+
+    const listed = await listParkMediaObjectPaths(supabase, "");
+    const orphans = parkMediaOrphanObjectPaths(listed, referenced);
+
+    if (orphans.length === 0) {
+      return resultSuccess({
+        scanned: listed.length,
+        removed: 0,
+        failed: 0,
+      });
+    }
+
+    const { removed, failed } = await removeParkMediaObjectPaths(
+      supabase,
+      orphans,
+    );
+
+    if (failed > 0) {
+      console.warn(
+        "[park-media] orphan sweep incomplete",
+        `scanned=${listed.length}`,
+        `orphans=${orphans.length}`,
+        `removed=${removed}`,
+        `failed=${failed}`,
+      );
+    }
+
+    return resultSuccess({
+      scanned: listed.length,
+      removed,
+      failed,
     });
   } catch (err) {
     return handleUnexpectedError(err);

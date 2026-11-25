@@ -65,11 +65,54 @@ export function campgroundCoverPathPrefix(campgroundId: string): string {
   return `${campgroundId}/cover/`;
 }
 
+/** Entire park tree: cover + all site folders (`{campgroundId}/`). */
+export function campgroundMediaPathPrefix(campgroundId: string): string {
+  return `${campgroundId}/`;
+}
+
 export function sitePhotoPathPrefix(
   campgroundId: string,
   siteId: string,
 ): string {
   return `${campgroundId}/sites/${siteId}/`;
+}
+
+/**
+ * Paths under a Storage list that are not referenced by cover_photo / photos.
+ * Used by the admin orphan sweep (#57).
+ */
+export function parkMediaOrphanObjectPaths(
+  listedObjectPaths: readonly string[],
+  referencedObjectPaths: ReadonlySet<string>,
+): string[] {
+  const orphans: string[] = [];
+  for (const path of listedObjectPaths) {
+    if (!path || path.includes("..")) continue;
+    if (!referencedObjectPaths.has(path)) orphans.push(path);
+  }
+  return orphans;
+}
+
+/** Collect Storage object paths referenced by cover / site photo URL columns. */
+export function referencedParkMediaObjectPaths(
+  coverPhotos: readonly (string | null | undefined)[],
+  sitePhotoArrays: readonly unknown[],
+  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+): Set<string> {
+  const refs = new Set<string>();
+  for (const cover of coverPhotos) {
+    const path = cover
+      ? parkMediaObjectPathFromPublicUrl(cover, supabaseUrl)
+      : null;
+    if (path) refs.add(path);
+  }
+  for (const photos of sitePhotoArrays) {
+    for (const url of coerceSitePhotoEntries(photos)) {
+      const path = parkMediaObjectPathFromPublicUrl(url, supabaseUrl);
+      if (path) refs.add(path);
+    }
+  }
+  return refs;
 }
 
 /**

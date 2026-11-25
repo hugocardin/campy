@@ -3,16 +3,20 @@ import { describe, it } from "node:test";
 import {
   CAMPGROUND_COVER_PLACEHOLDER,
   campgroundCoverObjectPath,
+  campgroundMediaPathPrefix,
   coerceSitePhotoEntries,
   isParkMediaMime,
   isParkMediaPublicUrl,
   normalizeParkMediaUrl,
   normalizeSitePhotoUrls,
   parkMediaObjectPathFromPublicUrl,
+  parkMediaOrphanObjectPaths,
   parkMediaPublicUrl,
   parkMediaUrlMatchesPrefix,
+  referencedParkMediaObjectPaths,
   resolveCampgroundCoverSrc,
   sitePhotoObjectPath,
+  sitePhotoPathPrefix,
   sniffParkMediaMime,
 } from "./park-media";
 
@@ -134,6 +138,32 @@ describe("park-media helpers", () => {
     assert.deepEqual(
       coerceSitePhotoEntries([good, "https://evil/x.jpg", null, 1, "  "]),
       [good, "https://evil/x.jpg"],
+    );
+  });
+
+  it("builds campground / site storage prefixes for delete cleanup", () => {
+    assert.equal(campgroundMediaPathPrefix("cg-1"), "cg-1/");
+    assert.equal(sitePhotoPathPrefix("cg-1", "site-2"), "cg-1/sites/site-2/");
+  });
+
+  it("computes orphan object paths vs referenced covers and photos", () => {
+    const cover = parkMediaPublicUrl("cg/cover/a.jpg", PROJECT);
+    const photo = parkMediaPublicUrl("cg/sites/s/b.jpg", PROJECT);
+    const refs = referencedParkMediaObjectPaths(
+      [cover, null, "https://evil/x.jpg"],
+      [[photo, "https://evil/y.jpg"], null],
+      PROJECT,
+    );
+    assert.equal(refs.has("cg/cover/a.jpg"), true);
+    assert.equal(refs.has("cg/sites/s/b.jpg"), true);
+    assert.equal(refs.size, 2);
+
+    assert.deepEqual(
+      parkMediaOrphanObjectPaths(
+        ["cg/cover/a.jpg", "cg/cover/orphan.jpg", "cg/sites/s/b.jpg", "../x"],
+        refs,
+      ),
+      ["cg/cover/orphan.jpg"],
     );
   });
 });

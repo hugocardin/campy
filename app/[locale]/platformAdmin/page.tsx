@@ -6,6 +6,7 @@ import { BackHeader } from "@/components/layout/back-header";
 import { USER_ROLE_PLATEFORMADMIN } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 import { DashboardCards } from "./DashboardCards";
+import { ParkMediaSweepCard } from "./ParkMediaSweepCard";
 import { generatePageMetadata } from "@/lib/utils";
 import { getTranslations } from "next-intl/server";
 
@@ -40,6 +41,7 @@ export default async function AdminDashboard() {
       />
 
       <DashboardCards />
+      <ParkMediaSweepCard />
     </div>
   );
 }

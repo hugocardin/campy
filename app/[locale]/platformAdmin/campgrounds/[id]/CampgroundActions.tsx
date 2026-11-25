@@ -2,11 +2,13 @@
 
 import {
   activateCampgroundAction,
+  deleteCampgroundAction,
   inactivateCampgroundAction,
 } from "@/app/actions/campgrounds-admin";
 import { EditButton } from "@/components/buttons/EditButton";
 import { ManageAmenitiesButton } from "@/components/buttons/ManageAmenitiesButton";
 import { ManageSitesButton } from "@/components/buttons/ManageSitesButton";
+import { DeleteButtonWithConfirmation } from "@/components/dialogs/DeleteButtonWithConfirmation";
 import { Button } from "@/components/ui/button";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { translateErrorCode, withErrorReference } from "@/lib/errors";
@@ -58,9 +60,42 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     });
   };
 
+  const handleDelete = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteCampgroundAction(campground.id);
+      if (!result.success) {
+        setError(
+          withErrorReference(
+            translateErrorCode(
+              result.errorCode,
+              t_errors,
+              tc("error"),
+              result.details,
+            ),
+            result.details,
+            (errorId) => tc("errorReference", { errorId }),
+          ),
+        );
+        return;
+      }
+      router.push(routes.platformAdmin.campgrounds());
+      router.refresh();
+    });
+  };
+
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-3">
+        <DeleteButtonWithConfirmation
+          disabled={isPending}
+          title={t_campgrounds("actions.deleteCampgroundTitle")}
+          description={t_campgrounds("actions.deleteCampgroundDescription", {
+            name: campground.name,
+          })}
+          onConfirm={handleDelete}
+        />
+
         <Button
           variant={campground.active ? "destructive" : "outline-success"}
           onClick={handleToggleStatus}

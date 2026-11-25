@@ -3,6 +3,15 @@
   "amenityCategoriesDescription": "Organize amenities into groups (Services, Facilities, etc.)",
   "campgroundDescription": "Organize campgrounds",
 
+  "parkMediaSweep": {
+    "title": "Park media cleanup",
+    "description": "Remove Storage objects in park-media that are not referenced by any campground cover or site photo. Safe to re-run; does not delete live media.",
+    "run": "Sweep orphan media",
+    "running": "Sweeping…",
+    "confirm": "Scan park-media and delete unreferenced objects? Referenced covers and site photos are kept.",
+    "result": "Scanned {scanned, number} objects. Removed {removed, number}. Failed {failed, number}."
+  },
+
   "AdminDashboardPage": {
     "pageHeader": {
       "title": "Admin Dashboard",

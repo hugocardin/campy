@@ -14,6 +14,9 @@ import {
 } from "@/lib/campground-price";
 import { ActionResult, DbErrorCode, resultError, resultSuccess } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
+import { isUuid } from "@/lib/is-uuid";
+import { campgroundMediaPathPrefix } from "@/lib/park-media";
+import { removeParkMediaByPrefix } from "@/lib/park-media-storage";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
@@ -283,6 +286,70 @@ export async function createCampgroundAction(
     href: routes.platformAdmin.campgroundView(newCampgroundId),
     locale,
   });
+}
+
+/**
+ * Hard-delete a campground (cascades sites / amenity links). Storage under
+ * `{campgroundId}/` is cleaned best-effort after the row delete (#57).
+ * Bookings on any site are ON DELETE RESTRICT → DB_RESOURCE_IN_USE.
+ */
+export async function deleteCampgroundAction(
+  id: string,
+): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
+  if (!isUuid(id)) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "id",
+    });
+  }
+
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("campgrounds")
+      .delete()
+      .eq("id", id)
+      .select("id");
+
+    if (error) {
+      if (error.code === "23503") {
+        return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
+          reason: "resource_in_use",
+        });
+      }
+      return mapPostgrestError(error);
+    }
+
+    if (!data || data.length === 0) {
+      return resultError(DbErrorCode.DB_NOT_FOUND, {
+        reason: "not_deleted",
+      });
+    }
+
+    try {
+      await removeParkMediaByPrefix(supabase, campgroundMediaPathPrefix(id));
+    } catch (err) {
+      console.warn(
+        "[park-media] campground delete storage cleanup threw",
+        err,
+      );
+    }
+
+    revalidateLocalizedPath(routes.home());
+    revalidateLocalizedPath(routes.campgroundDetail(id));
+    revalidateLocalizedPath(routes.platformAdmin.root());
+    revalidateLocalizedPath(routes.platformAdmin.campgrounds());
+    revalidateTag(CAMPGROUND_PROVINCES_CACHE_TAG, "max");
+
+    return resultSuccess();
+  } catch (err) {
+    return handleUnexpectedError(err);
+  }
 }
 
 export async function updateCampgroundAmenitiesAction({
