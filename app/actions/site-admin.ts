@@ -24,6 +24,10 @@ import {
   normalizeStoredRigLengthFeet,
   siteTypeRequiresMaxRigLength,
 } from "@/lib/site-rig-length";
+import {
+  type PricingRulesObject,
+  parsePricingRulesInput,
+} from "@/lib/site-pricing-rules";
 import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import {
   handleDbNoData,
@@ -115,6 +119,48 @@ function normalizeSiteWriteFields(
   };
 }
 
+/**
+ * Accept a pre-parsed object from the client, or a JSON string from older callers.
+ * Always returns a plain object suitable for jsonb (never null).
+ */
+function resolvePricingRulesForWrite(
+  input: SiteCreateUpdateInput,
+):
+  | { ok: true; data: PricingRulesObject }
+  | { ok: false; error: ActionResult } {
+  const raw = input.pricing_rules as PricingRulesObject | string | undefined;
+  if (typeof raw === "string" || raw == null) {
+    const parsed = parsePricingRulesInput(raw ?? "");
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        error: resultError(
+          parsed.reason === "too_large"
+            ? CommonErrorCode.COMMON_FIELD_TOO_LONG
+            : CommonErrorCode.COMMON_INVALID_FIELD,
+          { field: "pricing_rules" },
+        ),
+      };
+    }
+    return { ok: true, data: parsed.data };
+  }
+
+  // Client already sent an object — re-validate via serialize round-trip.
+  const reparsed = parsePricingRulesInput(JSON.stringify(raw));
+  if (!reparsed.ok) {
+    return {
+      ok: false,
+      error: resultError(
+        reparsed.reason === "too_large"
+          ? CommonErrorCode.COMMON_FIELD_TOO_LONG
+          : CommonErrorCode.COMMON_INVALID_FIELD,
+        { field: "pricing_rules" },
+      ),
+    };
+  }
+  return { ok: true, data: reparsed.data };
+}
+
 export async function updateSiteAction(
   campgroundId: string,
   input: SiteCreateUpdateInput,
@@ -145,6 +191,11 @@ export async function updateSiteAction(
     });
   }
 
+  const pricingRules = resolvePricingRulesForWrite(input);
+  if (!pricingRules.ok) {
+    return pricingRules.error;
+  }
+
   try {
     const supabase = await createClient();
 
@@ -171,6 +222,7 @@ export async function updateSiteAction(
           site_type_id: input.site_type_id,
           max_rig_length: normalized.max_rig_length,
           price_per_night_base: input.price_per_night,
+          pricing_rules: pricingRules.data,
           min_stay_nights: input.min_stay_nights,
           description: input.description,
           electricity_amps: ampsParsed.amps,
@@ -224,6 +276,11 @@ export async function createSiteAction(
     });
   }
 
+  const pricingRules = resolvePricingRulesForWrite(input);
+  if (!pricingRules.ok) {
+    return pricingRules.error;
+  }
+
   let newSiteId;
   try {
     const supabase = await createClient();
@@ -250,6 +307,7 @@ export async function createSiteAction(
           site_type_id: input.site_type_id,
           max_rig_length: normalized.max_rig_length,
           price_per_night_base: input.price_per_night,
+          pricing_rules: pricingRules.data,
           min_stay_nights: input.min_stay_nights,
           description: input.description,
           electricity_amps: ampsParsed.amps,

@@ -35,7 +35,12 @@
     "drivewayPlaceholder": "Inconnu / non défini",
     "drivewayPullThrough": "Traversante",
     "drivewayBackIn": "En marche arrière",
-    "drivewayHint": "Facultatif. Utilisé dans la recherche lorsque les visiteurs filtrent par allée."
+    "drivewayHint": "Facultatif. Utilisé dans la recherche lorsque les visiteurs filtrent par allée.",
+    "pricingRulesLabel": "Règles de prix (JSON)",
+    "pricingRulesPlaceholder": "Objet vide, ou clés comme weekend / season / per-person",
+    "pricingRulesHint": "Objet JSON facultatif enregistré tel quel (max. {max, number} caractères). Doit être un objet, pas un tableau. La recherche utilise encore le prix de base par nuit jusqu’à ce que la réservation gère les règles selon les dates.",
+    "pricingRulesEmpty": "Aucune (objet vide)",
+    "pricingRulesViewHint": "JSON opaque pour une tarification dynamique future — pas encore appliqué à la recherche."
   },
 
   "electricityAmps": {
@@ -57,7 +62,10 @@
     "invalidPricePerNight": "Prix par nuit invalide",
     "invalidMinStayNights": "Nombre minimal de nuits invalide",
     "invalidElectricityAmps": "Choisissez uniquement parmi 15, 20, 30 ou 50 ampères",
-    "invalidDrivewayType": "Choisissez traversante, marche arrière, ou laissez vide"
+    "invalidDrivewayType": "Choisissez traversante, marche arrière, ou laissez vide",
+    "pricingRulesInvalidJson": "Les règles de prix doivent être un JSON valide",
+    "pricingRulesNotObject": "Les règles de prix doivent être un objet JSON (pas un tableau ni une valeur seule)",
+    "pricingRulesTooLong": "Les règles de prix doivent compter au plus {max, number} caractères"
   },
 
   "actions": {

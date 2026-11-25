@@ -2,6 +2,7 @@ import { Site } from "@/entities/sites";
 import type { DrivewayType } from "@/lib/driveway-type";
 import type { ElectricityAmp } from "@/lib/electricity-amps";
 import { normalizeElectricityAmps } from "@/lib/electricity-amps";
+import { formatPricingRulesForEditor } from "@/lib/site-pricing-rules";
 
 export type SiteFormData = {
   id?: string;
@@ -13,6 +14,8 @@ export type SiteFormData = {
   min_stay_nights: string;
   electricity_amps: ElectricityAmp[];
   driveway_type: DrivewayType | "";
+  /** Pretty-printed JSON object text for the pricing_rules editor. */
+  pricing_rules: string;
 };
 
 /**
@@ -33,5 +36,6 @@ export function toSiteFormData(site: Site): SiteFormData | undefined {
     min_stay_nights: String(site.min_stay_nights ?? ""),
     electricity_amps: normalizeElectricityAmps(site.electricity_amps ?? []),
     driveway_type: site.driveway_type ?? "",
+    pricing_rules: formatPricingRulesForEditor(site.pricing_rules),
   };
 }

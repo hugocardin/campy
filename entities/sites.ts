@@ -1,5 +1,6 @@
 import type { DrivewayType } from "@/lib/driveway-type";
 import type { ElectricityAmp } from "@/lib/electricity-amps";
+import type { PricingRulesObject } from "@/lib/site-pricing-rules";
 
 export interface Site {
   id: string;
@@ -9,7 +10,11 @@ export interface Site {
   site_type_code: string;
   max_rig_length: number | null;
   price_per_night: number;
-  //   pricing_rules
+  /**
+   * Opaque jsonb object (`sites.pricing_rules`, default `{}`).
+   * Not evaluated by search/booking until Phase D — admin edit only.
+   */
+  pricing_rules: PricingRulesObject;
   min_stay_nights: number;
   /** Available pedestal amps; empty = no electricity. */
   electricity_amps: ElectricityAmp[];

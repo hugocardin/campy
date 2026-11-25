@@ -35,7 +35,12 @@
     "drivewayPlaceholder": "Unknown / not set",
     "drivewayPullThrough": "Pull-through",
     "drivewayBackIn": "Back-in",
-    "drivewayHint": "Optional. Used by guest search when guests filter by driveway."
+    "drivewayHint": "Optional. Used by guest search when guests filter by driveway.",
+    "pricingRulesLabel": "Pricing rules (JSON)",
+    "pricingRulesPlaceholder": "Empty object, or keys such as weekend / season / per-person",
+    "pricingRulesHint": "Optional JSON object stored as-is (max {max, number} characters). Must be an object, not an array. Guest search still uses the base nightly price until booking supports date-aware rules.",
+    "pricingRulesEmpty": "None (empty object)",
+    "pricingRulesViewHint": "Opaque JSON for future dynamic pricing — not applied to guest search yet."
   },
 
   "electricityAmps": {
@@ -57,7 +62,10 @@
     "invalidPricePerNight": "Invalid price per night",
     "invalidMinStayNights": "Invalid min stay nights",
     "invalidElectricityAmps": "Choose only from 15, 20, 30, or 50 amps",
-    "invalidDrivewayType": "Choose pull-through, back-in, or leave unset"
+    "invalidDrivewayType": "Choose pull-through, back-in, or leave unset",
+    "pricingRulesInvalidJson": "Pricing rules must be valid JSON",
+    "pricingRulesNotObject": "Pricing rules must be a JSON object (not an array or bare value)",
+    "pricingRulesTooLong": "Pricing rules must be at most {max, number} characters"
   },
 
   "actions": {

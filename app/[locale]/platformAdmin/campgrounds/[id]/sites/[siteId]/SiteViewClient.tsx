@@ -9,6 +9,10 @@ import { Site } from "@/entities/sites";
 import FormattedRigLength from "@/components/rig-length/FormattedRigLength";
 import { formatElectricityAmps } from "@/lib/electricity-amps";
 import { isLodgingSiteType } from "@/lib/site-rig-length";
+import {
+  formatPricingRulesForEditor,
+  isEmptyPricingRules,
+} from "@/lib/site-pricing-rules";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -152,6 +156,24 @@ export default function SiteViewClient({
                       ? t_sites("electricityAmps.list", { amps })
                       : t_sites("electricityAmps.none");
                   })()}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  {t_sites("form.pricingRulesLabel")}
+                </h3>
+                {isEmptyPricingRules(site.pricing_rules) ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    {t_sites("form.pricingRulesEmpty")}
+                  </p>
+                ) : (
+                  <pre className="mt-1 overflow-x-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed whitespace-pre">
+                    {formatPricingRulesForEditor(site.pricing_rules)}
+                  </pre>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t_sites("form.pricingRulesViewHint")}
                 </p>
               </div>
             </div>

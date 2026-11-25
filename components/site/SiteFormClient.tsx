@@ -41,6 +41,10 @@ import {
 } from "@/lib/errors";
 import type { GuestPriceCurrency } from "@/lib/campground-price";
 import { GUEST_PRICE_CURRENCY } from "@/lib/campground-price";
+import {
+  PRICING_RULES_MAX_CHARS,
+  parsePricingRulesInput,
+} from "@/lib/site-pricing-rules";
 
 const AMP_LABEL_KEYS = {
   15: "amp15",
@@ -89,6 +93,7 @@ export default function SiteFormClient({
       initialData?.electricity_amps ?? [],
     ),
     driveway_type: initialData?.driveway_type ?? "",
+    pricing_rules: initialData?.pricing_rules ?? "{}",
   }));
 
   const {
@@ -119,13 +124,15 @@ export default function SiteFormClient({
   );
 
   const maxRigParsed = parseRigDraft();
+  const pricingRulesParsed = parsePricingRulesInput(form.pricing_rules);
   const isFormValid = Boolean(
     form.name.trim() &&
     form.site_type_id &&
     form.price_per_night &&
     !isNaN(parseFloat(form.price_per_night)) &&
     !isNaN(parseFloat(form.min_stay_nights || "0")) &&
-    (!requiresMaxRig || maxRigParsed.ok),
+    (!requiresMaxRig || maxRigParsed.ok) &&
+    pricingRulesParsed.ok,
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -162,6 +169,21 @@ export default function SiteFormClient({
       return setError(t_sites("errors.typeRequired"));
     }
 
+    const pricingRulesSubmit = parsePricingRulesInput(form.pricing_rules);
+    if (!pricingRulesSubmit.ok) {
+      if (pricingRulesSubmit.reason === "too_large") {
+        return setError(
+          t_sites("errors.pricingRulesTooLong", {
+            max: PRICING_RULES_MAX_CHARS,
+          }),
+        );
+      }
+      if (pricingRulesSubmit.reason === "not_object") {
+        return setError(t_sites("errors.pricingRulesNotObject"));
+      }
+      return setError(t_sites("errors.pricingRulesInvalidJson"));
+    }
+
     const driveway: DrivewayType | null = isLodging
       ? null
       : form.driveway_type === ""
@@ -182,6 +204,7 @@ export default function SiteFormClient({
       min_stay_nights: isNaN(minStayNightsNum) ? undefined : minStayNightsNum,
       electricity_amps: normalizeElectricityAmps(form.electricity_amps),
       driveway_type: driveway,
+      pricing_rules: pricingRulesSubmit.data,
     };
 
     startTransition(async () => {
@@ -200,6 +223,12 @@ export default function SiteFormClient({
                   electricity_amps: t_sites("errors.invalidElectricityAmps"),
                   driveway_type: t_sites("errors.invalidDrivewayType"),
                   max_rig_length: t_sites("errors.maxRigLengthRequired"),
+                  pricing_rules: t_sites("errors.pricingRulesInvalidJson"),
+                },
+                fieldTooLongMessages: {
+                  pricing_rules: t_sites("errors.pricingRulesTooLong", {
+                    max: PRICING_RULES_MAX_CHARS,
+                  }),
                 },
               },
             ),
@@ -389,6 +418,43 @@ export default function SiteFormClient({
                 className="mt-1.5"
                 placeholder={t_sites("form.minStayNightPlaceholder")}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="pricing_rules">
+                {t_sites("form.pricingRulesLabel")}
+              </Label>
+              <Textarea
+                id="pricing_rules"
+                name="pricing_rules"
+                value={form.pricing_rules}
+                onChange={handleChange}
+                rows={8}
+                spellCheck={false}
+                className="mt-1.5 font-mono text-sm resize-y"
+                placeholder={t_sites("form.pricingRulesPlaceholder")}
+                aria-describedby="pricing-rules-hint"
+                aria-invalid={!pricingRulesParsed.ok}
+              />
+              <p
+                id="pricing-rules-hint"
+                className="mt-1 text-xs text-muted-foreground"
+              >
+                {t_sites("form.pricingRulesHint", {
+                  max: PRICING_RULES_MAX_CHARS,
+                })}
+              </p>
+              {!pricingRulesParsed.ok ? (
+                <p className="mt-1 text-xs text-destructive" role="status">
+                  {pricingRulesParsed.reason === "too_large"
+                    ? t_sites("errors.pricingRulesTooLong", {
+                        max: PRICING_RULES_MAX_CHARS,
+                      })
+                    : pricingRulesParsed.reason === "not_object"
+                      ? t_sites("errors.pricingRulesNotObject")
+                      : t_sites("errors.pricingRulesInvalidJson")}
+                </p>
+              ) : null}
             </div>
 
             {!isLodging ? (

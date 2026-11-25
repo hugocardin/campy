@@ -3,6 +3,7 @@ import { parseDrivewayType } from "@/lib/driveway-type";
 import { normalizeElectricityAmps } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import { coerceSitePhotoEntries } from "@/lib/park-media";
+import { coercePricingRulesObject } from "@/lib/site-pricing-rules";
 import {
   handleDbResponse,
   handleDbSingle,
@@ -18,6 +19,7 @@ type SiteWithSiteTypeRow = {
   site_type_id: number;
   max_rig_length: number | null;
   price_per_night_base: number;
+  pricing_rules?: unknown;
   min_stay_nights: number;
   electricity_amps: number[] | null;
   driveway_type: string | null;
@@ -35,6 +37,7 @@ function toDomain(row: SiteWithSiteTypeRow): Site {
     site_type_code: row.site_types.code,
     max_rig_length: row.max_rig_length,
     price_per_night: row.price_per_night_base,
+    pricing_rules: coercePricingRulesObject(row.pricing_rules),
     min_stay_nights: row.min_stay_nights,
     electricity_amps: normalizeElectricityAmps(row.electricity_amps ?? []),
     driveway_type: driveway === undefined ? null : driveway,
@@ -97,6 +100,7 @@ export const getSiteOfCampground = cache(
             site_type_id,
             max_rig_length,
             price_per_night_base,
+            pricing_rules,
             min_stay_nights,
             electricity_amps,
             driveway_type,

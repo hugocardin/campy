@@ -1,5 +1,6 @@
 import type { DrivewayType } from "@/lib/driveway-type";
 import type { ElectricityAmp } from "@/lib/electricity-amps";
+import type { PricingRulesObject } from "@/lib/site-pricing-rules";
 
 export interface SiteCreateUpdateInput {
   id: string | undefined;
@@ -11,4 +12,6 @@ export interface SiteCreateUpdateInput {
   min_stay_nights: number | undefined;
   electricity_amps: ElectricityAmp[];
   driveway_type: DrivewayType | null;
+  /** Parsed jsonb object for `sites.pricing_rules` (never null — use `{}`). */
+  pricing_rules: PricingRulesObject;
 }
