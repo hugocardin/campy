@@ -183,7 +183,10 @@ export default function SiteTypesClient({ initialSiteTypes }: Props) {
                       <span className="inline-flex items-center gap-2">
                         {siteType.code}
                         {protectedCode ? (
-                          <Badge variant="secondary">
+                          <Badge
+                            variant="secondary"
+                            title={protectedReason}
+                          >
                             {t_siteTypes("badges.system")}
                           </Badge>
                         ) : null}
