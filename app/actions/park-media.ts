@@ -33,34 +33,53 @@ import {
   handleUnexpectedError,
   mapPostgrestError,
 } from "@/lib/supabase/db-utils";
+import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const DB_PAGE = 500;
 
+/** Keyset page through every campground cover (stable order; RLS-independent when admin). */
 async function fetchAllCoverPhotos(
   supabase: SupabaseClient,
 ): Promise<ActionResult<(string | null)[]>> {
   const all: (string | null)[] = [];
-  let from = 0;
+  const seenIds = new Set<string>();
+  let lastId: string | null = null;
   let expectedTotal: number | null = null;
 
   for (;;) {
-    const { data, error, count } = await supabase
+    const base = supabase
       .from("campgrounds")
-      .select("cover_photo", { count: from === 0 ? "exact" : undefined })
-      .range(from, from + DB_PAGE - 1);
+      .select("id, cover_photo", {
+        count: lastId == null ? "exact" : undefined,
+      })
+      .order("id", { ascending: true })
+      .limit(DB_PAGE);
 
+    const { data, error, count } = await (lastId != null
+      ? base.gt("id", lastId)
+      : base);
     if (error) return mapPostgrestError(error);
-    if (from === 0 && typeof count === "number") expectedTotal = count;
+    if (lastId == null && typeof count === "number") expectedTotal = count;
 
-    const rows = data ?? [];
+    const rows = (data ?? []) as {
+      id: string;
+      cover_photo?: string | null;
+    }[];
     for (const row of rows) {
-      all.push((row as { cover_photo?: string | null }).cover_photo ?? null);
+      const id = String(row.id);
+      if (seenIds.has(id)) {
+        return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
+          reason: "cover_photo_duplicate_page",
+        });
+      }
+      seenIds.add(id);
+      all.push(row.cover_photo ?? null);
+      lastId = id;
     }
     if (rows.length < DB_PAGE) break;
-    from += DB_PAGE;
   }
 
   if (expectedTotal != null && all.length !== expectedTotal) {
@@ -76,28 +95,43 @@ async function fetchAllCoverPhotos(
   return resultSuccess(all);
 }
 
+/** Keyset page through every site photos array (stable order). */
 async function fetchAllSitePhotoArrays(
   supabase: SupabaseClient,
 ): Promise<ActionResult<unknown[]>> {
   const all: unknown[] = [];
-  let from = 0;
+  const seenIds = new Set<string>();
+  let lastId: string | null = null;
   let expectedTotal: number | null = null;
 
   for (;;) {
-    const { data, error, count } = await supabase
+    const base = supabase
       .from("sites")
-      .select("photos", { count: from === 0 ? "exact" : undefined })
-      .range(from, from + DB_PAGE - 1);
+      .select("id, photos", {
+        count: lastId == null ? "exact" : undefined,
+      })
+      .order("id", { ascending: true })
+      .limit(DB_PAGE);
 
+    const { data, error, count } = await (lastId != null
+      ? base.gt("id", lastId)
+      : base);
     if (error) return mapPostgrestError(error);
-    if (from === 0 && typeof count === "number") expectedTotal = count;
+    if (lastId == null && typeof count === "number") expectedTotal = count;
 
-    const rows = data ?? [];
+    const rows = (data ?? []) as { id: string; photos?: unknown }[];
     for (const row of rows) {
-      all.push((row as { photos?: unknown }).photos);
+      const id = String(row.id);
+      if (seenIds.has(id)) {
+        return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
+          reason: "site_photos_duplicate_page",
+        });
+      }
+      seenIds.add(id);
+      all.push(row.photos);
+      lastId = id;
     }
     if (rows.length < DB_PAGE) break;
-    from += DB_PAGE;
   }
 
   if (expectedTotal != null && all.length !== expectedTotal) {
@@ -616,7 +650,9 @@ export async function sweepOrphanParkMediaAction(): Promise<
   }
 
   try {
-    const supabase = await createClient();
+    // Service-role after auth: global sweep must see every row / object,
+    // independent of SELECT RLS (matches delete-time cleanup).
+    const supabase = getSupabaseAdmin();
 
     // List Storage first, then re-read DB refs so commits during the walk are kept.
     const listed = await listParkMediaObjects(supabase, "");

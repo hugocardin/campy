@@ -10,7 +10,7 @@
     "running": "Balayage…",
     "confirmTitle": "Balayer les orphelins?",
     "confirm": "Supprimer les objets park-media non référencés par une couverture ou une photo d'emplacement et âgés de plus de 24 heures? Les médias en usage sont conservés. Le balayage s'annule si les vérifications semblent incomplètes.",
-    "result": "{scanned, plural, one {# objet analysé} many {# objets analysés} other {# objets analysés}}. {removed, number} supprimés. {notRemoved, number} non retirés. {skippedYoung, number} récents ignorés."
+    "result": "{scanned, plural, one {# objet analysé} many {# objets analysés} other {# objets analysés}}. {removed, plural, one {# supprimé} many {# supprimés} other {# supprimés}}. {notRemoved, plural, one {# non retiré} many {# non retirés} other {# non retirés}}. {skippedYoung, plural, one {# récent ignoré} many {# récents ignorés} other {# récents ignorés}}."
   },
 
   "AdminDashboardPage": {

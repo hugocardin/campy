@@ -83,15 +83,6 @@ export async function listParkMediaObjects(
   return { objects, complete };
 }
 
-/** @deprecated Prefer {@link listParkMediaObjects}; kept for simple path-only callers. */
-export async function listParkMediaObjectPaths(
-  supabase: SupabaseClient,
-  prefix: string,
-): Promise<string[]> {
-  const { objects } = await listParkMediaObjects(supabase, prefix);
-  return objects.map((o) => o.path);
-}
-
 /**
  * Best-effort delete of every object under `prefix`.
  * Never throws — failures are logged. Safe to call after a successful row delete.
@@ -159,7 +150,7 @@ export async function removeParkMediaObjectPaths(
   for (let i = 0; i < safe.length; i += REMOVE_CHUNK) {
     const chunk = safe.slice(i, i + REMOVE_CHUNK);
     try {
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from(PARK_MEDIA_BUCKET)
         .remove(chunk);
       if (error) {
@@ -171,9 +162,8 @@ export async function removeParkMediaObjectPaths(
         notRemoved += chunk.length;
         continue;
       }
-      // API returns only objects it deleted; missing paths are already gone.
+      // Missing paths in the response are already gone — count as removed.
       removed += chunk.length;
-      void data;
     } catch (err) {
       console.warn("[park-media] orphan sweep remove threw", err);
       notRemoved += chunk.length;
