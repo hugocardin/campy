@@ -3,6 +3,16 @@
   "amenityCategoriesDescription": "Organiser les commodités en groupes (Services, Installations, etc.)",
   "campgroundDescription": "Organiser les campings",
 
+  "parkMediaSweep": {
+    "title": "Nettoyage des médias park-media",
+    "description": "Supprimer les objets Storage park-media non référencés de plus de 24 heures. Annule sans supprimer si le listage ou les URL semblent incomplets. Les téléversements récents sont ignorés.",
+    "run": "Balayer les orphelins",
+    "running": "Balayage…",
+    "confirmTitle": "Balayer les orphelins?",
+    "confirm": "Supprimer les objets park-media non référencés par une couverture ou une photo d'emplacement et âgés de plus de 24 heures? Les médias en usage sont conservés. Le balayage s'annule si les vérifications semblent incomplètes.",
+    "result": "{scanned, plural, one {# objet analysé} many {# objets analysés} other {# objets analysés}}. Supprimés\u00A0: {removed, number}. Non retirés\u00A0: {notRemoved, number}. Récents ignorés\u00A0: {skippedYoung, number}."
+  },
+
   "AdminDashboardPage": {
     "pageHeader": {
       "title": "Tableau de bord administrateur",

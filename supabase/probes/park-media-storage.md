@@ -38,6 +38,11 @@ Expect: no `cover_photo`, no bucket, no `park_media%` policies.
 2. Platform admin → site detail → upload photos → guest campground detail site row / gallery shows them.
 3. Non-admin authenticated user: Storage upload to `park-media` must fail (RLS).
 4. Anon: public object URL still loads (no auth header).
+5. Delete site / campground (no bookings): row gone; Storage under
+   `{campgroundId}/sites/{siteId}/` or `{campgroundId}/` cleaned via `after()`
+   (best-effort; campground must be inactive first).
+6. Admin dashboard → “Sweep orphan media”: fail-closed; only objects older than
+   24h and unreferenced are removed. Periodic cron still parked (#57).
 
 ## Dashboard fallback (if Storage policies fail in SQL Editor)
 

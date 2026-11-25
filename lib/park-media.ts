@@ -65,11 +65,75 @@ export function campgroundCoverPathPrefix(campgroundId: string): string {
   return `${campgroundId}/cover/`;
 }
 
+/** Entire park tree: cover + all site folders (`{campgroundId}/`). */
+export function campgroundMediaPathPrefix(campgroundId: string): string {
+  return `${campgroundId}/`;
+}
+
 export function sitePhotoPathPrefix(
   campgroundId: string,
   siteId: string,
 ): string {
   return `${campgroundId}/sites/${siteId}/`;
+}
+
+/**
+ * Paths under a Storage list that are not referenced by cover_photo / photos.
+ * Used by the admin orphan sweep (#57).
+ */
+export function parkMediaOrphanObjectPaths(
+  listedObjectPaths: readonly string[],
+  referencedObjectPaths: ReadonlySet<string>,
+): string[] {
+  const orphans: string[] = [];
+  for (const path of listedObjectPaths) {
+    if (!path || path.includes("..")) continue;
+    if (!referencedObjectPaths.has(path)) orphans.push(path);
+  }
+  return orphans;
+}
+
+export type ReferencedParkMediaResult = {
+  paths: Set<string>;
+  /** Non-empty URL strings that failed park-media path parse. */
+  unparsedCount: number;
+  /** Non-empty URL strings considered (covers + photo entries). */
+  urlCount: number;
+};
+
+/**
+ * Collect Storage object paths referenced by cover / site photo URL columns.
+ * Callers that delete must abort when `unparsedCount > 0` or when
+ * `urlCount > 0 && paths.size === 0` (env / origin mismatch).
+ */
+export function referencedParkMediaObjectPaths(
+  coverPhotos: readonly (string | null | undefined)[],
+  sitePhotoArrays: readonly unknown[],
+  supabaseUrl: string,
+): ReferencedParkMediaResult {
+  const paths = new Set<string>();
+  let unparsedCount = 0;
+  let urlCount = 0;
+
+  const consider = (raw: string | null | undefined) => {
+    if (typeof raw !== "string") return;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    urlCount += 1;
+    const path = parkMediaObjectPathFromPublicUrl(trimmed, supabaseUrl);
+    if (path) paths.add(path);
+    else unparsedCount += 1;
+  };
+
+  for (const cover of coverPhotos) {
+    consider(cover);
+  }
+  for (const photos of sitePhotoArrays) {
+    for (const url of coerceSitePhotoEntries(photos)) {
+      consider(url);
+    }
+  }
+  return { paths, unparsedCount, urlCount };
 }
 
 /**

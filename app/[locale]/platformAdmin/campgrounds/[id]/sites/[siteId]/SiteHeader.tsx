@@ -23,7 +23,11 @@ export function SiteHeader({ site, campground }: SiteHeaderProps) {
       })}
       backTo={routes.platformAdmin.campgroundSites(campground.id)}
       rightContent={
-        <SiteActions siteId={site.id} campgroundId={campground.id} />
+        <SiteActions
+          siteId={site.id}
+          campgroundId={campground.id}
+          siteName={site.name}
+        />
       }
     />
   );

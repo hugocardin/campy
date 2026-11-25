@@ -3,16 +3,20 @@ import { describe, it } from "node:test";
 import {
   CAMPGROUND_COVER_PLACEHOLDER,
   campgroundCoverObjectPath,
+  campgroundMediaPathPrefix,
   coerceSitePhotoEntries,
   isParkMediaMime,
   isParkMediaPublicUrl,
   normalizeParkMediaUrl,
   normalizeSitePhotoUrls,
   parkMediaObjectPathFromPublicUrl,
+  parkMediaOrphanObjectPaths,
   parkMediaPublicUrl,
   parkMediaUrlMatchesPrefix,
+  referencedParkMediaObjectPaths,
   resolveCampgroundCoverSrc,
   sitePhotoObjectPath,
+  sitePhotoPathPrefix,
   sniffParkMediaMime,
 } from "./park-media";
 
@@ -135,5 +139,50 @@ describe("park-media helpers", () => {
       coerceSitePhotoEntries([good, "https://evil/x.jpg", null, 1, "  "]),
       [good, "https://evil/x.jpg"],
     );
+  });
+
+  it("builds campground / site storage prefixes for delete cleanup", () => {
+    assert.equal(campgroundMediaPathPrefix("cg-1"), "cg-1/");
+    assert.equal(sitePhotoPathPrefix("cg-1", "site-2"), "cg-1/sites/site-2/");
+  });
+
+  it("computes orphan object paths vs referenced covers and photos", () => {
+    const cover = parkMediaPublicUrl("cg/cover/a.jpg", PROJECT);
+    const photo = parkMediaPublicUrl("cg/sites/s/b.jpg", PROJECT);
+    const refs = referencedParkMediaObjectPaths(
+      [cover, null],
+      [[photo], null],
+      PROJECT,
+    );
+    assert.equal(refs.paths.has("cg/cover/a.jpg"), true);
+    assert.equal(refs.paths.has("cg/sites/s/b.jpg"), true);
+    assert.equal(refs.paths.size, 2);
+    assert.equal(refs.unparsedCount, 0);
+    assert.equal(refs.urlCount, 2);
+
+    assert.deepEqual(
+      parkMediaOrphanObjectPaths(
+        ["cg/cover/a.jpg", "cg/cover/orphan.jpg", "cg/sites/s/b.jpg", "../x"],
+        refs.paths,
+      ),
+      ["cg/cover/orphan.jpg"],
+    );
+  });
+
+  it("counts unparsed media URLs for fail-closed sweeps", () => {
+    const cover = parkMediaPublicUrl("cg/cover/a.jpg", PROJECT);
+    const refs = referencedParkMediaObjectPaths(
+      [cover, "https://evil/x.jpg"],
+      [["https://evil/y.jpg"]],
+      PROJECT,
+    );
+    assert.equal(refs.paths.size, 1);
+    assert.equal(refs.unparsedCount, 2);
+    assert.equal(refs.urlCount, 3);
+
+    const emptyEnv = referencedParkMediaObjectPaths([cover], [], "");
+    assert.equal(emptyEnv.paths.size, 0);
+    assert.equal(emptyEnv.unparsedCount, 1);
+    assert.equal(emptyEnv.urlCount, 1);
   });
 });

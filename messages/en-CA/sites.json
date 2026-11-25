@@ -61,7 +61,9 @@
   },
 
   "actions": {
-    "createSite": "Create Site"
+    "createSite": "Create Site",
+    "deleteSiteTitle": "Delete site?",
+    "deleteSiteDescription": "Permanently delete \"{name}\" and its photos from storage. Sites with bookings cannot be deleted."
   },
 
   "media": {

@@ -61,7 +61,9 @@
   },
 
   "actions": {
-    "createSite": "Créer un emplacement"
+    "createSite": "Créer un emplacement",
+    "deleteSiteTitle": "Supprimer l'emplacement?",
+    "deleteSiteDescription": "Supprimer définitivement «\u00A0{name}\u00A0» et ses photos du stockage. Les emplacements avec des réservations ne peuvent pas être supprimés."
   },
 
   "media": {

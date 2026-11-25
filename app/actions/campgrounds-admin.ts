@@ -15,9 +15,13 @@ import {
 } from "@/lib/campground-price";
 import { ActionResult, DbErrorCode, resultError, resultSuccess } from "@/lib/errors";
 import { CommonErrorCode } from "@/lib/errors/common";
+import { isUuid } from "@/lib/is-uuid";
+import { campgroundMediaPathPrefix } from "@/lib/park-media";
+import { removeParkMediaByPrefix } from "@/lib/park-media-storage";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
+import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import {
   handleDbNoData,
   handleDbResponse,
@@ -29,6 +33,7 @@ import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { getLocale } from "next-intl/server";
 
 function normalizeWebsiteInput(
@@ -373,6 +378,89 @@ export async function createCampgroundAction(
     href: routes.platformAdmin.campgroundView(newCampgroundId),
     locale,
   });
+}
+
+/**
+ * Hard-delete a campground (cascades sites / amenity links). Must be inactive
+ * first (cheap misclick guard). Storage under `{campgroundId}/` is cleaned
+ * best-effort after the response (#57). Bookings → DB_RESOURCE_IN_USE.
+ */
+export async function deleteCampgroundAction(
+  id: string,
+): Promise<ActionResult> {
+  const auth = await requirePlatformAdmin();
+  if (!auth.success) {
+    return auth;
+  }
+
+  if (!isUuid(id)) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "id",
+    });
+  }
+
+  try {
+    const supabase = await createClient();
+
+    const existing = await handleDbSingle(
+      supabase
+        .from("campgrounds")
+        .select("id, active")
+        .eq("id", id)
+        .single(),
+    );
+    if (!existing.success) return existing;
+    if ((existing.data as { active?: boolean }).active) {
+      return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+        reason: "must_deactivate_first",
+        field: "active",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("campgrounds")
+      .delete()
+      .eq("id", id)
+      .eq("active", false)
+      .select("id");
+
+    if (error) {
+      if (error.code === "23503") {
+        return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
+          reason: "resource_in_use",
+        });
+      }
+      return mapPostgrestError(error);
+    }
+
+    if (!data || data.length === 0) {
+      return resultError(DbErrorCode.DB_NOT_FOUND, {
+        reason: "not_deleted",
+      });
+    }
+
+    const mediaPrefix = campgroundMediaPathPrefix(id);
+    after(async () => {
+      try {
+        await removeParkMediaByPrefix(getSupabaseAdmin(), mediaPrefix);
+      } catch (err) {
+        console.warn(
+          "[park-media] campground delete storage cleanup threw",
+          err,
+        );
+      }
+    });
+
+    revalidateLocalizedPath(routes.home());
+    revalidateLocalizedPath(routes.campgroundDetail(id));
+    revalidateLocalizedPath(routes.platformAdmin.root());
+    revalidateLocalizedPath(routes.platformAdmin.campgrounds());
+    revalidateTag(CAMPGROUND_PROVINCES_CACHE_TAG, "max");
+
+    return resultSuccess();
+  } catch (err) {
+    return handleUnexpectedError(err);
+  }
 }
 
 export async function updateCampgroundAmenitiesAction({
