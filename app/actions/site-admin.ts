@@ -25,8 +25,9 @@ import {
   siteTypeRequiresMaxRigLength,
 } from "@/lib/site-rig-length";
 import {
+  type ParsePricingRulesReason,
   type PricingRulesObject,
-  parsePricingRulesInput,
+  resolvePricingRulesForWrite,
 } from "@/lib/site-pricing-rules";
 import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import {
@@ -119,46 +120,38 @@ function normalizeSiteWriteFields(
   };
 }
 
-/**
- * Accept a pre-parsed object from the client, or a JSON string from older callers.
- * Always returns a plain object suitable for jsonb (never null).
- */
-function resolvePricingRulesForWrite(
-  input: SiteCreateUpdateInput,
-):
-  | { ok: true; data: PricingRulesObject }
-  | { ok: false; error: ActionResult } {
-  const raw = input.pricing_rules as PricingRulesObject | string | undefined;
-  if (typeof raw === "string" || raw == null) {
-    const parsed = parsePricingRulesInput(raw ?? "");
-    if (!parsed.ok) {
-      return {
-        ok: false,
-        error: resultError(
-          parsed.reason === "too_large"
-            ? CommonErrorCode.COMMON_FIELD_TOO_LONG
-            : CommonErrorCode.COMMON_INVALID_FIELD,
-          { field: "pricing_rules" },
-        ),
-      };
-    }
-    return { ok: true, data: parsed.data };
-  }
+function pricingRulesFailureToError(
+  reason: ParsePricingRulesReason,
+): ActionResult {
+  return resultError(
+    reason === "too_large"
+      ? CommonErrorCode.COMMON_FIELD_TOO_LONG
+      : CommonErrorCode.COMMON_INVALID_FIELD,
+    { field: "pricing_rules", reason },
+  );
+}
 
-  // Client already sent an object — re-validate via serialize round-trip.
-  const reparsed = parsePricingRulesInput(JSON.stringify(raw));
-  if (!reparsed.ok) {
-    return {
-      ok: false,
-      error: resultError(
-        reparsed.reason === "too_large"
-          ? CommonErrorCode.COMMON_FIELD_TOO_LONG
-          : CommonErrorCode.COMMON_INVALID_FIELD,
-        { field: "pricing_rules" },
-      ),
-    };
+/**
+ * Resolve pricing_rules for create/update at the trust boundary.
+ * Update: `undefined` omits the column (no wipe). Create: omit → `{}`.
+ */
+function pricingRulesForSiteWrite(
+  input: SiteCreateUpdateInput,
+  mode: "create" | "update",
+):
+  | { ok: true; data: PricingRulesObject | undefined }
+  | { ok: false; error: ActionResult } {
+  const resolved = resolvePricingRulesForWrite(input.pricing_rules);
+  if (!resolved.ok) {
+    return { ok: false, error: pricingRulesFailureToError(resolved.reason) };
   }
-  return { ok: true, data: reparsed.data };
+  if ("omit" in resolved) {
+    if (mode === "update") {
+      return { ok: true, data: undefined };
+    }
+    return { ok: true, data: {} };
+  }
+  return { ok: true, data: resolved.data };
 }
 
 export async function updateSiteAction(
@@ -191,7 +184,7 @@ export async function updateSiteAction(
     });
   }
 
-  const pricingRules = resolvePricingRulesForWrite(input);
+  const pricingRules = pricingRulesForSiteWrite(input, "update");
   if (!pricingRules.ok) {
     return pricingRules.error;
   }
@@ -212,23 +205,27 @@ export async function updateSiteAction(
       return normalized.error;
     }
 
+    const updatePayload: Record<string, unknown> = {
+      name: input.name,
+      site_type_id: input.site_type_id,
+      max_rig_length: normalized.max_rig_length,
+      price_per_night_base: input.price_per_night,
+      min_stay_nights: input.min_stay_nights,
+      description: input.description,
+      electricity_amps: ampsParsed.amps,
+      driveway_type: normalized.driveway_type,
+      updated_at: new Date().toISOString(),
+    };
+    if (pricingRules.data !== undefined) {
+      updatePayload.pricing_rules = pricingRules.data;
+    }
+
     // .select().single() so RLS-filtered 0-row updates surface as errors
     // instead of handleDbNoData fake-success + redirect.
     const result = await handleDbSingle(
       supabase
         .from("sites")
-        .update({
-          name: input.name,
-          site_type_id: input.site_type_id,
-          max_rig_length: normalized.max_rig_length,
-          price_per_night_base: input.price_per_night,
-          pricing_rules: pricingRules.data,
-          min_stay_nights: input.min_stay_nights,
-          description: input.description,
-          electricity_amps: ampsParsed.amps,
-          driveway_type: normalized.driveway_type,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("id", input.id)
         .select("id")
         .single(),
@@ -276,7 +273,7 @@ export async function createSiteAction(
     });
   }
 
-  const pricingRules = resolvePricingRulesForWrite(input);
+  const pricingRules = pricingRulesForSiteWrite(input, "create");
   if (!pricingRules.ok) {
     return pricingRules.error;
   }
@@ -307,7 +304,7 @@ export async function createSiteAction(
           site_type_id: input.site_type_id,
           max_rig_length: normalized.max_rig_length,
           price_per_night_base: input.price_per_night,
-          pricing_rules: pricingRules.data,
+          pricing_rules: pricingRules.data ?? {},
           min_stay_nights: input.min_stay_nights,
           description: input.description,
           electricity_amps: ampsParsed.amps,

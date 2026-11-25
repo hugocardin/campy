@@ -38,8 +38,9 @@
     "drivewayHint": "Optional. Used by guest search when guests filter by driveway.",
     "pricingRulesLabel": "Pricing rules (JSON)",
     "pricingRulesPlaceholder": "Empty object, or keys such as weekend / season / per-person",
-    "pricingRulesHint": "Optional JSON object stored as-is (max {max, number} characters). Must be an object, not an array. Guest search still uses the base nightly price until booking supports date-aware rules.",
+    "pricingRulesHint": "Optional JSON object (max {max, number} characters when minified). Formatting is not preserved. Must be an object, not an array. Guest search still uses the base nightly price until booking supports date-aware rules.",
     "pricingRulesEmpty": "None (empty object)",
+    "pricingRulesUnexpected": "Stored value was not a JSON object and was replaced with an empty object for editing. Saving will overwrite it.",
     "pricingRulesViewHint": "Opaque JSON for future dynamic pricing — not applied to guest search yet."
   },
 
@@ -65,7 +66,9 @@
     "invalidDrivewayType": "Choose pull-through, back-in, or leave unset",
     "pricingRulesInvalidJson": "Pricing rules must be valid JSON",
     "pricingRulesNotObject": "Pricing rules must be a JSON object (not an array or bare value)",
-    "pricingRulesTooLong": "Pricing rules must be at most {max, number} characters"
+    "pricingRulesTooLong": "Pricing rules must be at most {max, number} characters when minified",
+    "pricingRulesForbiddenKey": "Pricing rules cannot use __proto__, constructor, or prototype keys",
+    "pricingRulesNonFiniteNumber": "Pricing rules cannot contain Infinity or NaN"
   },
 
   "actions": {

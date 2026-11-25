@@ -38,8 +38,9 @@
     "drivewayHint": "Facultatif. Utilisé dans la recherche lorsque les visiteurs filtrent par allée.",
     "pricingRulesLabel": "Règles de prix (JSON)",
     "pricingRulesPlaceholder": "Objet vide, ou clés comme weekend / season / per-person",
-    "pricingRulesHint": "Objet JSON facultatif enregistré tel quel (max. {max, number} caractères). Doit être un objet, pas un tableau. La recherche utilise encore le prix de base par nuit jusqu’à ce que la réservation gère les règles selon les dates.",
+    "pricingRulesHint": "Objet JSON facultatif (max. {max, number} caractères une fois minifié). La mise en forme n’est pas conservée. Doit être un objet, pas un tableau. La recherche utilise encore le prix de base par nuit jusqu’à ce que la réservation gère les règles selon les dates.",
     "pricingRulesEmpty": "Aucune (objet vide)",
+    "pricingRulesUnexpected": "La valeur enregistrée n’était pas un objet JSON et a été remplacée par un objet vide pour l’édition. L’enregistrement l’écrasera.",
     "pricingRulesViewHint": "JSON opaque pour une tarification dynamique future — pas encore appliqué à la recherche."
   },
 
@@ -65,7 +66,9 @@
     "invalidDrivewayType": "Choisissez traversante, marche arrière, ou laissez vide",
     "pricingRulesInvalidJson": "Les règles de prix doivent être un JSON valide",
     "pricingRulesNotObject": "Les règles de prix doivent être un objet JSON (pas un tableau ni une valeur seule)",
-    "pricingRulesTooLong": "Les règles de prix doivent compter au plus {max, number} caractères"
+    "pricingRulesTooLong": "Les règles de prix doivent compter au plus {max, number} caractères une fois minifiées",
+    "pricingRulesForbiddenKey": "Les règles de prix ne peuvent pas utiliser les clés __proto__, constructor ou prototype",
+    "pricingRulesNonFiniteNumber": "Les règles de prix ne peuvent pas contenir Infinity ni NaN"
   },
 
   "actions": {

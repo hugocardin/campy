@@ -12,6 +12,10 @@ export interface SiteCreateUpdateInput {
   min_stay_nights: number | undefined;
   electricity_amps: ElectricityAmp[];
   driveway_type: DrivewayType | null;
-  /** Parsed jsonb object for `sites.pricing_rules` (never null — use `{}`). */
-  pricing_rules: PricingRulesObject;
+  /**
+   * Parsed jsonb object for `sites.pricing_rules`.
+   * Omit (`undefined`) on update to leave the column unchanged.
+   * Create should always send an object (use `{}` when empty).
+   */
+  pricing_rules?: PricingRulesObject;
 }

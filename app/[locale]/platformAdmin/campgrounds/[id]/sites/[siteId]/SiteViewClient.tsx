@@ -163,7 +163,12 @@ export default function SiteViewClient({
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
                   {t_sites("form.pricingRulesLabel")}
                 </h3>
-                {isEmptyPricingRules(site.pricing_rules) ? (
+                {site.pricing_rules_unexpected ? (
+                  <p className="text-sm text-amber-700 dark:text-amber-400">
+                    {t_sites("form.pricingRulesUnexpected")}
+                  </p>
+                ) : site.pricing_rules === undefined ||
+                  isEmptyPricingRules(site.pricing_rules) ? (
                   <p className="text-sm text-muted-foreground italic">
                     {t_sites("form.pricingRulesEmpty")}
                   </p>

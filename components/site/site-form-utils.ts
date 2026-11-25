@@ -16,6 +16,8 @@ export type SiteFormData = {
   driveway_type: DrivewayType | "";
   /** Pretty-printed JSON object text for the pricing_rules editor. */
   pricing_rules: string;
+  /** Loaded column had a non-object shape (pre-CHECK legacy). */
+  pricing_rules_unexpected?: boolean;
 };
 
 /**
@@ -36,6 +38,9 @@ export function toSiteFormData(site: Site): SiteFormData | undefined {
     min_stay_nights: String(site.min_stay_nights ?? ""),
     electricity_amps: normalizeElectricityAmps(site.electricity_amps ?? []),
     driveway_type: site.driveway_type ?? "",
-    pricing_rules: formatPricingRulesForEditor(site.pricing_rules),
+    pricing_rules: site.pricing_rules_unexpected
+      ? "{}"
+      : formatPricingRulesForEditor(site.pricing_rules),
+    pricing_rules_unexpected: site.pricing_rules_unexpected === true,
   };
 }
