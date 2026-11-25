@@ -22,6 +22,7 @@ import {
 import { formatCampgroundPricePerNight } from "@/lib/campground-price";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { isUuid } from "@/lib/is-uuid";
+import { normalizeSitePhotoUrls } from "@/lib/park-media";
 import { routes } from "@/lib/routes";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import { parseRigLengthUnit } from "@/lib/site-rig-length";
@@ -362,14 +363,16 @@ export default async function CampgroundDetailsPage({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sites.map((site) => (
+                      {sites.map((site) => {
+                        const guestPhotos = normalizeSitePhotoUrls(site.photos);
+                        return (
                         <TableRow key={site.id}>
                           <TableCell className="font-medium">
                             <div className="space-y-2">
                               <span>{site.name}</span>
-                              {site.photos.length > 0 ? (
+                              {guestPhotos.length > 0 ? (
                                 <div className="flex flex-wrap gap-1.5">
-                                  {site.photos.slice(0, 4).map((url) => (
+                                  {guestPhotos.slice(0, 4).map((url) => (
                                     <div
                                       key={url}
                                       className="relative h-12 w-16 overflow-hidden rounded bg-muted"
@@ -423,7 +426,8 @@ export default async function CampgroundDetailsPage({
                           </TableCell>
                           <TableCell>{site.min_stay_nights}</TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

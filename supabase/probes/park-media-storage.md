@@ -28,6 +28,9 @@ Expect: no `cover_photo`, no bucket, no `park_media%` policies.
    (no public SELECT — public bucket CDN URLs do not need RLS; listing stays admin-only).
 5. RPCs `append_site_photo` / `remove_site_photo` for atomic `sites.photos` updates
    (`20261125031029_park_media_review_followup.sql`).
+6. `append_site_photo(uuid,uuid,text)` uses a fixed 12-photo cap
+   (`20261125032045_park_media_append_cap.sql`); browser uploads to Storage, then
+   Server Actions only commit URLs (no raised `serverActions.bodySizeLimit`).
 
 ## Manual smoke
 

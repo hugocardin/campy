@@ -72,6 +72,7 @@
     "upload": "Add photo",
     "remove": "Remove",
     "removeConfirm": "Remove this photo?",
+    "foreignPhoto": "External URL (not park-media). Remove to free a slot.",
     "count": "{current} of {max}",
     "fileConstraints": "Max {mb} MB each. JPEG, PNG, or WebP only."
   },

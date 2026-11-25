@@ -72,6 +72,7 @@
     "upload": "Ajouter une photo",
     "remove": "Retirer",
     "removeConfirm": "Retirer cette photo ?",
+    "foreignPhoto": "URL externe (hors park-media). Retirez-la pour libérer un emplacement.",
     "count": "{current} sur {max}",
     "fileConstraints": "Maximum {mb} Mo chacune. JPEG, PNG ou WebP seulement."
   },

@@ -2,7 +2,7 @@ import { Site } from "@/entities/sites";
 import { parseDrivewayType } from "@/lib/driveway-type";
 import { normalizeElectricityAmps } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
-import { normalizeSitePhotoUrls } from "@/lib/park-media";
+import { coerceSitePhotoEntries } from "@/lib/park-media";
 import {
   handleDbResponse,
   handleDbSingle,
@@ -38,7 +38,8 @@ function toDomain(row: SiteWithSiteTypeRow): Site {
     min_stay_nights: row.min_stay_nights,
     electricity_amps: normalizeElectricityAmps(row.electricity_amps ?? []),
     driveway_type: driveway === undefined ? null : driveway,
-    photos: normalizeSitePhotoUrls(row.photos),
+    // Preserve foreign/seed URLs for admin edit/remove; guests filter at render.
+    photos: coerceSitePhotoEntries(row.photos),
   };
 }
 

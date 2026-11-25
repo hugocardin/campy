@@ -45,14 +45,6 @@ const nextConfig: NextConfig = {
       ...(supabasePattern ? [supabasePattern] : []),
     ],
   },
-
-  // Phone photos are often 2–5 MB; default Server Action body limit is 1 MB.
-  // Leave headroom above PARK_MEDIA_MAX_BYTES (5 MiB) for multipart overhead.
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "6mb",
-    },
-  },
 };
 
 export default withNextIntl(nextConfig);

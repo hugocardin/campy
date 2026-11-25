@@ -1,9 +1,10 @@
 "use client";
 
 import {
+  appendSitePhotoAction,
   removeSitePhotoAction,
-  uploadSitePhotoAction,
 } from "@/app/actions/park-media";
+import { uploadSitePhotoFile } from "@/components/media/uploadParkMediaFile";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import {
   PARK_MEDIA_ALLOWED_MIME,
   PARK_MEDIA_MAX_BYTES,
   PARK_MEDIA_MAX_SITE_PHOTOS,
+  isParkMediaPublicUrl,
   parkMediaMaxMb,
 } from "@/lib/park-media";
 import {
@@ -62,14 +64,24 @@ export default function SitePhotosAdmin({
       return;
     }
 
-    const formData = new FormData();
-    formData.set("file", file);
-
     startTransition(async () => {
-      const result = await uploadSitePhotoAction(
+      const uploaded = await uploadSitePhotoFile(campgroundId, siteId, file);
+      if (!uploaded.ok) {
+        setError(
+          translateErrorCode(
+            uploaded.errorCode,
+            tErrors,
+            tc("error"),
+            uploaded.details,
+          ),
+        );
+        return;
+      }
+
+      const result = await appendSitePhotoAction(
         campgroundId,
         siteId,
-        formData,
+        uploaded.publicUrl,
       );
       if (!result.success) {
         setError(
@@ -130,29 +142,38 @@ export default function SitePhotosAdmin({
           <p className="text-sm text-muted-foreground italic">{t("empty")}</p>
         ) : (
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {photos.map((url) => (
-              <li key={url} className="space-y-2">
-                <div className="relative aspect-square overflow-hidden rounded-md bg-muted">
-                  <Image
-                    src={url}
-                    alt={t("photoAlt")}
-                    fill
-                    className="object-cover"
-                    sizes="160px"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  disabled={isPending}
-                  onClick={() => onRemove(url)}
-                >
-                  {t("remove")}
-                </Button>
-              </li>
-            ))}
+            {photos.map((url) => {
+              const isOurs = isParkMediaPublicUrl(url);
+              return (
+                <li key={url} className="space-y-2">
+                  <div className="relative aspect-square overflow-hidden rounded-md bg-muted">
+                    {isOurs ? (
+                      <Image
+                        src={url}
+                        alt={t("photoAlt")}
+                        fill
+                        className="object-cover"
+                        sizes="160px"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
+                        {t("foreignPhoto")}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={isPending}
+                    onClick={() => onRemove(url)}
+                  >
+                    {t("remove")}
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         )}
 

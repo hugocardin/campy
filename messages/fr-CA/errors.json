@@ -9,6 +9,7 @@
   "MEDIA_UNSUPPORTED_TYPE": "Type d'image non pris en charge. Utilisez JPEG, PNG ou WebP.",
   "MEDIA_LIMIT_REACHED": "Cet emplacement a déjà le maximum de 12 photos.",
   "MEDIA_STORAGE_FAILED": "Impossible d'enregistrer cette image. Veuillez réessayer.",
+  "MEDIA_COVER_CONFLICT": "La photo de couverture a été modifiée ailleurs. Actualisez la page et réessayez.",
 
   "DB_DUPLICATE_VALUE": "Cette valeur existe déjà. Veuillez en choisir une autre.",
   "DB_INVALID_REFERENCE": "L'enregistrement référencé n'existe pas.",

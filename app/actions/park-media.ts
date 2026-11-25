@@ -9,22 +9,14 @@ import {
   resultSuccess,
 } from "@/lib/errors";
 import {
-  campgroundCoverObjectPath,
   campgroundCoverPathPrefix,
   coerceSitePhotoEntries,
   normalizeParkMediaUrl,
-  normalizeSitePhotoUrls,
   PARK_MEDIA_BUCKET,
-  PARK_MEDIA_MAX_BYTES,
   PARK_MEDIA_MAX_SITE_PHOTOS,
-  parkMediaMaxMb,
   parkMediaObjectPathFromPublicUrl,
-  parkMediaPublicUrl,
   parkMediaUrlMatchesPrefix,
-  sitePhotoObjectPath,
   sitePhotoPathPrefix,
-  sniffParkMediaMime,
-  type ParkMediaMime,
 } from "@/lib/park-media";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
@@ -36,7 +28,8 @@ import {
 } from "@/lib/supabase/db-utils";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
-import { randomUUID } from "node:crypto";
+
+const SITE_PHOTO_CAP_MARKER = "park_media_site_photos_at_cap";
 
 function revalidateCampgroundMedia(campgroundId: string) {
   revalidateLocalizedPath(routes.home());
@@ -55,42 +48,6 @@ function revalidateSiteMedia(campgroundId: string, siteId: string) {
     routes.platformAdmin.campgroundSiteEdit(campgroundId, siteId),
   );
   revalidateLocalizedPath(routes.platformAdmin.campgroundSites(campgroundId));
-}
-
-async function readUploadFile(
-  formData: FormData,
-  field = "file",
-): Promise<
-  | { ok: true; bytes: Uint8Array; mime: ParkMediaMime }
-  | { ok: false; error: ActionResult<never> }
-> {
-  const raw = formData.get(field);
-  if (!(raw instanceof File) || raw.size === 0) {
-    return {
-      ok: false,
-      error: resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
-        field: "file",
-      }),
-    };
-  }
-  if (raw.size > PARK_MEDIA_MAX_BYTES) {
-    return {
-      ok: false,
-      error: resultError(MediaErrorCode.MEDIA_FILE_TOO_LARGE, {
-        mb: parkMediaMaxMb(),
-      }),
-    };
-  }
-
-  const buffer = new Uint8Array(await raw.arrayBuffer());
-  const mime = sniffParkMediaMime(buffer);
-  if (!mime) {
-    return {
-      ok: false,
-      error: resultError(MediaErrorCode.MEDIA_UNSUPPORTED_TYPE),
-    };
-  }
-  return { ok: true, bytes: buffer, mime };
 }
 
 async function removeStorageObjectIfOurs(
@@ -123,9 +80,14 @@ async function removeStorageObjectIfOurs(
   }
 }
 
-export async function uploadCampgroundCoverAction(
+/**
+ * Commit a browser-uploaded cover URL with optimistic concurrency.
+ * `expectedCoverPhoto` must match the row's current `cover_photo` (null if empty).
+ */
+export async function commitCampgroundCoverAction(
   campgroundId: string,
-  formData: FormData,
+  publicUrl: string,
+  expectedCoverPhoto: string | null,
 ): Promise<ActionResult<{ coverPhoto: string }>> {
   const auth = await requirePlatformAdmin();
   if (!auth.success) return auth;
@@ -136,76 +98,77 @@ export async function uploadCampgroundCoverAction(
     });
   }
 
-  const fileResult = await readUploadFile(formData);
-  if (!fileResult.ok) return fileResult.error;
+  const coverPrefix = campgroundCoverPathPrefix(campgroundId);
+  const nextUrl = normalizeParkMediaUrl(publicUrl);
+  if (!nextUrl || !parkMediaUrlMatchesPrefix(nextUrl, coverPrefix)) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "publicUrl",
+    });
+  }
+
+  const expected =
+    expectedCoverPhoto == null
+      ? null
+      : normalizeParkMediaUrl(expectedCoverPhoto);
+
+  if (expectedCoverPhoto != null && expected == null) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "expectedCoverPhoto",
+    });
+  }
 
   try {
     const supabase = await createClient();
-    const coverPrefix = campgroundCoverPathPrefix(campgroundId);
 
-    const existing = await handleDbSingle(
-      supabase
-        .from("campgrounds")
-        .select("id, cover_photo")
-        .eq("id", campgroundId)
-        .single(),
-    );
-    if (!existing.success) return existing;
+    let query = supabase
+      .from("campgrounds")
+      .update({
+        cover_photo: nextUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", campgroundId);
 
-    const objectPath = campgroundCoverObjectPath(
-      campgroundId,
-      randomUUID(),
-      fileResult.mime,
-    );
+    query =
+      expected == null
+        ? query.is("cover_photo", null)
+        : query.eq("cover_photo", expected);
 
-    const { error: uploadError } = await supabase.storage
-      .from(PARK_MEDIA_BUCKET)
-      .upload(objectPath, fileResult.bytes, {
-        contentType: fileResult.mime,
-        upsert: false,
-        cacheControl: "3600",
-      });
+    const { data, error } = await query
+      .select("id, cover_photo")
+      .maybeSingle();
 
-    if (uploadError) {
-      console.error("[park-media] cover upload failed", uploadError.message);
-      return resultError(MediaErrorCode.MEDIA_STORAGE_FAILED);
+    if (error) {
+      await removeStorageObjectIfOurs(nextUrl, coverPrefix);
+      return mapPostgrestError(error);
     }
 
-    const publicUrl = parkMediaPublicUrl(objectPath);
-
-    const update = await handleDbSingle(
-      supabase
-        .from("campgrounds")
-        .update({
-          cover_photo: publicUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", campgroundId)
-        .select("id, cover_photo")
-        .single(),
-    );
-
-    if (!update.success) {
-      await removeStorageObjectIfOurs(publicUrl, coverPrefix);
-      return update;
+    if (!data) {
+      await removeStorageObjectIfOurs(nextUrl, coverPrefix);
+      const exists = await handleDbSingle(
+        supabase.from("campgrounds").select("id").eq("id", campgroundId).single(),
+      );
+      if (!exists.success) return exists;
+      return resultError(MediaErrorCode.MEDIA_COVER_CONFLICT);
     }
 
-    const previous = normalizeParkMediaUrl(
-      (existing.data as { cover_photo?: string | null }).cover_photo,
-    );
-    if (previous && previous !== publicUrl) {
-      await removeStorageObjectIfOurs(previous, coverPrefix);
+    if (expected && expected !== nextUrl) {
+      await removeStorageObjectIfOurs(expected, coverPrefix);
     }
 
     revalidateCampgroundMedia(campgroundId);
-    return resultSuccess({ coverPhoto: publicUrl });
+    return resultSuccess({ coverPhoto: nextUrl });
   } catch (err) {
+    await removeStorageObjectIfOurs(nextUrl, coverPrefix);
     return handleUnexpectedError(err);
   }
 }
 
+/**
+ * Clear cover when the row still matches `expectedCoverPhoto` (optimistic).
+ */
 export async function clearCampgroundCoverAction(
   campgroundId: string,
+  expectedCoverPhoto: string | null,
 ): Promise<ActionResult> {
   const auth = await requirePlatformAdmin();
   if (!auth.success) return auth;
@@ -216,37 +179,47 @@ export async function clearCampgroundCoverAction(
     });
   }
 
+  const coverPrefix = campgroundCoverPathPrefix(campgroundId);
+  const expected =
+    expectedCoverPhoto == null
+      ? null
+      : normalizeParkMediaUrl(expectedCoverPhoto);
+
+  if (expectedCoverPhoto != null && expected == null) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "expectedCoverPhoto",
+    });
+  }
+
+  if (expected == null) {
+    return resultSuccess();
+  }
+
   try {
     const supabase = await createClient();
-    const coverPrefix = campgroundCoverPathPrefix(campgroundId);
 
-    const existing = await handleDbSingle(
-      supabase
-        .from("campgrounds")
-        .select("id, cover_photo")
-        .eq("id", campgroundId)
-        .single(),
-    );
-    if (!existing.success) return existing;
+    const { data, error } = await supabase
+      .from("campgrounds")
+      .update({
+        cover_photo: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", campgroundId)
+      .eq("cover_photo", expected)
+      .select("id")
+      .maybeSingle();
 
-    const previous = normalizeParkMediaUrl(
-      (existing.data as { cover_photo?: string | null }).cover_photo,
-    );
+    if (error) return mapPostgrestError(error);
 
-    const update = await handleDbSingle(
-      supabase
-        .from("campgrounds")
-        .update({
-          cover_photo: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", campgroundId)
-        .select("id")
-        .single(),
-    );
-    if (!update.success) return update;
+    if (!data) {
+      const exists = await handleDbSingle(
+        supabase.from("campgrounds").select("id").eq("id", campgroundId).single(),
+      );
+      if (!exists.success) return exists;
+      return resultError(MediaErrorCode.MEDIA_COVER_CONFLICT);
+    }
 
-    if (previous) await removeStorageObjectIfOurs(previous, coverPrefix);
+    await removeStorageObjectIfOurs(expected, coverPrefix);
 
     revalidateCampgroundMedia(campgroundId);
     return resultSuccess();
@@ -255,10 +228,14 @@ export async function clearCampgroundCoverAction(
   }
 }
 
-export async function uploadSitePhotoAction(
+/**
+ * Append a browser-uploaded site photo URL via atomic RPC.
+ * Soft cap uses the raw array length (including foreign entries).
+ */
+export async function appendSitePhotoAction(
   campgroundId: string,
   siteId: string,
-  formData: FormData,
+  publicUrl: string,
 ): Promise<ActionResult<{ photos: string[] }>> {
   const auth = await requirePlatformAdmin();
   if (!auth.success) return auth;
@@ -269,14 +246,17 @@ export async function uploadSitePhotoAction(
     });
   }
 
-  const fileResult = await readUploadFile(formData);
-  if (!fileResult.ok) return fileResult.error;
+  const photoPrefix = sitePhotoPathPrefix(campgroundId, siteId);
+  const nextUrl = normalizeParkMediaUrl(publicUrl);
+  if (!nextUrl || !parkMediaUrlMatchesPrefix(nextUrl, photoPrefix)) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "publicUrl",
+    });
+  }
 
   try {
     const supabase = await createClient();
-    const photoPrefix = sitePhotoPathPrefix(campgroundId, siteId);
 
-    // Existence + soft cap check (authoritative cap is in append_site_photo).
     const existing = await handleDbSingle(
       supabase
         .from("sites")
@@ -287,47 +267,28 @@ export async function uploadSitePhotoAction(
     );
     if (!existing.success) return existing;
 
-    const currentDisplay = normalizeSitePhotoUrls(
+    const currentRaw = coerceSitePhotoEntries(
       (existing.data as { photos?: unknown }).photos,
     );
-    if (currentDisplay.length >= PARK_MEDIA_MAX_SITE_PHOTOS) {
+    if (currentRaw.length >= PARK_MEDIA_MAX_SITE_PHOTOS) {
+      await removeStorageObjectIfOurs(nextUrl, photoPrefix);
       return resultError(MediaErrorCode.MEDIA_LIMIT_REACHED, {
         max: PARK_MEDIA_MAX_SITE_PHOTOS,
       });
     }
 
-    const objectPath = sitePhotoObjectPath(
-      campgroundId,
-      siteId,
-      randomUUID(),
-      fileResult.mime,
-    );
-
-    const { error: uploadError } = await supabase.storage
-      .from(PARK_MEDIA_BUCKET)
-      .upload(objectPath, fileResult.bytes, {
-        contentType: fileResult.mime,
-        upsert: false,
-        cacheControl: "3600",
-      });
-
-    if (uploadError) {
-      console.error("[park-media] site upload failed", uploadError.message);
-      return resultError(MediaErrorCode.MEDIA_STORAGE_FAILED);
-    }
-
-    const publicUrl = parkMediaPublicUrl(objectPath);
-
     const { data, error } = await supabase.rpc("append_site_photo", {
       p_campground_id: campgroundId,
       p_site_id: siteId,
-      p_photo_url: publicUrl,
-      p_max: PARK_MEDIA_MAX_SITE_PHOTOS,
+      p_photo_url: nextUrl,
     });
 
     if (error) {
-      await removeStorageObjectIfOurs(publicUrl, photoPrefix);
-      if (error.code === "P0001") {
+      await removeStorageObjectIfOurs(nextUrl, photoPrefix);
+      if (
+        typeof error.message === "string" &&
+        error.message.includes(SITE_PHOTO_CAP_MARKER)
+      ) {
         return resultError(MediaErrorCode.MEDIA_LIMIT_REACHED, {
           max: PARK_MEDIA_MAX_SITE_PHOTOS,
         });
@@ -340,13 +301,18 @@ export async function uploadSitePhotoAction(
 
     revalidateSiteMedia(campgroundId, siteId);
     return resultSuccess({
-      photos: normalizeSitePhotoUrls(data ?? coerceSitePhotoEntries(data)),
+      photos: coerceSitePhotoEntries(data),
     });
   } catch (err) {
+    await removeStorageObjectIfOurs(nextUrl, photoPrefix);
     return handleUnexpectedError(err);
   }
 }
 
+/**
+ * Remove one photo URL (park-media or foreign) via atomic RPC.
+ * Storage delete only runs for this site's park-media prefix.
+ */
 export async function removeSitePhotoAction(
   campgroundId: string,
   siteId: string,
@@ -361,13 +327,14 @@ export async function removeSitePhotoAction(
     });
   }
 
-  const photoPrefix = sitePhotoPathPrefix(campgroundId, siteId);
-  const target = normalizeParkMediaUrl(photoUrl);
-  if (!target || !parkMediaUrlMatchesPrefix(target, photoPrefix)) {
+  const target = typeof photoUrl === "string" ? photoUrl.trim() : "";
+  if (!target) {
     return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
       field: "photoUrl",
     });
   }
+
+  const photoPrefix = sitePhotoPathPrefix(campgroundId, siteId);
 
   try {
     const supabase = await createClient();
@@ -389,7 +356,7 @@ export async function removeSitePhotoAction(
 
     revalidateSiteMedia(campgroundId, siteId);
     return resultSuccess({
-      photos: normalizeSitePhotoUrls(data ?? []),
+      photos: coerceSitePhotoEntries(data),
     });
   } catch (err) {
     return handleUnexpectedError(err);

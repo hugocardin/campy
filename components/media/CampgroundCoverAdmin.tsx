@@ -2,8 +2,9 @@
 
 import {
   clearCampgroundCoverAction,
-  uploadCampgroundCoverAction,
+  commitCampgroundCoverAction,
 } from "@/app/actions/park-media";
+import { uploadCampgroundCoverFile } from "@/components/media/uploadParkMediaFile";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,11 +62,25 @@ export default function CampgroundCoverAdmin({
       return;
     }
 
-    const formData = new FormData();
-    formData.set("file", file);
-
     startTransition(async () => {
-      const result = await uploadCampgroundCoverAction(campgroundId, formData);
+      const uploaded = await uploadCampgroundCoverFile(campgroundId, file);
+      if (!uploaded.ok) {
+        setError(
+          translateErrorCode(
+            uploaded.errorCode,
+            tErrors,
+            tc("error"),
+            uploaded.details,
+          ),
+        );
+        return;
+      }
+
+      const result = await commitCampgroundCoverAction(
+        campgroundId,
+        uploaded.publicUrl,
+        coverPhoto,
+      );
       if (!result.success) {
         setError(
           withErrorReference(
@@ -90,7 +105,7 @@ export default function CampgroundCoverAdmin({
     if (!confirm(t("coverClearConfirm"))) return;
     setError(null);
     startTransition(async () => {
-      const result = await clearCampgroundCoverAction(campgroundId);
+      const result = await clearCampgroundCoverAction(campgroundId, coverPhoto);
       if (!result.success) {
         setError(
           withErrorReference(
