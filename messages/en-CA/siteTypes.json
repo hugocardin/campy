@@ -1,0 +1,43 @@
+{
+  "singular": "Site type",
+  "plural": "Site types",
+  "noResult": "No site type",
+
+  "form": {
+    "codeLabel": "Site type code",
+    "createCodePlaceholder": "e.g. TENT, RV, LODGING"
+  },
+
+  "hints": {
+    "customTypes": "Custom codes are allowed for catalog experiments. Until type attributes live on site_types, they behave like TENT (camping): optional rig length, driveway allowed, stay under camping search — and they are not guest-filterable by fine type."
+  },
+
+  "errors": {
+    "codeRequired": "Site type code is required but was not provided.",
+    "codeTooLong": "Site type code must be {max} characters or fewer.",
+    "codeInvalidFormat": "Site type code must start with a letter and use only A–Z, digits, and underscores (e.g. RV_AND_TENT).",
+    "systemCodeProtected": "{codes} are used by site forms, guest search, and database rules and cannot be deleted."
+  },
+
+  "badges": {
+    "system": "System",
+    "systemTitle": "{codes} are protected system codes and cannot be deleted."
+  },
+
+  "actions": {
+    "deleteSiteTypeTitle": "Delete site type",
+    "confirmSiteTypeDeletion": "Delete site type \"{code}\"? This action cannot be undone."
+  },
+
+  "AdminSiteTypesPage": {
+    "pageHeader": {
+      "title": "Manage Site Types",
+      "description": "Add or remove site types"
+    },
+    "meta": {
+      "title": "Site Types | Admin | Campy",
+      "description": "Manage the available site types."
+    },
+    "loadError": "Could not load site types."
+  }
+}

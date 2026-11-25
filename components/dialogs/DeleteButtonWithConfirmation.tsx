@@ -18,6 +18,8 @@ interface DeleteButtonWithConfirmationProps {
   title: string;
   description: string;
   onConfirm: CallableFunction;
+  /** Optional id of an element that explains why delete is disabled. */
+  ariaDescribedBy?: string;
 }
 
 export function DeleteButtonWithConfirmation({
@@ -25,6 +27,7 @@ export function DeleteButtonWithConfirmation({
   description,
   onConfirm,
   disabled = false,
+  ariaDescribedBy,
 }: DeleteButtonWithConfirmationProps) {
   const tc = useTranslations("common");
 
@@ -35,6 +38,7 @@ export function DeleteButtonWithConfirmation({
           variant="ghost"
           size="sm"
           disabled={disabled}
+          aria-describedby={ariaDescribedBy}
           className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
         >
           <Trash2 className="mr-2 h-4 w-4" />

@@ -35,6 +35,7 @@ export const routes = {
     root: () => "/platformAdmin",
     amenities: () => "/platformAdmin/amenities",
     amenityCategory: () => "/platformAdmin/amenity-categories",
+    siteTypes: () => "/platformAdmin/site-types",
     campgrounds: () => "/platformAdmin/campgrounds",
     campgroundCreate: () => "/platformAdmin/campgrounds/create",
     campgroundView: (id: string) => `/platformAdmin/campgrounds/${id}`,

@@ -27,6 +27,14 @@ export const AmenityMissingField = {
   category: "amenity.category",
 } as const;
 
+/**
+ * Entity-namespaced `field` values emitted by site-type actions.
+ * Callers map these to form-local required messages (not raw column names).
+ */
+export const SiteTypeMissingField = {
+  code: "siteType.code",
+} as const;
+
 /** Optional per-call hooks for translating ActionResult errors. */
 export type TranslateErrorOptions = {
   /**

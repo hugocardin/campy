@@ -2,11 +2,12 @@ export {
   PROTECTED_HOOKUP_AMENITY_CODES,
   isProtectedHookupAmenityCode,
 } from "./hookup-codes";
+import { normalizeLookupCode } from "@/lib/lookup-code";
 
 /**
  * App-level cap for amenity `code` (UTF-16 length after trim + uppercase).
- * DB column limit is not in-repo (no migrations); keep this conservative so
- * multi-MB payloads never hit insert.
+ * Live `amenities.code` is unbounded `text` unless a later migration adds a
+ * CHECK; keep this conservative so multi-MB payloads never hit insert.
  */
 export const AMENITY_CODE_MAX_LENGTH = 64;
 
@@ -21,13 +22,5 @@ export type NormalizeAmenityCodeResult =
 export function normalizeAmenityCode(
   input: unknown,
 ): NormalizeAmenityCodeResult {
-  const trimmed = typeof input === "string" ? input.trim() : "";
-  if (!trimmed) {
-    return { ok: false, reason: "missing" };
-  }
-  const code = trimmed.toUpperCase();
-  if (code.length > AMENITY_CODE_MAX_LENGTH) {
-    return { ok: false, reason: "too_long" };
-  }
-  return { ok: true, code };
+  return normalizeLookupCode(input, AMENITY_CODE_MAX_LENGTH);
 }

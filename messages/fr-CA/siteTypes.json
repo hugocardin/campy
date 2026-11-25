@@ -1,0 +1,43 @@
+{
+  "singular": "Type d'emplacement",
+  "plural": "Types d'emplacement",
+  "noResult": "Aucun type d'emplacement",
+
+  "form": {
+    "codeLabel": "Code du type d'emplacement",
+    "createCodePlaceholder": "ex. TENT, RV, LODGING"
+  },
+
+  "hints": {
+    "customTypes": "Les codes personnalisés sont permis pour des essais de catalogue. Tant que les attributs de type ne sont pas sur site_types, ils se comportent comme TENT (camping) : longueur de véhicule optionnelle, entrée permise, inclus dans la recherche camping — et ils ne sont pas filtrables par type fin côté invité."
+  },
+
+  "errors": {
+    "codeRequired": "Le code du type d'emplacement est obligatoire, mais n'a pas été fourni.",
+    "codeTooLong": "Le code du type d'emplacement doit comporter au plus {max} caractères.",
+    "codeInvalidFormat": "Le code du type d'emplacement doit commencer par une lettre et n'utiliser que A–Z, des chiffres et des tirets bas (ex. RV_AND_TENT).",
+    "systemCodeProtected": "{codes} sont utilisés par les formulaires d'emplacement, la recherche invitée et les règles de la base de données, et ne peuvent pas être supprimés."
+  },
+
+  "badges": {
+    "system": "Système",
+    "systemTitle": "{codes} sont des codes système protégés et ne peuvent pas être supprimés."
+  },
+
+  "actions": {
+    "deleteSiteTypeTitle": "Supprimer le type d'emplacement",
+    "confirmSiteTypeDeletion": "Supprimer le type d'emplacement «\u00A0{code}\u00A0»? Cette action est irréversible."
+  },
+
+  "AdminSiteTypesPage": {
+    "pageHeader": {
+      "title": "Gérer les types d'emplacement",
+      "description": "Ajouter ou retirer des types d'emplacement"
+    },
+    "meta": {
+      "title": "Types d'emplacement | Administration | Campy",
+      "description": "Gérer les types d'emplacement disponibles."
+    },
+    "loadError": "Impossible de charger les types d'emplacement."
+  }
+}

@@ -23,6 +23,12 @@
  *   preference / feet default". Does not change the numeric meaning of
  *   `rigLength`.
  */
+/**
+ * Canonical seeded site-type codes (guest filters, lodging/rig rules, SQL).
+ * Also drives delete/rename protection in `lib/site-types/code.ts` and the
+ * `protect_seeded_site_type_codes` trigger — keep those lists in sync when
+ * adding a seeded type.
+ */
 export const SITE_TYPE_CODES = [
   "TENT",
   "RV",
