@@ -75,8 +75,12 @@ function mapCampgroundWriteError(error: PostgrestError): ActionResult<never> {
     });
   }
 
-  // numeric_value_out_of_range — e.g. commission_value beyond numeric(8,2).
-  if (error.code === "22003") {
+  // numeric_value_out_of_range from numeric(p,s) overflow only (not integer
+  // overflow / other columns). Message is Postgres: "numeric field overflow".
+  if (
+    error.code === "22003" &&
+    /numeric field overflow/i.test(error.message)
+  ) {
     return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
       field: "campground.commission_value",
       reason: "value_out_of_range",

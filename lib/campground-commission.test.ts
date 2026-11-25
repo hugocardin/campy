@@ -7,6 +7,8 @@ import {
   COMMISSION_GUARD_DETAIL,
   COMMISSION_GUARD_SQL_MESSAGE_PREFIXES,
   COMMISSION_PERCENT_MAX,
+  COMMISSION_TYPE_NAMES,
+  COMMISSION_TYPES_NAME_LOCKED_DETAIL,
   formatCommissionFixed,
   formatCommissionPercent,
   normalizeCommissionInput,
@@ -18,26 +20,19 @@ import {
 
 const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
 
-/** Latest migration that defines `campgrounds_enforce_commission_value`. */
-function latestCommissionEnforceMigrationSql(): string {
+/** Latest migration whose body matches `pattern` (filename-sorted). */
+function latestMigrationMatching(pattern: RegExp): string {
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((name) => name.endsWith(".sql"))
     .sort();
   let latest: string | null = null;
   for (const name of files) {
     const body = readFileSync(join(MIGRATIONS_DIR, name), "utf8");
-    if (
-      /CREATE OR REPLACE FUNCTION\s+public\.campgrounds_enforce_commission_value\s*\(/i.test(
-        body,
-      )
-    ) {
+    if (pattern.test(body)) {
       latest = body;
     }
   }
-  assert.ok(
-    latest,
-    "expected a migration defining campgrounds_enforce_commission_value",
-  );
+  assert.ok(latest, `expected a migration matching ${pattern}`);
   return latest!;
 }
 
@@ -345,11 +340,12 @@ describe("parseCampgroundCommissionGuardError", () => {
 });
 
 describe("commission DB guard migration pins", () => {
-  it("keeps SQL literals in sync with TS constants and DETAIL markers", () => {
-    // Pin against the latest CREATE OR REPLACE of the enforce function so a
-    // future redefine cannot drift from COMMISSION_*_MAX while this test still
-    // passes against an older applied migration file.
-    const sql = latestCommissionEnforceMigrationSql();
+  it("keeps enforce-function literals in sync with TS constants", () => {
+    // Latest CREATE OR REPLACE — not a fixed filename — so a redefine can't
+    // drift from COMMISSION_*_MAX while an older file still satisfies the pin.
+    const sql = latestMigrationMatching(
+      /CREATE OR REPLACE FUNCTION\s+public\.campgrounds_enforce_commission_value\s*\(/i,
+    );
 
     assert.match(
       sql,
@@ -376,6 +372,26 @@ describe("commission DB guard migration pins", () => {
     assert.ok(sql.includes(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.fixedMax));
     assert.ok(
       sql.includes(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.typeMissing),
+    );
+    // Rename-refuse DETAIL is admin/SQL-only; intentionally not in GUARD_RESULTS.
+    assert.ok(sql.includes(COMMISSION_TYPES_NAME_LOCKED_DETAIL));
+  });
+
+  it("pins NaN clause on latest nonneg CHECK redefine", () => {
+    const sql = latestMigrationMatching(
+      /campgrounds_commission_value_nonneg_chk/i,
+    );
+    assert.match(sql, /commission_value <> 'NaN'::numeric/);
+  });
+
+  it("pins commission_types.name CHECK to COMMISSION_TYPE_NAMES", () => {
+    const sql = latestMigrationMatching(/commission_types_name_chk/i);
+    const expected = [...COMMISSION_TYPE_NAMES]
+      .map((n) => `'${n}'`)
+      .join(",\\s*");
+    assert.match(
+      sql,
+      new RegExp(`CHECK\\s*\\(\\s*name\\s+IN\\s*\\(\\s*${expected}\\s*\\)\\s*\\)`, "i"),
     );
   });
 });

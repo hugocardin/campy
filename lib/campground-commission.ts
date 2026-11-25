@@ -36,6 +36,10 @@ export const COMMISSION_GUARD_DETAIL = {
   typeMissing: "commission_type_missing",
 } as const;
 
+/** DETAIL from rename-refuse trigger — admin/SQL-only; intentionally unmapped. */
+export const COMMISSION_TYPES_NAME_LOCKED_DETAIL =
+  "commission_types_name_locked";
+
 export type CommissionGuardDetail =
   (typeof COMMISSION_GUARD_DETAIL)[keyof typeof COMMISSION_GUARD_DETAIL];
 
