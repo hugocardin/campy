@@ -25,6 +25,82 @@ export const COMMISSION_FIXED_MAX = 999_999.99;
 /** Max percent commission (inclusive). */
 export const COMMISSION_PERCENT_MAX = 100;
 
+/**
+ * Structured EXCEPTION DETAIL markers from
+ * `campgrounds_enforce_commission_value` (and related guards).
+ * Prefer DETAIL over message text when mapping PostgREST errors.
+ */
+export const COMMISSION_GUARD_DETAIL = {
+  percentMax: "commission_percent_max",
+  fixedMax: "commission_fixed_max",
+  typeMissing: "commission_type_missing",
+} as const;
+
+export type CommissionGuardDetail =
+  (typeof COMMISSION_GUARD_DETAIL)[keyof typeof COMMISSION_GUARD_DETAIL];
+
+/** Exact SQL message prefixes (pin against migration). */
+export const COMMISSION_GUARD_SQL_MESSAGE_PREFIXES = {
+  percentMax: "campgrounds_commission_percent_max:",
+  fixedMax: "campgrounds_commission_fixed_max:",
+  typeMissing: "campgrounds_commission_type_missing:",
+} as const;
+
+export type CommissionGuardParseResult = {
+  field: "campground.commission_type_id" | "campground.commission_value";
+  reason: "value_out_of_range" | "type_mismatch";
+};
+
+/**
+ * Parse PostgREST trigger/CHECK error → commission field ActionResult shape.
+ * Prefer structured `details` (EXCEPTION DETAIL); fall back to message prefix.
+ */
+export function parseCampgroundCommissionGuardError(options: {
+  message?: string | null;
+  details?: string | null;
+}): CommissionGuardParseResult | null {
+  const detail = options.details?.trim();
+  if (detail === COMMISSION_GUARD_DETAIL.percentMax) {
+    return {
+      field: "campground.commission_value",
+      reason: "value_out_of_range",
+    };
+  }
+  if (detail === COMMISSION_GUARD_DETAIL.fixedMax) {
+    return {
+      field: "campground.commission_value",
+      reason: "value_out_of_range",
+    };
+  }
+  if (detail === COMMISSION_GUARD_DETAIL.typeMissing) {
+    return {
+      field: "campground.commission_type_id",
+      reason: "type_mismatch",
+    };
+  }
+
+  const message = options.message ?? "";
+  if (message.startsWith(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.percentMax)) {
+    return {
+      field: "campground.commission_value",
+      reason: "value_out_of_range",
+    };
+  }
+  if (message.startsWith(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.fixedMax)) {
+    return {
+      field: "campground.commission_value",
+      reason: "value_out_of_range",
+    };
+  }
+  if (message.startsWith(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.typeMissing)) {
+    return {
+      field: "campground.commission_type_id",
+      reason: "type_mismatch",
+    };
+  }
+  return null;
+}
+
 const MAX_FRACTION_DIGITS = 2;
 
 export function isCommissionTypeName(

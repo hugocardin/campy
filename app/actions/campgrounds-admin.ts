@@ -3,7 +3,10 @@
 import { CAMPGROUND_PROVINCES_CACHE_TAG } from "@/data/campgrounds/get-campgrounds";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { redirect } from "@/i18n/navigation";
-import { normalizeCommissionInput } from "@/lib/campground-commission";
+import {
+  normalizeCommissionInput,
+  parseCampgroundCommissionGuardError,
+} from "@/lib/campground-commission";
 import {
   CAMPGROUND_CURRENCY_LOCKED_FIELD,
   parseCampgroundCurrencyLockError,
@@ -284,6 +287,18 @@ export async function updateCampgroundAction(
             reason: `currency_locked_${lockReason}`,
           });
         }
+      }
+      // Commission guards (23514 percent/fixed max; 23503 type missing) —
+      // backstop when pre-validation is skipped; DETAIL markers from #62.
+      const commissionGuard = parseCampgroundCommissionGuardError({
+        message: updateError.message,
+        details: updateError.details,
+      });
+      if (commissionGuard) {
+        return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+          field: commissionGuard.field,
+          reason: commissionGuard.reason,
+        });
       }
       return mapPostgrestError(updateError);
     }
