@@ -17,4 +17,8 @@ export interface CampgroundCreateUpdateInput {
     lat: number;
     lng: number;
   };
+  /** Nullable FK to `commission_types`. */
+  commission_type_id: number | null;
+  /** Commission amount (percent 0–100 or fixed ≥0). */
+  commission_value: number | null;
 }

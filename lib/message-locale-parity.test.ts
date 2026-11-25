@@ -26,6 +26,7 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "campgrounds.form.websitePlaceholder",
   "campgrounds.form.latitudeLabel",
   "campgrounds.form.longitudeLabel",
+  "campgrounds.form.commissionValueUnset",
   "sites.form.descriptionLabel",
   // Amp labels are the same in both locales (IEC-style "15 A")
   "search.controls.filterAmp15",

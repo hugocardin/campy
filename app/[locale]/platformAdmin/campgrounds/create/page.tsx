@@ -2,6 +2,7 @@ import { createCampgroundAction } from "@/app/actions/campgrounds-admin";
 import CampgroundFormClient from "@/components/campground/CampgroundFormClient";
 import { BackHeader } from "@/components/layout/back-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getAllCommissionTypes } from "@/data/commission-types/get-commission-types";
 import { getOwners } from "@/data/profile/get-owners";
 import { routes } from "@/lib/routes";
 import { generatePageMetadata } from "@/lib/utils";
@@ -16,13 +17,17 @@ export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 export default async function CampgroundCreatePage() {
   const t = await getTranslations(PAGE_NAMESPACE);
 
-  const ownersresult = await getOwners();
+  const [ownersresult, commissionTypesResult] = await Promise.all([
+    getOwners(),
+    getAllCommissionTypes(),
+  ]);
 
-  if (!ownersresult.success) {
+  if (!ownersresult.success || !commissionTypesResult.success) {
     redirect(routes.platformAdmin.campgrounds());
   }
 
   const owners = ownersresult.data!;
+  const commissionTypes = commissionTypesResult.data!;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -41,6 +46,7 @@ export default async function CampgroundCreatePage() {
       >
         <CampgroundFormClient
           owners={owners}
+          commissionTypes={commissionTypes}
           onSubmit={createCampgroundAction}
         />
       </Suspense>

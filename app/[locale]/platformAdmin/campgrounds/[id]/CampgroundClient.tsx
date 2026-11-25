@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
+import { parseCommissionTypeName } from "@/lib/campground-commission";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import { useTranslations } from "next-intl";
 
@@ -37,6 +38,33 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
         items.sort((a, b) => a.code.localeCompare(b.code)),
       ]),
   );
+
+  const commissionTypeName = parseCommissionTypeName(
+    campground.commission_type_name,
+  );
+  const commissionTypeLabel =
+    commissionTypeName === "percent"
+      ? t_campgrounds("commissionTypes.percent")
+      : commissionTypeName === "fixed"
+        ? t_campgrounds("commissionTypes.fixed")
+        : t_campgrounds("form.commissionTypeNone");
+  const commissionValueLabel =
+    commissionTypeName === "percent"
+      ? t_campgrounds("form.commissionValuePercentLabel")
+      : commissionTypeName === "fixed"
+        ? t_campgrounds("form.commissionValueFixedLabel")
+        : t_campgrounds("form.commissionValueLabel");
+  const commissionValueDisplay =
+    campground.commission_type_id == null
+      ? t_campgrounds("form.commissionValueUnset")
+      : commissionTypeName === "percent"
+        ? t_campgrounds("form.commissionValuePercentDisplay", {
+            value: campground.commission_value,
+          })
+        : t_campgrounds("form.commissionValueFixedDisplay", {
+            value: campground.commission_value,
+            currency: campground.currency,
+          });
 
   return (
     <div className="space-y-10">
@@ -153,6 +181,21 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
                       ? campground.location.lng.toFixed(6)
                       : ""}
                   </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                    {t_campgrounds("form.commissionTypeLabel")}
+                  </h3>
+                  <p>{commissionTypeLabel}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                    {commissionValueLabel}
+                  </h3>
+                  <p>{commissionValueDisplay}</p>
                 </div>
               </div>
             </div>

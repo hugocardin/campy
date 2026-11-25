@@ -1,4 +1,5 @@
 import { CampgroundAdmin } from "@/entities/campground-admin";
+import { getAllCommissionTypes } from "@/data/commission-types/get-commission-types";
 import {
   GUEST_PRICE_CURRENCY,
   resolveCampgroundPriceCurrency,
@@ -29,10 +30,23 @@ type CampgroundAdminRow = {
   website: string | null;
   phone: string | null;
   active: boolean;
+  commission_type_id?: number | null;
+  commission_value?: number | string | null;
   cover_photo?: string | null;
 };
 
-function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
+function toDomain(
+  row: CampgroundAdminRow,
+  typeNameById: Map<number, string>,
+): CampgroundAdmin {
+  const typeId =
+    row.commission_type_id == null ? null : Number(row.commission_type_id);
+  const resolvedTypeId =
+    typeId != null && Number.isInteger(typeId) && typeId > 0 ? typeId : null;
+  const rawValue = row.commission_value;
+  const valueNum =
+    rawValue == null || rawValue === "" ? 0 : Number(rawValue);
+
   return {
     id: row.id,
     owner_id: row.owner_id,
@@ -54,8 +68,26 @@ function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
     website: row.website ?? "",
     phone: row.phone ?? "",
     active: row.active,
+    commission_type_id: resolvedTypeId,
+    commission_type_name:
+      resolvedTypeId != null
+        ? (typeNameById.get(resolvedTypeId) ?? null)
+        : null,
+    commission_value: Number.isFinite(valueNum) ? valueNum : 0,
     coverPhoto: normalizeParkMediaUrl(row.cover_photo),
   };
+}
+
+async function commissionTypeNameById(): Promise<Map<number, string>> {
+  const typesResult = await getAllCommissionTypes();
+  const map = new Map<number, string>();
+  if (!typesResult.success) {
+    return map;
+  }
+  for (const type of typesResult.data) {
+    map.set(type.id, type.name);
+  }
+  return map;
 }
 
 /**
@@ -67,15 +99,18 @@ export const getCampgroundsAdmin = cache(
     try {
       const supabase = await createClient();
 
-      const result = await handleDbResponse(
-        supabase.rpc("get_campgrounds_admin"),
-      );
+      const [result, typeNameById] = await Promise.all([
+        handleDbResponse(supabase.rpc("get_campgrounds_admin")),
+        commissionTypeNameById(),
+      ]);
 
       if (!result.success) {
         return result;
       }
 
-      const campgrounds = (result.data as CampgroundAdminRow[]).map(toDomain);
+      const campgrounds = (result.data as CampgroundAdminRow[]).map((row) =>
+        toDomain(row, typeNameById),
+      );
 
       return resultSuccess(campgrounds);
     } catch (err) {
@@ -89,9 +124,10 @@ export const getCampgroundAdminById = cache(
     try {
       const supabase = await createClient();
 
-      const result = await handleDbResponse(
-        supabase.rpc("get_campgrounds_admin", { p_id: id }),
-      );
+      const [result, typeNameById] = await Promise.all([
+        handleDbResponse(supabase.rpc("get_campgrounds_admin", { p_id: id })),
+        commissionTypeNameById(),
+      ]);
 
       if (!result.success) {
         return result;
@@ -102,7 +138,7 @@ export const getCampgroundAdminById = cache(
         return resultError(DbErrorCode.DB_NOT_FOUND);
       }
 
-      return resultSuccess(toDomain(rows[0]!));
+      return resultSuccess(toDomain(rows[0]!, typeNameById));
     } catch (err) {
       return handleUnexpectedError(err);
     }

@@ -3,6 +3,7 @@
 import { CAMPGROUND_PROVINCES_CACHE_TAG } from "@/data/campgrounds/get-campgrounds";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
 import { redirect } from "@/i18n/navigation";
+import { normalizeCommissionInput } from "@/lib/campground-commission";
 import {
   CAMPGROUND_CURRENCY_LOCKED_FIELD,
   parseCampgroundCurrencyLockError,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/supabase/db-utils";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidateTag } from "next/cache";
 import { getLocale } from "next-intl/server";
 
@@ -78,6 +80,79 @@ function revalidateCampgroundPublicAndAdmin(id: string) {
   revalidateLocalizedPath(routes.platformAdmin.campgroundView(id));
   revalidateLocalizedPath(routes.platformAdmin.campgroundEdit(id));
   revalidateTag(CAMPGROUND_PROVINCES_CACHE_TAG, "max");
+}
+
+async function resolveCommissionTypeName(
+  supabase: SupabaseClient,
+  typeId: number | null | undefined,
+): Promise<ActionResult<string | null>> {
+  if (typeId == null) {
+    return resultSuccess(null);
+  }
+  if (!Number.isInteger(typeId) || typeId < 1) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "campground.commission_type_id",
+    });
+  }
+
+  const result = await handleDbSingle(
+    supabase
+      .from("commission_types")
+      .select("name")
+      .eq("id", typeId)
+      .single(),
+  );
+
+  if (!result.success) {
+    if (result.errorCode === DbErrorCode.DB_NOT_FOUND) {
+      return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+        field: "campground.commission_type_id",
+      });
+    }
+    return result;
+  }
+
+  const name = String(result.data.name ?? "").trim().toLowerCase();
+  if (!name) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "campground.commission_type_id",
+    });
+  }
+  return resultSuccess(name);
+}
+
+async function normalizeCommissionWrite(
+  supabase: SupabaseClient,
+  input: Pick<
+    CampgroundCreateUpdateInput,
+    "commission_type_id" | "commission_value"
+  >,
+): Promise<
+  ActionResult<{ commission_type_id: number | null; commission_value: number }>
+> {
+  const typeResult = await resolveCommissionTypeName(
+    supabase,
+    input.commission_type_id,
+  );
+  if (!typeResult.success) {
+    return typeResult;
+  }
+
+  const normalized = normalizeCommissionInput({
+    commission_type_id: input.commission_type_id,
+    commission_value: input.commission_value,
+    typeName: typeResult.data,
+  });
+  if (!normalized.ok) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field:
+        normalized.field === "commission_type_id"
+          ? "campground.commission_type_id"
+          : "campground.commission_value",
+      reason: normalized.reason,
+    });
+  }
+  return resultSuccess(normalized.data);
 }
 
 async function changeCampgroundStatus(
@@ -152,6 +227,11 @@ export async function updateCampgroundAction(
 
     const supabase = await createClient();
 
+    const commissionResult = await normalizeCommissionWrite(supabase, input);
+    if (!commissionResult.success) {
+      return commissionResult;
+    }
+
     // Build the geography point in WKT format (Well-Known Text)
     // Format: POINT(longitude latitude)
     // SRID 4326 = WGS 84 (standard for GPS coordinates)
@@ -161,6 +241,7 @@ export async function updateCampgroundAction(
     // map 23514 + DETAIL → clear ActionResult. No TS pre-check (#52 review).
     // .select().single() so RLS-filtered 0-row updates surface as errors
     // instead of handleDbNoData fake-success + redirect.
+    // Explicit select columns only — never bare select=* (commission_* grants).
     const { data: updated, error: updateError } = await supabase
       .from("campgrounds")
       .update({
@@ -174,6 +255,8 @@ export async function updateCampgroundAction(
         currency: currencyResult.data,
         website: websiteResult.data,
         phone: input.phone || null,
+        commission_type_id: commissionResult.data.commission_type_id,
+        commission_value: commissionResult.data.commission_value,
         updated_at: new Date().toISOString(),
 
         // This is the important part: convert to geography type
@@ -241,6 +324,11 @@ export async function createCampgroundAction(
     const locationWKT = `POINT(${input.location.lng} ${input.location.lat})`;
     const supabase = await createClient();
 
+    const commissionResult = await normalizeCommissionWrite(supabase, input);
+    if (!commissionResult.success) {
+      return commissionResult;
+    }
+
     const result = await handleDbSingle(
       supabase
         .from("campgrounds")
@@ -255,6 +343,8 @@ export async function createCampgroundAction(
           currency: currencyResult.data,
           website: websiteResult.data,
           phone: input.phone?.trim() || null,
+          commission_type_id: commissionResult.data.commission_type_id,
+          commission_value: commissionResult.data.commission_value,
           location: `SRID=4326;${locationWKT}`,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

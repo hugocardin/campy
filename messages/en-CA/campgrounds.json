@@ -35,8 +35,28 @@
     "longitudePlaceholder": "e.g. -75.6972",
     "longitudeRange": "Range: -180° to +180°",
     "locationLabel": "Location",
+    "commissionTypeLabel": "Commission type",
+    "commissionTypePlaceholder": "Select a commission type",
+    "commissionTypeNone": "None",
+    "commissionTypeHint": "Optional. Platform fee terms for this park (data entry only).",
+    "commissionValueLabel": "Commission value",
+    "commissionValuePercentLabel": "Commission percent",
+    "commissionValueFixedLabel": "Commission amount",
+    "commissionValuePercentPlaceholder": "e.g. 10",
+    "commissionValueFixedPlaceholder": "e.g. 5.00",
+    "commissionValueHintNone": "Choose a commission type to set a value.",
+    "commissionValuePercentHint": "Percent of booking total (0–100).",
+    "commissionValueFixedHint": "Fixed amount in the listing currency (0 or more).",
+    "commissionValueUnset": "—",
+    "commissionValuePercentDisplay": "{value}%",
+    "commissionValueFixedDisplay": "{value} {currency}",
     "active": "Active",
     "inactive": "Inactive"
+  },
+
+  "commissionTypes": {
+    "percent": "Percent",
+    "fixed": "Fixed amount"
   },
 
   "errors": {
@@ -48,7 +68,11 @@
     "currencyInvalid": "Choose a valid listing currency (CAD, USD, or MXN).",
     "currencyLockedSites": "Listing currency can't be changed once this park has sites.",
     "currencyLockedBookings": "Listing currency can't be changed once this park has bookings with stored amounts.",
-    "currencyLockedUnknown": "Couldn't verify whether listing currency can be changed. Reload and try again."
+    "currencyLockedUnknown": "Couldn't verify whether listing currency can be changed. Reload and try again.",
+    "commissionTypeInvalid": "Choose a valid commission type, or none.",
+    "commissionValueInvalid": "Enter a valid commission value (up to 2 decimal places).",
+    "commissionValuePercentRange": "Percent commission must be between 0 and 100.",
+    "commissionValueFixedRange": "Fixed commission must be between 0 and 1,000,000."
   },
 
   "actions": {
