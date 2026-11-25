@@ -41,6 +41,7 @@ describe("park-media orphan RPC payload", () => {
         skipped_young: 0,
         skipped_unknown_age: 0,
         has_more: false,
+        next_after: null,
         orphans: [],
       }),
       null,
@@ -52,6 +53,7 @@ describe("park-media orphan RPC payload", () => {
         skipped_young: 0,
         skipped_unknown_age: 0,
         has_more: false,
+        next_after: null,
         orphans: "nope",
       }),
       null,
@@ -63,13 +65,26 @@ describe("park-media orphan RPC payload", () => {
         skipped_young: 0,
         skipped_unknown_age: 0,
         has_more: false,
+        next_after: null,
         orphans: ["ok", "../x"],
+      }),
+      null,
+    );
+    assert.equal(
+      orphanPathsFromRpcResult({
+        ok: true,
+        scanned: 1,
+        skipped_young: 0,
+        skipped_unknown_age: 0,
+        has_more: false,
+        next_after: null,
+        orphans: [{ path: "a/b.jpg" }],
       }),
       null,
     );
   });
 
-  it("accepts path strings and legacy {path} objects", () => {
+  it("accepts path strings and next_after", () => {
     assert.deepEqual(
       orphanPathsFromRpcResult({
         ok: true,
@@ -77,13 +92,15 @@ describe("park-media orphan RPC payload", () => {
         skipped_young: 1,
         skipped_unknown_age: 0,
         has_more: true,
-        orphans: ["a/b.jpg", { path: "c/d.jpg" }],
+        next_after: "c/d.jpg",
+        orphans: ["a/b.jpg", "c/d.jpg"],
       }),
       {
         scanned: 2,
         skippedYoung: 1,
         skippedUnknownAge: 0,
         hasMore: true,
+        nextAfter: "c/d.jpg",
         paths: ["a/b.jpg", "c/d.jpg"],
       },
     );

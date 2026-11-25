@@ -12,6 +12,7 @@ export type OrphanParkMediaRpcResult = {
   url_count?: unknown;
   unparsed_count?: unknown;
   has_more?: unknown;
+  next_after?: unknown;
   orphans?: unknown;
 };
 
@@ -51,6 +52,7 @@ export function orphanPathsFromRpcResult(
   skippedYoung: number;
   skippedUnknownAge: number;
   hasMore: boolean;
+  nextAfter: string | null;
   paths: string[];
 } | null {
   if (listed.ok !== true) return null;
@@ -64,20 +66,27 @@ export function orphanPathsFromRpcResult(
 
   if (typeof listed.has_more !== "boolean") return null;
 
+  let nextAfter: string | null = null;
+  if (listed.next_after != null) {
+    if (
+      typeof listed.next_after !== "string" ||
+      !listed.next_after ||
+      listed.next_after.includes("..")
+    ) {
+      return null;
+    }
+    nextAfter = listed.next_after;
+  }
+
   const orphanRows = Array.isArray(listed.orphans) ? listed.orphans : null;
   if (orphanRows == null) return null;
 
   const paths: string[] = [];
   for (const row of orphanRows) {
-    // Harden RPC returns path strings; tolerate legacy `{ path }` objects.
-    let path: unknown = row;
-    if (row && typeof row === "object" && "path" in row) {
-      path = (row as { path?: unknown }).path;
-    }
-    if (typeof path !== "string" || !path || path.includes("..")) {
+    if (typeof row !== "string" || !row || row.includes("..")) {
       return null;
     }
-    paths.push(path);
+    paths.push(row);
   }
 
   return {
@@ -85,6 +94,7 @@ export function orphanPathsFromRpcResult(
     skippedYoung,
     skippedUnknownAge,
     hasMore: listed.has_more,
+    nextAfter,
     paths,
   };
 }

@@ -48,16 +48,22 @@ export function ParkMediaSweepCard() {
         );
         return;
       }
-      const base = t("result", {
+      let summary = t("result", {
         scanned: result.data.scanned,
         removed: result.data.removed,
         notRemoved: result.data.notRemoved,
         skippedYoung: result.data.skippedYoung,
-        skippedUnknownAge: result.data.skippedUnknownAge,
       });
-      setSummary(
-        result.data.hasMore ? `${base} ${t("hasMoreHint")}` : base,
-      );
+      if (result.data.skippedUnknownAge > 0) {
+        summary = `${summary} ${t("skippedUnknownAgeHint", {
+          skippedUnknownAge: result.data.skippedUnknownAge,
+        })}`;
+      }
+      // Only when more remain and this run deleted something (avoids stuck-page loop).
+      if (result.data.hasMore) {
+        summary = `${summary} ${t("hasMoreHint")}`;
+      }
+      setSummary(summary);
     });
   };
 

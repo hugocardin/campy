@@ -41,8 +41,10 @@ import { createClient } from "@/lib/supabase/server";
 
 const SITE_PHOTO_CAP_MARKER = "park_media_site_photos_at_cap";
 
-/** Cap orphan deletes per admin sweep click (matches RPC default). */
+/** Cap orphan deletes per RPC page (matches SQL default). */
 const ORPHAN_SWEEP_LIMIT = 1000;
+/** Safety cap on keyset pages per admin click. */
+const ORPHAN_SWEEP_MAX_PAGES = 50;
 
 /** True when supabase-js surfaced a Postgres/PostgREST SQLSTATE (not a transport drop). */
 function isPostgresRejection(error: {
@@ -523,9 +525,9 @@ export async function removeSitePhotoAction(
  * `storage.objects` anti-joined to cover/photos). Fail-closed: aborts (no
  * deletes) on missing project URL, unparseable media URLs, or RPC shape
  * errors. Skips objects younger than the grace window (upload→commit race)
- * and NULL `created_at` (counted separately). Batched via `p_limit` /
- * `hasMore` — re-run to continue. Storage remove failures are `notRemoved`.
- * No cron yet — call manually from platform admin.
+ * and NULL `created_at` (counted separately). Keyset-batched via `p_limit` /
+ * `p_after` / `next_after` (auto-advances until done or a stuck page).
+ * Storage remove failures are `notRemoved`. No cron yet — manual admin only.
  */
 export async function sweepOrphanParkMediaAction(): Promise<
   ActionResult<{
@@ -554,81 +556,96 @@ export async function sweepOrphanParkMediaAction(): Promise<
     const supabase = getSupabaseAdmin();
 
     const graceSeconds = Math.floor(PARK_MEDIA_ORPHAN_GRACE_MS / 1000);
-    const { data, error } = await supabase.rpc("list_orphan_park_media", {
-      p_project_url: supabaseUrl,
-      p_grace_seconds: graceSeconds,
-      p_limit: ORPHAN_SWEEP_LIMIT,
-    });
-    if (error) return mapPostgrestError(error);
+    let after: string | null = null;
+    let scanned = 0;
+    let skippedYoung = 0;
+    let skippedUnknownAge = 0;
+    let removed = 0;
+    let notRemoved = 0;
+    let hasMore = false;
 
-    const listed = parseOrphanParkMediaRpc(data);
-    if (!listed) {
-      console.warn("[park-media] orphan sweep aborted — invalid RPC payload");
-      return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-        reason: "invalid_orphan_rpc_payload",
+    for (let page = 0; page < ORPHAN_SWEEP_MAX_PAGES; page += 1) {
+      const { data, error } = await supabase.rpc("list_orphan_park_media", {
+        p_project_url: supabaseUrl,
+        p_grace_seconds: graceSeconds,
+        p_limit: ORPHAN_SWEEP_LIMIT,
+        p_after: after,
       });
+      if (error) return mapPostgrestError(error);
+
+      const listed = parseOrphanParkMediaRpc(data);
+      if (!listed) {
+        console.warn("[park-media] orphan sweep aborted — invalid RPC payload");
+        return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
+          reason: "invalid_orphan_rpc_payload",
+        });
+      }
+
+      if (listed.ok !== true) {
+        const reason =
+          typeof listed.reason === "string" && listed.reason
+            ? listed.reason
+            : "orphan_rpc_aborted";
+        console.warn(
+          "[park-media] orphan sweep aborted —",
+          reason,
+          "unparsed=",
+          listed.unparsed_count,
+        );
+        const unparsedCount = requireNonNegInt(listed.unparsed_count);
+        return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
+          reason,
+          ...(unparsedCount != null ? { unparsedCount } : {}),
+        });
+      }
+
+      const parsed = orphanPathsFromRpcResult(listed);
+      if (!parsed) {
+        console.warn("[park-media] orphan sweep aborted — invalid ok payload");
+        return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
+          reason: "invalid_orphan_rpc_payload",
+        });
+      }
+
+      scanned = parsed.scanned;
+      skippedYoung = parsed.skippedYoung;
+      skippedUnknownAge = parsed.skippedUnknownAge;
+      hasMore = parsed.hasMore;
+
+      if (parsed.paths.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      const batch = await removeParkMediaObjectPaths(supabase, parsed.paths);
+      removed += batch.removed;
+      notRemoved += batch.notRemoved;
+
+      // Stuck page (nothing deleted) — stop so hasMore does not loop forever.
+      if (batch.removed === 0) {
+        break;
+      }
+
+      if (!parsed.hasMore || !parsed.nextAfter) {
+        hasMore = false;
+        break;
+      }
+      after = parsed.nextAfter;
     }
 
-    if (listed.ok !== true) {
-      const reason =
-        typeof listed.reason === "string" && listed.reason
-          ? listed.reason
-          : "orphan_rpc_aborted";
-      console.warn(
-        "[park-media] orphan sweep aborted —",
-        reason,
-        "unparsed=",
-        listed.unparsed_count,
-      );
-      const unparsedCount = requireNonNegInt(listed.unparsed_count);
-      return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-        reason,
-        ...(unparsedCount != null ? { unparsedCount } : {}),
-      });
-    }
+    // Only invite another click when more remain AND this run made progress.
+    const inviteMore = hasMore && removed > 0;
 
-    const parsed = orphanPathsFromRpcResult(listed);
-    if (!parsed) {
-      console.warn("[park-media] orphan sweep aborted — invalid ok payload");
-      return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-        reason: "invalid_orphan_rpc_payload",
-      });
-    }
-
-    const {
-      scanned,
-      skippedYoung,
-      skippedUnknownAge,
-      hasMore,
-      paths: candidatePaths,
-    } = parsed;
-
-    if (candidatePaths.length === 0) {
-      return resultSuccess({
-        scanned,
-        removed: 0,
-        notRemoved: 0,
-        skippedYoung,
-        skippedUnknownAge,
-        hasMore,
-      });
-    }
-
-    const { removed, notRemoved } = await removeParkMediaObjectPaths(
-      supabase,
-      candidatePaths,
-    );
-
-    if (notRemoved > 0 || hasMore) {
+    if (notRemoved > 0 || inviteMore) {
       console.warn(
         "[park-media] orphan sweep incomplete",
         `scanned=${scanned}`,
-        `candidates=${candidatePaths.length}`,
         `removed=${removed}`,
         `notRemoved=${notRemoved}`,
         `skippedYoung=${skippedYoung}`,
         `skippedUnknownAge=${skippedUnknownAge}`,
         `hasMore=${hasMore}`,
+        `inviteMore=${inviteMore}`,
       );
     }
 
@@ -638,7 +655,7 @@ export async function sweepOrphanParkMediaAction(): Promise<
       notRemoved,
       skippedYoung,
       skippedUnknownAge,
-      hasMore,
+      hasMore: inviteMore,
     });
   } catch (err) {
     return handleUnexpectedError(err);
