@@ -27,6 +27,8 @@ function folderFromPrefix(prefix: string): string {
 /**
  * Recursively list object paths under a bucket folder prefix
  * (e.g. `{campgroundId}/` or `{campgroundId}/sites/{siteId}/`).
+ * Used for delete-by-prefix cleanup. Global orphan sweep uses
+ * `list_orphan_park_media` (SQL) instead — see #57.
  */
 export async function listParkMediaObjects(
   supabase: SupabaseClient,
