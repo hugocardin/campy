@@ -27,4 +27,9 @@ export interface Campground {
   priceCurrency: GuestPriceCurrency;
   website: string;
   phone: string;
+  /**
+   * Public park-media cover URL when set; null → guest UI uses placeholder.
+   * Enriched from `v_campgrounds.cover_photo` / search enrichment.
+   */
+  coverPhoto: string | null;
 }

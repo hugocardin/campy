@@ -113,8 +113,21 @@
     }
   },
 
+  "media": {
+    "coverTitle": "Cover photo",
+    "coverHint": "Shown on search cards and the guest campground page. JPEG, PNG, or WebP.",
+    "coverAlt": "Campground cover",
+    "coverEmpty": "No cover uploaded yet — guests see a placeholder.",
+    "coverUpload": "Upload cover",
+    "coverReplace": "Replace cover",
+    "coverClear": "Remove cover",
+    "coverClearConfirm": "Remove this cover photo? Guests will see the placeholder again.",
+    "fileConstraints": "Max {mb} MB. JPEG, PNG, or WebP only."
+  },
+
   "CampgroundDetailsPage": {
     "sitesHeading": "Sites",
+    "sitePhotoAlt": "Photo of {name}",
     "noDescription": "No description provided.",
     "loadErrorTitle": "Couldn't load this campground",
     "loadErrorDescription": "Something went wrong while loading this page. Please try again.",

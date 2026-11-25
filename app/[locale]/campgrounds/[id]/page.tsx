@@ -22,12 +22,14 @@ import {
 import { formatCampgroundPricePerNight } from "@/lib/campground-price";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { isUuid } from "@/lib/is-uuid";
+import { resolveCampgroundCoverSrc } from "@/lib/park-media";
 import { routes } from "@/lib/routes";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import { parseRigLengthUnit } from "@/lib/site-rig-length";
 import { translateCode } from "@/lib/translate-code";
 import { MapPin } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 
 const PAGE_NAMESPACE = "campgrounds.CampgroundDetailsPage" as const;
@@ -185,6 +187,17 @@ export default async function CampgroundDetailsPage({
         />
 
         <div className="space-y-10">
+          <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
+            <Image
+              src={resolveCampgroundCoverSrc(campground.coverPhoto)}
+              alt={campground.name}
+              fill
+              className="object-cover"
+              sizes="(max-width: 1280px) 100vw, 1280px"
+              priority
+            />
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle>{tc("details")}</CardTitle>
@@ -351,7 +364,29 @@ export default async function CampgroundDetailsPage({
                       {sites.map((site) => (
                         <TableRow key={site.id}>
                           <TableCell className="font-medium">
-                            {site.name}
+                            <div className="space-y-2">
+                              <span>{site.name}</span>
+                              {site.photos.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {site.photos.slice(0, 4).map((url) => (
+                                    <div
+                                      key={url}
+                                      className="relative h-12 w-16 overflow-hidden rounded bg-muted"
+                                    >
+                                      <Image
+                                        src={url}
+                                        alt={t("sitePhotoAlt", {
+                                          name: site.name,
+                                        })}
+                                        fill
+                                        className="object-cover"
+                                        sizes="64px"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
                           </TableCell>
                           <TableCell>{site.description}</TableCell>
                           <TableCell>

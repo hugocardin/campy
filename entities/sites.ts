@@ -15,4 +15,6 @@ export interface Site {
   electricity_amps: ElectricityAmp[];
   /** Pull-through / back-in; null = unknown. */
   driveway_type: DrivewayType | null;
+  /** Public park-media photo URLs (may be empty). */
+  photos: string[];
 }

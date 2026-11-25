@@ -11,6 +11,7 @@ import { Link } from "@/i18n/navigation";
 import { formatDistanceKm } from "@/lib/campground-search";
 import { formatCampgroundPricePerNight } from "@/lib/campground-price";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
+import { resolveCampgroundCoverSrc } from "@/lib/park-media";
 import { routes, type CampgroundDetailQuery } from "@/lib/routes";
 import { scrollChildIntoContainer } from "@/lib/search-hover-sync";
 import { cn } from "@/lib/utils";
@@ -88,7 +89,7 @@ function CampgroundCard({
     >
       <div className="relative aspect-4/3 md:aspect-video">
         <Image
-          src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop"
+          src={resolveCampgroundCoverSrc(campground.coverPhoto)}
           alt={campground.name}
           fill
           className="object-cover"

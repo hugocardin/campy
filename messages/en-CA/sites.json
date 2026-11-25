@@ -64,6 +64,18 @@
     "createSite": "Create Site"
   },
 
+  "media": {
+    "title": "Site photos",
+    "hint": "Guest campground pages show these when present. JPEG, PNG, or WebP.",
+    "photoAlt": "Site photo",
+    "empty": "No photos yet.",
+    "upload": "Add photo",
+    "remove": "Remove",
+    "removeConfirm": "Remove this photo?",
+    "count": "{current} of {max}",
+    "fileConstraints": "Max {mb} MB each. JPEG, PNG, or WebP only."
+  },
+
   "AdminSitesPage": {
     "pageHeader": {
       "title": "{name} - Manage campground's sites",

@@ -1,5 +1,6 @@
 "use client";
 
+import SitePhotosAdmin from "@/components/media/SitePhotosAdmin";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Amenity } from "@/entities/amenity";
@@ -47,6 +48,12 @@ export default function SiteViewClient({
 
   return (
     <div className="space-y-10">
+      <SitePhotosAdmin
+        campgroundId={campground.id}
+        siteId={site.id}
+        photos={site.photos}
+      />
+
       {/* Details */}
       <Card>
         <CardHeader>

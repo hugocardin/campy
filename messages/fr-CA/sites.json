@@ -64,6 +64,18 @@
     "createSite": "Créer un emplacement"
   },
 
+  "media": {
+    "title": "Photos de l'emplacement",
+    "hint": "Les pages visiteurs les affichent lorsqu'elles sont présentes. JPEG, PNG ou WebP.",
+    "photoAlt": "Photo de l'emplacement",
+    "empty": "Aucune photo pour l'instant.",
+    "upload": "Ajouter une photo",
+    "remove": "Retirer",
+    "removeConfirm": "Retirer cette photo ?",
+    "count": "{current} sur {max}",
+    "fileConstraints": "Maximum {mb} Mo chacune. JPEG, PNG ou WebP seulement."
+  },
+
   "AdminSitesPage": {
     "pageHeader": {
       "title": "{name} - Gérer les emplacements du camping",

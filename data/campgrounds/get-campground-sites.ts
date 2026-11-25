@@ -2,6 +2,7 @@ import { Site } from "@/entities/sites";
 import { parseDrivewayType } from "@/lib/driveway-type";
 import { normalizeElectricityAmps } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
+import { normalizeSitePhotoUrls } from "@/lib/park-media";
 import {
   handleDbResponse,
   handleDbSingle,
@@ -20,6 +21,7 @@ type SiteWithSiteTypeRow = {
   min_stay_nights: number;
   electricity_amps: number[] | null;
   driveway_type: string | null;
+  photos?: unknown;
   site_types: { code: string };
 };
 
@@ -36,6 +38,7 @@ function toDomain(row: SiteWithSiteTypeRow): Site {
     min_stay_nights: row.min_stay_nights,
     electricity_amps: normalizeElectricityAmps(row.electricity_amps ?? []),
     driveway_type: driveway === undefined ? null : driveway,
+    photos: normalizeSitePhotoUrls(row.photos),
   };
 }
 
@@ -57,6 +60,7 @@ export const getSitesOfCampground = cache(
             electricity_amps,
             driveway_type,
             description,
+            photos,
             site_types!inner (code)
           `,
           )
@@ -96,6 +100,7 @@ export const getSiteOfCampground = cache(
             electricity_amps,
             driveway_type,
             description,
+            photos,
             site_types!inner (code)
           `,
           )
