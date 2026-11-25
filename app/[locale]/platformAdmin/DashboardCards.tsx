@@ -17,7 +17,7 @@ export function DashboardCards() {
         href={routes.platformAdmin.campgrounds()}
         icon={Tent}
         title={t_campgrounds("plural")}
-        description={t_adminDashboard("amenitiesDescription")}
+        description={t_adminDashboard("campgroundDescription")}
       />
 
       <DashboardCard
@@ -31,7 +31,7 @@ export function DashboardCards() {
         href={routes.platformAdmin.amenities()}
         icon={Leaf}
         title={t_amenities("plural")}
-        description={t_adminDashboard("campgroundDescription")}
+        description={t_adminDashboard("amenitiesDescription")}
       />
 
       <DashboardCard

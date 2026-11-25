@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/site-types";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
 import { DeleteButtonWithConfirmation } from "@/components/dialogs/DeleteButtonWithConfirmation";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ import {
   withErrorReference,
 } from "@/lib/errors";
 import {
+  formatProtectedSiteTypeCodes,
   isProtectedSiteTypeCode,
   SITE_TYPE_CODE_MAX_LENGTH,
 } from "@/lib/site-types/code";
@@ -46,6 +48,7 @@ export default function SiteTypesClient({ initialSiteTypes }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
+  const protectedCodesLabel = formatProtectedSiteTypeCodes();
 
   const siteTypeFieldMessages = {
     [SiteTypeMissingField.code]: t_siteTypes("errors.codeRequired"),
@@ -62,11 +65,15 @@ export default function SiteTypesClient({ initialSiteTypes }: Props) {
   ) => {
     const message =
       details?.reason === "site_type_code_protected"
-        ? t_siteTypes("errors.systemCodeProtected")
-        : translateErrorCode(errorCode, t_errors, tc("error"), details, {
-            fieldMessages: siteTypeFieldMessages,
-            fieldTooLongMessages: siteTypeFieldTooLongMessages,
-          });
+        ? t_siteTypes("errors.systemCodeProtected", {
+            codes: protectedCodesLabel,
+          })
+        : details?.reason === "invalid_format"
+          ? t_siteTypes("errors.codeInvalidFormat")
+          : translateErrorCode(errorCode, t_errors, tc("error"), details, {
+              fieldMessages: siteTypeFieldMessages,
+              fieldTooLongMessages: siteTypeFieldTooLongMessages,
+            });
     setError(
       withErrorReference(message, details, (errorId) =>
         tc("errorReference", { errorId }),
@@ -81,36 +88,48 @@ export default function SiteTypesClient({ initialSiteTypes }: Props) {
     setSubmitting(true);
     setError(null);
 
-    const result = await createSiteTypeAction({ code: code.trim() });
+    try {
+      const result = await createSiteTypeAction({ code: code.trim() });
 
-    if (!result.success) {
-      showActionError(result.errorCode, result.details);
-    } else {
-      setCode("");
-      router.refresh();
+      if (!result.success) {
+        showActionError(result.errorCode, result.details);
+      } else {
+        setCode("");
+        router.refresh();
+      }
+    } catch {
+      setError(tc("error"));
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
   };
 
   const handleDelete = async (id: string) => {
     setSubmitting(true);
     setError(null);
 
-    const result = await deleteSiteTypeAction(id);
+    try {
+      const result = await deleteSiteTypeAction(id);
 
-    if (!result.success) {
-      showActionError(result.errorCode, result.details);
-    } else {
-      router.refresh();
+      if (!result.success) {
+        showActionError(result.errorCode, result.details);
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setError(tc("error"));
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
   };
 
   return (
     <div className="space-y-8">
       <ErrorAlert errorMsg={error}></ErrorAlert>
+
+      <p className="text-sm text-muted-foreground max-w-3xl">
+        {t_siteTypes("hints.customTypes")}
+      </p>
 
       <form onSubmit={handleCreate} className="space-y-4 max-w-xl">
         <div className="space-y-2">
@@ -151,27 +170,41 @@ export default function SiteTypesClient({ initialSiteTypes }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {initialSiteTypes.map((siteType) => (
-                <TableRow key={siteType.id}>
-                  <TableCell className="font-medium">{siteType.code}</TableCell>
-                  <TableCell className="text-right">
-                    <DeleteButtonWithConfirmation
-                      title={t_siteTypes("actions.deleteSiteTypeTitle")}
-                      description={
-                        isProtectedSiteTypeCode(siteType.code)
-                          ? t_siteTypes("errors.systemCodeProtected")
-                          : t_siteTypes("actions.confirmSiteTypeDeletion", {
-                              code: siteType.code,
-                            })
-                      }
-                      onConfirm={() => handleDelete(siteType.id)}
-                      disabled={
-                        submitting || isProtectedSiteTypeCode(siteType.code)
-                      }
-                    ></DeleteButtonWithConfirmation>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {initialSiteTypes.map((siteType) => {
+                const protectedCode = isProtectedSiteTypeCode(siteType.code);
+                return (
+                  <TableRow key={siteType.id}>
+                    <TableCell className="font-medium">
+                      <span className="inline-flex items-center gap-2">
+                        {siteType.code}
+                        {protectedCode ? (
+                          <Badge
+                            variant="secondary"
+                            title={t_siteTypes("badges.systemTitle", {
+                              codes: protectedCodesLabel,
+                            })}
+                          >
+                            {t_siteTypes("badges.system")}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DeleteButtonWithConfirmation
+                        title={t_siteTypes("actions.deleteSiteTypeTitle")}
+                        description={t_siteTypes(
+                          "actions.confirmSiteTypeDeletion",
+                          {
+                            code: siteType.code,
+                          },
+                        )}
+                        onConfirm={() => handleDelete(siteType.id)}
+                        disabled={submitting || protectedCode}
+                      ></DeleteButtonWithConfirmation>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

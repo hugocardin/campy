@@ -47,6 +47,12 @@ export async function createSiteTypeAction(
           field: SiteTypeMissingField.code,
         });
       }
+      if (normalized.reason === "invalid_format") {
+        return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+          reason: "invalid_format",
+          field: SiteTypeMissingField.code,
+        });
+      }
       return resultError(CommonErrorCode.COMMON_MISSING_FIELD, {
         field: SiteTypeMissingField.code,
       });
@@ -108,6 +114,13 @@ export async function deleteSiteTypeAction(id: string): Promise<ActionResult> {
       if (error.code === "23503") {
         return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
           reason: "resource_in_use",
+        });
+      }
+      // DB trigger protect_seeded_site_type_codes → check_violation (23514)
+      if (error.code === "23514") {
+        return resultError(DbErrorCode.DB_RESOURCE_IN_USE, {
+          reason: "site_type_code_protected",
+          field: SiteTypeMissingField.code,
         });
       }
       return mapPostgrestError(error);

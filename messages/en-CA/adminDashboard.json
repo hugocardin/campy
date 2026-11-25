@@ -2,7 +2,7 @@
   "amenitiesDescription": "Manage the list of available amenities",
   "amenityCategoriesDescription": "Organize amenities into groups (Services, Facilities, etc.)",
   "campgroundDescription": "Organize campgrounds",
-  "siteTypesDescription": "Manage site type codes (TENT, RV, lodging, etc.)",
+  "siteTypesDescription": "Manage site type codes (TENT, RV, LODGING, etc.)",
 
   "parkMediaSweep": {
     "title": "Park media cleanup",

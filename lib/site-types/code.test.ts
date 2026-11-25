@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  formatProtectedSiteTypeCodes,
   isProtectedSiteTypeCode,
   normalizeSiteTypeCode,
   SITE_TYPE_CODE_MAX_LENGTH,
@@ -42,11 +43,41 @@ describe("normalizeSiteTypeCode", () => {
     });
   });
 
-  it("accepts exactly SITE_TYPE_CODE_MAX_LENGTH ASCII characters after uppercase", () => {
+  it("accepts exactly SITE_TYPE_CODE_MAX_LENGTH ASCII letters after uppercase", () => {
     const input = "a".repeat(SITE_TYPE_CODE_MAX_LENGTH);
     assert.deepEqual(normalizeSiteTypeCode(input), {
       ok: true,
       code: "A".repeat(SITE_TYPE_CODE_MAX_LENGTH),
+    });
+  });
+
+  it("rejects spaces, commas, and other non-identifier characters", () => {
+    assert.deepEqual(normalizeSiteTypeCode("RV, TENT"), {
+      ok: false,
+      reason: "invalid_format",
+    });
+    assert.deepEqual(normalizeSiteTypeCode("my type"), {
+      ok: false,
+      reason: "invalid_format",
+    });
+    assert.deepEqual(normalizeSiteTypeCode("1TENT"), {
+      ok: false,
+      reason: "invalid_format",
+    });
+    assert.deepEqual(normalizeSiteTypeCode("_TENT"), {
+      ok: false,
+      reason: "invalid_format",
+    });
+  });
+
+  it("accepts underscores and digits after the leading letter", () => {
+    assert.deepEqual(normalizeSiteTypeCode("rv_and_tent"), {
+      ok: true,
+      code: "RV_AND_TENT",
+    });
+    assert.deepEqual(normalizeSiteTypeCode("type2"), {
+      ok: true,
+      code: "TYPE2",
     });
   });
 });
@@ -63,5 +94,14 @@ describe("isProtectedSiteTypeCode", () => {
     assert.equal(isProtectedSiteTypeCode("CABIN"), false);
     assert.equal(isProtectedSiteTypeCode(""), false);
     assert.equal(isProtectedSiteTypeCode(null), false);
+  });
+});
+
+describe("formatProtectedSiteTypeCodes", () => {
+  it("joins SITE_TYPE_CODES for i18n interpolation", () => {
+    assert.equal(
+      formatProtectedSiteTypeCodes(),
+      "TENT, RV, RV_AND_TENT, LODGING",
+    );
   });
 });
