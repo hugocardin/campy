@@ -4,6 +4,7 @@ import {
   handleUnexpectedError,
   mapPostgrestError,
 } from "@/lib/supabase/db-utils";
+import type { PostgrestError } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 /** Allow a multi-page Storage sweep on platforms that honor this hint. */
@@ -13,7 +14,8 @@ async function handleCron(request: Request): Promise<Response> {
   return handleParkMediaOrphanCron(request, {
     sweep: executeOrphanParkMediaSweep,
     mapRpcError: (error) => {
-      const mapped = mapPostgrestError(error as never);
+      // CronSweep error shape matches PostgrestError fields used by the mapper.
+      const mapped = mapPostgrestError(error as PostgrestError);
       return mapped.success
         ? {}
         : { errorCode: mapped.errorCode, details: mapped.details };

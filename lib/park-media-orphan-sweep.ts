@@ -53,6 +53,17 @@ export type OrphanSweepRpcFailure = {
   hint?: string | null;
 };
 
+/** Full run outcome (lives here so cron handler can `import type` without server-only). */
+export type OrphanParkMediaSweepRunResult =
+  | { kind: "missing_supabase_url" }
+  | { kind: "rpc_error"; error: OrphanSweepRpcFailure }
+  | {
+      kind: "aborted";
+      reason: string;
+      unparsedCount?: number;
+    }
+  | ({ kind: "success" } & OrphanParkMediaSweepTotals);
+
 export type OrphanSweepListOutcome<E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure> =
   | { kind: "ok"; page: OrphanSweepPage }
   | { kind: "abort"; reason: string; unparsedCount?: number }

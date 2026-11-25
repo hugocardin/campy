@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { afterEach, describe, it } from "node:test";
 import {
   handleParkMediaOrphanCron,
   type CronSweepFn,
-  type CronSweepRunResult,
 } from "./park-media-orphan-cron-handler";
-import type { OrphanParkMediaSweepTotals } from "./park-media-orphan-sweep";
+import type {
+  OrphanParkMediaSweepRunResult,
+  OrphanParkMediaSweepTotals,
+} from "./park-media-orphan-sweep";
 
 function req(authorization?: string, method = "GET"): Request {
   const headers = new Headers();
@@ -37,7 +39,14 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe("handleParkMediaOrphanCron", () => {
-  it("401 without calling sweep when unauthorized", async () => {
+  const prevSecret = process.env.CRON_SECRET;
+
+  afterEach(() => {
+    if (prevSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = prevSecret;
+  });
+
+  it("401 without calling sweep when unauthorized (injected authorize)", async () => {
     let called = 0;
     const sweep: CronSweepFn = async () => {
       called += 1;
@@ -55,6 +64,35 @@ describe("handleParkMediaOrphanCron", () => {
       ok: false,
       error: "unauthorized",
     });
+  });
+
+  it("uses real authorizeCronRequest when authorize is omitted", async () => {
+    let called = 0;
+    const sweep: CronSweepFn = async () => {
+      called += 1;
+      return { kind: "success", ...okTotals({ removed: 1 }) };
+    };
+
+    delete process.env.CRON_SECRET;
+    const unset = await handleParkMediaOrphanCron(req("Bearer anything"), {
+      sweep,
+    });
+    assert.equal(unset.status, 401);
+    assert.equal(called, 0);
+
+    process.env.CRON_SECRET = "cron-test-secret";
+    const wrong = await handleParkMediaOrphanCron(req("Bearer wrong-secret"), {
+      sweep,
+    });
+    assert.equal(wrong.status, 401);
+    assert.equal(called, 0);
+
+    const ok = await handleParkMediaOrphanCron(
+      req("Bearer cron-test-secret"),
+      { sweep },
+    );
+    assert.equal(ok.status, 200);
+    assert.equal(called, 1);
   });
 
   it("GET and POST both run the sweep when authorized", async () => {
@@ -80,7 +118,7 @@ describe("handleParkMediaOrphanCron", () => {
 
   it("maps missing URL / rpc / abort / unexpected to status codes", async () => {
     const cases: Array<{
-      result?: CronSweepRunResult;
+      result?: OrphanParkMediaSweepRunResult;
       throwErr?: Error;
       status: number;
     }> = [

@@ -12,6 +12,7 @@ import {
   ORPHAN_SWEEP_LIMIT,
   ORPHAN_SWEEP_MAX_PAGES,
   runOrphanParkMediaSweepLoop,
+  type OrphanParkMediaSweepRunResult,
   type OrphanParkMediaSweepTotals,
   type OrphanSweepListOutcome,
   type OrphanSweepLoopResult,
@@ -25,18 +26,9 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 export {
   ORPHAN_CRON_DEADLINE_MS,
   ORPHAN_CRON_MAX_PAGES,
+  type OrphanParkMediaSweepRunResult,
   type OrphanParkMediaSweepTotals,
 };
-
-export type OrphanParkMediaSweepRunResult =
-  | { kind: "missing_supabase_url" }
-  | { kind: "rpc_error"; error: PostgrestError }
-  | {
-      kind: "aborted";
-      reason: string;
-      unparsedCount?: number;
-    }
-  | ({ kind: "success" } & OrphanParkMediaSweepTotals);
 
 /** Sample size for structured run logs (audit / “missing photo” traces). */
 const REMOVED_PATH_SAMPLE = 5;
@@ -114,13 +106,14 @@ export async function executeOrphanParkMediaSweep(opts?: {
       },
       removePaths: async (paths) => {
         const batch = await removeParkMediaObjectPaths(supabase, paths);
-        if (batch.removed > 0 && removedSample.length < REMOVED_PATH_SAMPLE) {
-          for (const path of paths) {
-            if (removedSample.length >= REMOVED_PATH_SAMPLE) break;
-            removedSample.push(path);
-          }
+        for (const path of batch.removedPaths) {
+          if (removedSample.length >= REMOVED_PATH_SAMPLE) break;
+          removedSample.push(path);
         }
-        return batch;
+        return {
+          removed: batch.removed,
+          notRemoved: batch.notRemoved,
+        };
       },
     });
 
