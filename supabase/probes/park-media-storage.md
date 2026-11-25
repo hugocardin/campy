@@ -65,7 +65,7 @@ ROLLBACK;
    24h and unreferenced are removed. Listing uses
    `list_orphan_park_media` (SQL over `storage.objects`; migrations
    `20261125181714` -> `181806` auth gate -> `182801` harden ->
-   `20261125183305` keyset -> `20261125183701` exact cursor). Keyset pages
+   `20261125183305` keyset -> `20261125183759` exact cursor). Keyset pages
    auto-advance (cap ~5/click); a page that removes 0 still skips ahead via
    `next_after`. `scanned`/skipped are from page 0; a mid-sweep listing
    failure returns success with totals + `stoppedEarly`. Periodic cron still

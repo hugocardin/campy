@@ -30,6 +30,7 @@ import {
 import {
   ORPHAN_SWEEP_LIMIT,
   runOrphanParkMediaSweepLoop,
+  type OrphanSweepListOutcome,
 } from "@/lib/park-media-orphan-sweep";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
@@ -42,6 +43,7 @@ import {
 import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
+import type { PostgrestError } from "@supabase/supabase-js";
 
 const SITE_PHOTO_CAP_MARKER = "park_media_site_photos_at_cap";
 
@@ -559,8 +561,10 @@ export async function sweepOrphanParkMediaAction(): Promise<
     const supabase = getSupabaseAdmin();
     const graceSeconds = Math.floor(PARK_MEDIA_ORPHAN_GRACE_MS / 1000);
 
-    const loop = await runOrphanParkMediaSweepLoop({
-      listPage: async (after) => {
+    const loop = await runOrphanParkMediaSweepLoop<PostgrestError>({
+      listPage: async (
+        after,
+      ): Promise<OrphanSweepListOutcome<PostgrestError>> => {
         const { data, error } = await supabase.rpc("list_orphan_park_media", {
           p_project_url: supabaseUrl,
           p_grace_seconds: graceSeconds,
