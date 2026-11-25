@@ -65,7 +65,9 @@ ROLLBACK;
    24h and unreferenced are removed. Listing uses
    `list_orphan_park_media` (SQL over `storage.objects`; migrations
    `20261125181714` -> `181806` auth gate -> `182801` harden ->
-   `20261125183305_park_media_list_orphans_rpc_keyset`). Periodic cron still
+   `20261125183305_park_media_list_orphans_rpc_keyset`). Keyset pages
+   auto-advance; a page that removes 0 still skips ahead via `next_after`
+   so leading unremovable paths do not block the rest. Periodic cron still
    parked (#57).
 
 ```sql

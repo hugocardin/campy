@@ -526,8 +526,9 @@ export async function removeSitePhotoAction(
  * deletes) on missing project URL, unparseable media URLs, or RPC shape
  * errors. Skips objects younger than the grace window (upload→commit race)
  * and NULL `created_at` (counted separately). Keyset-batched via `p_limit` /
- * `p_after` / `next_after` (auto-advances until done or a stuck page).
- * Storage remove failures are `notRemoved`. No cron yet — manual admin only.
+ * `p_after` / `next_after` (auto-advances; stuck pages skip ahead via
+ * `nextAfter` and count as `notRemoved`). Storage remove failures are
+ * `notRemoved`. No cron yet — manual admin only.
  */
 export async function sweepOrphanParkMediaAction(): Promise<
   ActionResult<{
@@ -621,20 +622,17 @@ export async function sweepOrphanParkMediaAction(): Promise<
       removed += batch.removed;
       notRemoved += batch.notRemoved;
 
-      // Stuck page (nothing deleted) — stop so hasMore does not loop forever.
-      if (batch.removed === 0) {
-        break;
-      }
-
       if (!parsed.hasMore || !parsed.nextAfter) {
         hasMore = false;
         break;
       }
+      // Stuck or partial page: always advance the keyset so leading
+      // unremovable paths cannot block the rest of the bucket.
       after = parsed.nextAfter;
     }
 
-    // Only invite another click when more remain AND this run made progress.
-    const inviteMore = hasMore && removed > 0;
+    // Invite another click when more remain (including after page-cap).
+    const inviteMore = hasMore;
 
     if (notRemoved > 0 || inviteMore) {
       console.warn(
