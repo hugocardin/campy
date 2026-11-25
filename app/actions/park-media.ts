@@ -42,7 +42,6 @@ import {
 import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
-import type { PostgrestError } from "@supabase/supabase-js";
 
 const SITE_PHOTO_CAP_MARKER = "park_media_site_photos_at_cap";
 
@@ -569,11 +568,7 @@ export async function sweepOrphanParkMediaAction(): Promise<
           p_after: after,
         });
         if (error) {
-          return {
-            kind: "rpc_error",
-            code: error.code,
-            message: error.message,
-          };
+          return { kind: "rpc_error", error };
         }
 
         const listed = parseOrphanParkMediaRpc(data);
@@ -600,13 +595,7 @@ export async function sweepOrphanParkMediaAction(): Promise<
     });
 
     if (loop.kind === "rpc_error") {
-      return mapPostgrestError({
-        name: "PostgrestError",
-        code: loop.code ?? "",
-        message: loop.message ?? "rpc_error",
-        details: "",
-        hint: "",
-      } as PostgrestError);
+      return mapPostgrestError(loop.error);
     }
     if (loop.kind === "aborted") {
       return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {

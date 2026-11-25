@@ -20,10 +20,18 @@ export type OrphanSweepPage = {
   paths: string[];
 };
 
-export type OrphanSweepListOutcome =
+/** Minimal RPC failure shape; callers may pass a real PostgrestError. */
+export type OrphanSweepRpcFailure = {
+  code?: string;
+  message?: string;
+  details?: string | null;
+  hint?: string | null;
+};
+
+export type OrphanSweepListOutcome<E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure> =
   | { kind: "ok"; page: OrphanSweepPage }
   | { kind: "abort"; reason: string; unparsedCount?: number }
-  | { kind: "rpc_error"; code?: string; message?: string }
+  | { kind: "rpc_error"; error: E }
   | { kind: "invalid_payload" };
 
 export type OrphanSweepLoopSuccess = {
@@ -38,30 +46,29 @@ export type OrphanSweepLoopSuccess = {
   stoppedEarly: string | null;
 };
 
-export type OrphanSweepLoopResult =
+export type OrphanSweepLoopResult<E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure> =
   | OrphanSweepLoopSuccess
   | { kind: "aborted"; reason: string; unparsedCount?: number }
-  | { kind: "rpc_error"; code?: string; message?: string };
+  | { kind: "rpc_error"; error: E };
 
 /** Stable client-facing stop code; never return a raw transport message. */
-export function stableOrphanSweepStopCode(error: {
-  code?: string;
-  message?: string;
-}): string {
+export function stableOrphanSweepStopCode(error: OrphanSweepRpcFailure): string {
   const code = error.code?.trim();
   // SQLSTATE is 5 alphanumeric chars (e.g. P0001, 23505, 42501).
   if (code && /^[A-Z0-9]{5}$/i.test(code)) return code;
   return "rpc_error";
 }
 
-export async function runOrphanParkMediaSweepLoop(opts: {
+export async function runOrphanParkMediaSweepLoop<
+  E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure,
+>(opts: {
   maxPages?: number;
-  listPage: (after: string | null) => Promise<OrphanSweepListOutcome>;
+  listPage: (after: string | null) => Promise<OrphanSweepListOutcome<E>>;
   removePaths: (
     paths: readonly string[],
   ) => Promise<{ removed: number; notRemoved: number }>;
   warn?: (...args: unknown[]) => void;
-}): Promise<OrphanSweepLoopResult> {
+}): Promise<OrphanSweepLoopResult<E>> {
   const maxPages = opts.maxPages ?? ORPHAN_SWEEP_MAX_PAGES;
   const warn = opts.warn ?? console.warn;
 
@@ -95,18 +102,17 @@ export async function runOrphanParkMediaSweepLoop(opts: {
 
     if (listed.kind === "rpc_error") {
       if (page > 0) {
+        const detail = [listed.error.message, listed.error.details, listed.error.hint]
+          .filter((part) => typeof part === "string" && part.trim())
+          .join(" | ");
         logPartialAndStop(
-          stableOrphanSweepStopCode(listed),
+          stableOrphanSweepStopCode(listed.error),
           page,
-          listed.message,
+          detail || undefined,
         );
         break;
       }
-      return {
-        kind: "rpc_error",
-        code: listed.code,
-        message: listed.message,
-      };
+      return { kind: "rpc_error", error: listed.error };
     }
 
     if (listed.kind === "invalid_payload") {

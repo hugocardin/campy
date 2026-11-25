@@ -103,7 +103,11 @@ describe("runOrphanParkMediaSweepLoop", () => {
         }
         return {
           kind: "rpc_error",
-          message: "TypeError: fetch failed: ECONNRESET",
+          error: {
+            message: "TypeError: fetch failed: ECONNRESET",
+            details: "socket hang up",
+            hint: null,
+          },
         };
       },
       removePaths: async (paths) => ({
@@ -120,27 +124,39 @@ describe("runOrphanParkMediaSweepLoop", () => {
     assert.equal(result.hasMore, true);
     assert.ok(
       warnings.some((w) =>
-        w.some((x) => typeof x === "string" && x.includes("ECONNRESET")),
+        w.some(
+          (x) =>
+            typeof x === "string" &&
+            x.includes("ECONNRESET") &&
+            x.includes("socket hang up"),
+        ),
       ),
-      "full transport message should be logged, not returned",
+      "full transport message + details should be logged, not returned",
     );
   });
 
-  it("page-0 rpc error aborts without success totals", async () => {
+  it("page-0 rpc error aborts without success totals and keeps original error", async () => {
+    const original = {
+      code: "57014",
+      message: "canceling statement due to statement timeout",
+      details: "list_orphan_park_media",
+      hint: "raise the statement_timeout",
+    };
     const result = await runOrphanParkMediaSweepLoop({
       warn: silent,
       listPage: async () => ({
         kind: "rpc_error",
-        code: "57014",
-        message: "canceling statement due to statement timeout",
+        error: original,
       }),
       removePaths: async () => ({ removed: 0, notRemoved: 0 }),
     });
     assert.deepEqual(result, {
       kind: "rpc_error",
-      code: "57014",
-      message: "canceling statement due to statement timeout",
+      error: original,
     });
+    if (result.kind === "rpc_error") {
+      assert.equal(result.error, original);
+    }
   });
 
   it("stuck pages skip ahead; zero-remove click does not invite more", async () => {
