@@ -78,65 +78,6 @@ export function sitePhotoPathPrefix(
 }
 
 /**
- * Paths under a Storage list that are not referenced by cover_photo / photos.
- * Used by the admin orphan sweep (#57).
- */
-export function parkMediaOrphanObjectPaths(
-  listedObjectPaths: readonly string[],
-  referencedObjectPaths: ReadonlySet<string>,
-): string[] {
-  const orphans: string[] = [];
-  for (const path of listedObjectPaths) {
-    if (!path || path.includes("..")) continue;
-    if (!referencedObjectPaths.has(path)) orphans.push(path);
-  }
-  return orphans;
-}
-
-export type ReferencedParkMediaResult = {
-  paths: Set<string>;
-  /** Non-empty URL strings that failed park-media path parse. */
-  unparsedCount: number;
-  /** Non-empty URL strings considered (covers + photo entries). */
-  urlCount: number;
-};
-
-/**
- * Collect Storage object paths referenced by cover / site photo URL columns.
- * Callers that delete must abort when `unparsedCount > 0` or when
- * `urlCount > 0 && paths.size === 0` (env / origin mismatch).
- */
-export function referencedParkMediaObjectPaths(
-  coverPhotos: readonly (string | null | undefined)[],
-  sitePhotoArrays: readonly unknown[],
-  supabaseUrl: string,
-): ReferencedParkMediaResult {
-  const paths = new Set<string>();
-  let unparsedCount = 0;
-  let urlCount = 0;
-
-  const consider = (raw: string | null | undefined) => {
-    if (typeof raw !== "string") return;
-    const trimmed = raw.trim();
-    if (!trimmed) return;
-    urlCount += 1;
-    const path = parkMediaObjectPathFromPublicUrl(trimmed, supabaseUrl);
-    if (path) paths.add(path);
-    else unparsedCount += 1;
-  };
-
-  for (const cover of coverPhotos) {
-    consider(cover);
-  }
-  for (const photos of sitePhotoArrays) {
-    for (const url of coerceSitePhotoEntries(photos)) {
-      consider(url);
-    }
-  }
-  return { paths, unparsedCount, urlCount };
-}
-
-/**
  * Sniff JPEG / PNG / WebP from magic bytes (ignore client-declared MIME).
  * Returns null when the bytes are not a supported image.
  */

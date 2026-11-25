@@ -15,16 +15,23 @@ import {
   PARK_MEDIA_BUCKET,
   PARK_MEDIA_MAX_SITE_PHOTOS,
   parkMediaObjectPathFromPublicUrl,
-  parkMediaOrphanObjectPaths,
   parkMediaUrlMatchesPrefix,
-  referencedParkMediaObjectPaths,
   sitePhotoPathPrefix,
 } from "@/lib/park-media";
 import {
-  isOlderThanParkMediaGrace,
-  listParkMediaObjects,
+  PARK_MEDIA_ORPHAN_GRACE_MS,
   removeParkMediaObjectPaths,
 } from "@/lib/park-media-storage";
+import {
+  orphanPathsFromRpcResult,
+  parseOrphanParkMediaRpc,
+  requireNonNegInt,
+} from "@/lib/park-media-orphan-rpc";
+import {
+  ORPHAN_SWEEP_LIMIT,
+  runOrphanParkMediaSweepLoop,
+  type OrphanSweepListOutcome,
+} from "@/lib/park-media-orphan-sweep";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
 import { isUuid } from "@/lib/is-uuid";
@@ -36,116 +43,7 @@ import {
 import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-const DB_PAGE = 500;
-
-/** Keyset page through every campground cover (stable order; RLS-independent when admin). */
-async function fetchAllCoverPhotos(
-  supabase: SupabaseClient,
-): Promise<ActionResult<(string | null)[]>> {
-  const all: (string | null)[] = [];
-  const seenIds = new Set<string>();
-  let lastId: string | null = null;
-  let expectedTotal: number | null = null;
-
-  for (;;) {
-    const base = supabase
-      .from("campgrounds")
-      .select("id, cover_photo", {
-        count: lastId == null ? "exact" : undefined,
-      })
-      .order("id", { ascending: true })
-      .limit(DB_PAGE);
-
-    const { data, error, count } = await (lastId != null
-      ? base.gt("id", lastId)
-      : base);
-    if (error) return mapPostgrestError(error);
-    if (lastId == null && typeof count === "number") expectedTotal = count;
-
-    const rows = (data ?? []) as {
-      id: string;
-      cover_photo?: string | null;
-    }[];
-    for (const row of rows) {
-      const id = String(row.id);
-      if (seenIds.has(id)) {
-        return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-          reason: "cover_photo_duplicate_page",
-        });
-      }
-      seenIds.add(id);
-      all.push(row.cover_photo ?? null);
-      lastId = id;
-    }
-    if (rows.length < DB_PAGE) break;
-  }
-
-  if (expectedTotal != null && all.length !== expectedTotal) {
-    console.warn(
-      "[park-media] cover_photo page total mismatch",
-      all.length,
-      expectedTotal,
-    );
-    return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-      reason: "cover_photo_row_cap",
-    });
-  }
-  return resultSuccess(all);
-}
-
-/** Keyset page through every site photos array (stable order). */
-async function fetchAllSitePhotoArrays(
-  supabase: SupabaseClient,
-): Promise<ActionResult<unknown[]>> {
-  const all: unknown[] = [];
-  const seenIds = new Set<string>();
-  let lastId: string | null = null;
-  let expectedTotal: number | null = null;
-
-  for (;;) {
-    const base = supabase
-      .from("sites")
-      .select("id, photos", {
-        count: lastId == null ? "exact" : undefined,
-      })
-      .order("id", { ascending: true })
-      .limit(DB_PAGE);
-
-    const { data, error, count } = await (lastId != null
-      ? base.gt("id", lastId)
-      : base);
-    if (error) return mapPostgrestError(error);
-    if (lastId == null && typeof count === "number") expectedTotal = count;
-
-    const rows = (data ?? []) as { id: string; photos?: unknown }[];
-    for (const row of rows) {
-      const id = String(row.id);
-      if (seenIds.has(id)) {
-        return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-          reason: "site_photos_duplicate_page",
-        });
-      }
-      seenIds.add(id);
-      all.push(row.photos);
-      lastId = id;
-    }
-    if (rows.length < DB_PAGE) break;
-  }
-
-  if (expectedTotal != null && all.length !== expectedTotal) {
-    console.warn(
-      "[park-media] sites.photos page total mismatch",
-      all.length,
-      expectedTotal,
-    );
-    return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-      reason: "site_photos_row_cap",
-    });
-  }
-  return resultSuccess(all);
-}
+import type { PostgrestError } from "@supabase/supabase-js";
 
 const SITE_PHOTO_CAP_MARKER = "park_media_site_photos_at_cap";
 
@@ -624,11 +522,16 @@ export async function removeSitePhotoAction(
  * Admin orphan sweep (#57): remove park-media objects not referenced by
  * `campgrounds.cover_photo` or `sites.photos`.
  *
- * Fail-closed: aborts (no deletes) on incomplete Storage listing, PostgREST
- * row-cap mismatches, missing project URL, or unparseable media URLs.
- * Skips objects younger than the grace window (upload→commit race).
- * Storage remove failures are counted as `notRemoved` and do not fail the action.
- * No cron yet — call manually from platform admin.
+ * Listing + orphan math run in SQL (`list_orphan_park_media` over
+ * `storage.objects` anti-joined to cover/photos). Fail-closed: aborts (no
+ * deletes) on missing project URL, unparseable media URLs, or RPC shape
+ * errors. Skips objects younger than the grace window (upload→commit race)
+ * and NULL `created_at` (counted separately). Keyset-batched via `p_limit` /
+ * `p_after` / `next_after` (auto-advances; stuck pages skip ahead via
+ * `nextAfter` and count as `notRemoved`). `scanned` / skipped counts are
+ * pinned from page 0 (bucket at start). A failure after page 0 returns
+ * success with totals so far + `stoppedEarly` instead of discarding deletes.
+ * Storage remove failures are `notRemoved`. No cron yet — manual admin only.
  */
 export async function sweepOrphanParkMediaAction(): Promise<
   ActionResult<{
@@ -636,6 +539,9 @@ export async function sweepOrphanParkMediaAction(): Promise<
     removed: number;
     notRemoved: number;
     skippedYoung: number;
+    skippedUnknownAge: number;
+    hasMore: boolean;
+    stoppedEarly: string | null;
   }>
 > {
   const auth = await requirePlatformAdmin();
@@ -653,96 +559,65 @@ export async function sweepOrphanParkMediaAction(): Promise<
     // Service-role after auth: global sweep must see every row / object,
     // independent of SELECT RLS (matches delete-time cleanup).
     const supabase = getSupabaseAdmin();
+    const graceSeconds = Math.floor(PARK_MEDIA_ORPHAN_GRACE_MS / 1000);
 
-    // List Storage first, then re-read DB refs so commits during the walk are kept.
-    const listed = await listParkMediaObjects(supabase, "");
-    if (!listed.complete) {
-      console.warn("[park-media] orphan sweep aborted — incomplete storage list");
+    const loop = await runOrphanParkMediaSweepLoop<PostgrestError>({
+      listPage: async (
+        after,
+      ): Promise<OrphanSweepListOutcome<PostgrestError>> => {
+        const { data, error } = await supabase.rpc("list_orphan_park_media", {
+          p_project_url: supabaseUrl,
+          p_grace_seconds: graceSeconds,
+          p_limit: ORPHAN_SWEEP_LIMIT,
+          p_after: after,
+        });
+        if (error) {
+          return { kind: "rpc_error", error };
+        }
+
+        const listed = parseOrphanParkMediaRpc(data);
+        if (!listed) return { kind: "invalid_payload" };
+
+        if (listed.ok !== true) {
+          const reason =
+            typeof listed.reason === "string" && listed.reason
+              ? listed.reason
+              : "orphan_rpc_aborted";
+          const unparsedCount = requireNonNegInt(listed.unparsed_count);
+          return {
+            kind: "abort",
+            reason,
+            ...(unparsedCount != null ? { unparsedCount } : {}),
+          };
+        }
+
+        const parsed = orphanPathsFromRpcResult(listed);
+        if (!parsed) return { kind: "invalid_payload" };
+        return { kind: "ok", page: parsed };
+      },
+      removePaths: (paths) => removeParkMediaObjectPaths(supabase, paths),
+    });
+
+    if (loop.kind === "rpc_error") {
+      return mapPostgrestError(loop.error);
+    }
+    if (loop.kind === "aborted") {
       return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-        reason: "incomplete_storage_list",
+        reason: loop.reason,
+        ...(loop.unparsedCount != null
+          ? { unparsedCount: loop.unparsedCount }
+          : {}),
       });
-    }
-
-    const coversRes = await fetchAllCoverPhotos(supabase);
-    if (!coversRes.success) return coversRes;
-    const sitesRes = await fetchAllSitePhotoArrays(supabase);
-    if (!sitesRes.success) return sitesRes;
-
-    const referenced = referencedParkMediaObjectPaths(
-      coversRes.data,
-      sitesRes.data,
-      supabaseUrl,
-    );
-
-    if (referenced.unparsedCount > 0) {
-      console.warn(
-        "[park-media] orphan sweep aborted — unparsed media URLs",
-        referenced.unparsedCount,
-      );
-      return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-        reason: "unparsed_media_urls",
-        unparsedCount: referenced.unparsedCount,
-      });
-    }
-
-    if (referenced.urlCount > 0 && referenced.paths.size === 0) {
-      console.warn(
-        "[park-media] orphan sweep aborted — no paths from non-empty URLs",
-      );
-      return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {
-        reason: "url_origin_mismatch",
-      });
-    }
-
-    const orphanPathSet = new Set(
-      parkMediaOrphanObjectPaths(
-        listed.objects.map((o) => o.path),
-        referenced.paths,
-      ),
-    );
-
-    const nowMs = Date.now();
-    let skippedYoung = 0;
-    const candidatePaths: string[] = [];
-    for (const obj of listed.objects) {
-      if (!orphanPathSet.has(obj.path)) continue;
-      if (!isOlderThanParkMediaGrace(obj.createdAt, nowMs)) {
-        skippedYoung += 1;
-        continue;
-      }
-      candidatePaths.push(obj.path);
-    }
-
-    if (candidatePaths.length === 0) {
-      return resultSuccess({
-        scanned: listed.objects.length,
-        removed: 0,
-        notRemoved: 0,
-        skippedYoung,
-      });
-    }
-
-    const { removed, notRemoved } = await removeParkMediaObjectPaths(
-      supabase,
-      candidatePaths,
-    );
-
-    if (notRemoved > 0) {
-      console.warn(
-        "[park-media] orphan sweep incomplete",
-        `scanned=${listed.objects.length}`,
-        `candidates=${candidatePaths.length}`,
-        `removed=${removed}`,
-        `notRemoved=${notRemoved}`,
-        `skippedYoung=${skippedYoung}`,
-      );
     }
 
     return resultSuccess({
-      scanned: listed.objects.length,
-      removed,
-      notRemoved,
-      skippedYoung,
+      scanned: loop.scanned,
+      removed: loop.removed,
+      notRemoved: loop.notRemoved,
+      skippedYoung: loop.skippedYoung,
+      skippedUnknownAge: loop.skippedUnknownAge,
+      hasMore: loop.hasMore,
+      stoppedEarly: loop.stoppedEarly,
     });
   } catch (err) {
     return handleUnexpectedError(err);

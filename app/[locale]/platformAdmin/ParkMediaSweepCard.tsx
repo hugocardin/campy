@@ -48,14 +48,28 @@ export function ParkMediaSweepCard() {
         );
         return;
       }
-      setSummary(
-        t("result", {
-          scanned: result.data.scanned,
-          removed: result.data.removed,
-          notRemoved: result.data.notRemoved,
-          skippedYoung: result.data.skippedYoung,
-        }),
-      );
+      let summary = t("result", {
+        scanned: result.data.scanned,
+        removed: result.data.removed,
+        notRemoved: result.data.notRemoved,
+        skippedYoung: result.data.skippedYoung,
+      });
+      if (result.data.skippedUnknownAge > 0) {
+        summary = `${summary} ${t("skippedUnknownAgeHint", {
+          skippedUnknownAge: result.data.skippedUnknownAge,
+        })}`;
+      }
+      // One run-again hint only (stoppedEarly takes precedence over hasMore).
+      if (result.data.stoppedEarly) {
+        summary = `${summary} ${
+          result.data.removed > 0
+            ? t("stoppedEarlyHint")
+            : t("stoppedEarlyNoRemovalsHint")
+        }`;
+      } else if (result.data.hasMore) {
+        summary = `${summary} ${t("hasMoreHint")}`;
+      }
+      setSummary(summary);
     });
   };
 

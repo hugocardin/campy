@@ -62,7 +62,32 @@ ROLLBACK;
    `{campgroundId}/sites/{siteId}/` or `{campgroundId}/` cleaned via `after()`
    (best-effort; campground must be inactive first).
 6. Admin dashboard → “Sweep orphan media”: fail-closed; only objects older than
-   24h and unreferenced are removed. Periodic cron still parked (#57).
+   24h and unreferenced are removed. Listing uses
+   `list_orphan_park_media` (SQL over `storage.objects`; migrations
+   `20261125181714` -> `181806` auth gate -> `182801` harden ->
+   `20261125183305` keyset -> `20261125183759` exact cursor). Keyset pages
+   auto-advance (cap ~5/click); a page that removes 0 still skips ahead via
+   `next_after`. `scanned`/skipped are from page 0; a mid-sweep listing
+   failure returns success with totals + `stoppedEarly`. Periodic cron still
+   parked (#57).
+
+```sql
+-- Probe listing RPC (service_role JWT claim; MCP/SQL editor has no JWT by default):
+SELECT set_config('request.jwt.claim.role', 'service_role', true);
+SELECT public.list_orphan_park_media(
+  'https://<project-ref>.supabase.co',
+  86400,
+  1000,
+  NULL  -- p_after keyset cursor
+);
+
+-- Grace below 3600 must fail (22023):
+-- SELECT public.list_orphan_park_media('https://<project-ref>.supabase.co', 10, 1000, NULL);
+
+-- Decoder parity with decodeURIComponent (truncated % -> NULL):
+SELECT private.uri_percent_decode('abc%2') IS NULL AS truncated_pct;
+SELECT private.uri_percent_decode('cg%2Fcover%2Fa.jpg') = 'cg/cover/a.jpg' AS decoded;
+```
 
 ## Dashboard fallback (if Storage policies fail in SQL Editor)
 

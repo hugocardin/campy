@@ -27,6 +27,8 @@ function folderFromPrefix(prefix: string): string {
 /**
  * Recursively list object paths under a bucket folder prefix
  * (e.g. `{campgroundId}/` or `{campgroundId}/sites/{siteId}/`).
+ * Used for delete-by-prefix cleanup. Global orphan sweep uses
+ * `list_orphan_park_media` (SQL) instead — see #57.
  */
 export async function listParkMediaObjects(
   supabase: SupabaseClient,
@@ -171,16 +173,4 @@ export async function removeParkMediaObjectPaths(
   }
 
   return { removed, notRemoved };
-}
-
-/** True when the object is old enough to be an orphan candidate. */
-export function isOlderThanParkMediaGrace(
-  createdAt: string | null | undefined,
-  nowMs = Date.now(),
-  graceMs = PARK_MEDIA_ORPHAN_GRACE_MS,
-): boolean {
-  if (!createdAt) return false;
-  const t = Date.parse(createdAt);
-  if (Number.isNaN(t)) return false;
-  return t < nowMs - graceMs;
 }
