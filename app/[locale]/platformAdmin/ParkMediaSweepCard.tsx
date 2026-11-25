@@ -18,7 +18,8 @@ import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 
 /**
- * Manual orphan sweep for park-media (#57). No cron yet — platform admin only.
+ * Manual orphan sweep for park-media (#57). Periodic cron:
+ * `/api/cron/park-media-orphan-sweep` (same fail-closed path).
  */
 export function ParkMediaSweepCard() {
   const tc = useTranslations("common");

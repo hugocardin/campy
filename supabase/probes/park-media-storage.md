@@ -68,8 +68,77 @@ ROLLBACK;
    `20261125183305` keyset -> `20261125183759` exact cursor). Keyset pages
    auto-advance (cap ~5/click); a page that removes 0 still skips ahead via
    `next_after`. `scanned`/skipped are from page 0; a mid-sweep listing
-   failure returns success with totals + `stoppedEarly`. Periodic cron still
-   parked (#57).
+   failure returns success with totals + `stoppedEarly`.
+
+## Periodic cron (#57)
+
+Same fail-closed path as the admin button (`executeOrphanParkMediaSweep` →
+`list_orphan_park_media` + Storage remove), gated by `CRON_SECRET` then
+service-role. Route: `GET|POST /api/cron/park-media-orphan-sweep`
+(page budget `ORPHAN_CRON_MAX_PAGES` = 20).
+
+### Secrets / env
+
+| Name | Where | Purpose |
+| --- | --- | --- |
+| `CRON_SECRET` | App host + (optional) GitHub Actions | Bearer token for the cron route. Required; unset → 401. |
+| `NEXT_PUBLIC_SUPABASE_URL` | App host | Project URL passed to the listing RPC. |
+| `SUPABASE_SERVICE_ROLE_KEY` | App host only | Service-role client for RPC + Storage remove. Never put in client or CI cron secrets beyond the app host. |
+| `CAMPY_APP_URL` | GitHub Actions only | Deployed app origin (no trailing slash), e.g. `https://campy.example.com`. |
+
+Generate `CRON_SECRET` with a long random string (`openssl rand -hex 32`).
+
+### Enable (pick one schedule)
+
+**A. Vercel Cron** (if the app is on Vercel): `vercel.json` already schedules
+`15 12 * * *` (12:15 UTC daily) against the route. Set `CRON_SECRET` in the
+Vercel project env — Vercel sends `Authorization: Bearer <CRON_SECRET>`.
+
+**B. GitHub Actions**: workflow `.github/workflows/park-media-orphan-cron.yml`
+(`schedule` + `workflow_dispatch`). Add repo secrets `CAMPY_APP_URL` and
+`CRON_SECRET` (same secret as the app). Without both secrets the job no-ops.
+
+**C. Supabase Cron / pg_net** (optional): Dashboard → Integrations → Cron, or:
+
+```sql
+-- Store the app URL + cron secret in Vault first, then:
+select cron.schedule(
+  'park-media-orphan-sweep',
+  '15 12 * * *',
+  $$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'campy_app_url')
+           || '/api/cron/park-media-orphan-sweep',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'campy_cron_secret')
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 90000
+  ) as request_id;
+  $$
+);
+```
+
+Do **not** put the service-role key in Vault for this job — the Next route
+already holds it.
+
+### Smoke
+
+```bash
+# Expect 401 without / with wrong secret:
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  "$CAMPY_APP_URL/api/cron/park-media-orphan-sweep"
+
+# Expect 200 JSON with scanned/removed/… (service-role + listing RPC applied live):
+curl -sS -X POST \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  "$CAMPY_APP_URL/api/cron/park-media-orphan-sweep"
+```
+
+Unit: `lib/cron-auth.test.ts` (Bearer gate). Loop math: existing
+`lib/park-media-orphan-sweep.test.ts`. Manual admin button still works as a
+one-shot smoke without cron secrets.
 
 ```sql
 -- Probe listing RPC (service_role JWT claim; MCP/SQL editor has no JWT by default):
