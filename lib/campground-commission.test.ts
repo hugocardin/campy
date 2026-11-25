@@ -39,7 +39,7 @@ describe("normalizeDecimalInput", () => {
   });
 });
 
-describe("normalizeCommissionInput grouping commas", () => {
+describe("normalizeCommissionInput strict decimal", () => {
   it("rejects 1,000 as invalid (not one)", () => {
     const result = normalizeCommissionInput({
       commission_type_id: 2,
@@ -49,6 +49,31 @@ describe("normalizeCommissionInput grouping commas", () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.equal(result.reason, "value_invalid");
+    }
+  });
+
+  it("rejects scientific and hex that Number() would accept", () => {
+    for (const value of ["1e2", "1e-2", "0x64", "0b11", "0o7", "1,000.50"]) {
+      const result = normalizeCommissionInput({
+        commission_type_id: 2,
+        commission_value: value,
+        typeName: "fixed",
+      });
+      assert.equal(result.ok, false, value);
+      if (!result.ok) {
+        assert.equal(result.reason, "value_invalid", value);
+      }
+    }
+  });
+
+  it("rejects bare fraction forms", () => {
+    for (const value of [".5", ",5"]) {
+      const result = normalizeCommissionInput({
+        commission_type_id: 1,
+        commission_value: value,
+        typeName: "percent",
+      });
+      assert.equal(result.ok, false, value);
     }
   });
 });

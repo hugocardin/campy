@@ -640,12 +640,20 @@ export default function CampgroundFormClient({
                   inputMode="decimal"
                   value={form.commission_value}
                   onChange={handleChange}
-                  disabled={!form.commission_type_id}
+                  disabled={
+                    !form.commission_type_id || Boolean(orphanCommissionTypeId)
+                  }
                   className="mt-1.5"
                   placeholder={
-                    selectedCommissionTypeName === "percent"
-                      ? t_campgrounds("form.commissionValuePercentPlaceholder")
-                      : t_campgrounds("form.commissionValueFixedPlaceholder")
+                    orphanCommissionTypeId || !form.commission_type_id
+                      ? t_campgrounds("form.commissionValuePlaceholder")
+                      : selectedCommissionTypeName === "percent"
+                        ? t_campgrounds(
+                            "form.commissionValuePercentPlaceholder",
+                          )
+                        : t_campgrounds(
+                            "form.commissionValueFixedPlaceholder",
+                          )
                   }
                   aria-describedby="commission-value-hint"
                 />
@@ -653,11 +661,13 @@ export default function CampgroundFormClient({
                   id="commission-value-hint"
                   className="mt-1 text-xs text-muted-foreground"
                 >
-                  {!form.commission_type_id
-                    ? t_campgrounds("form.commissionValueHintNone")
-                    : selectedCommissionTypeName === "percent"
-                      ? t_campgrounds("form.commissionValuePercentHint")
-                      : t_campgrounds("form.commissionValueFixedHint")}
+                  {orphanCommissionTypeId
+                    ? t_campgrounds("form.commissionValueHintUnknown")
+                    : !form.commission_type_id
+                      ? t_campgrounds("form.commissionValueHintNone")
+                      : selectedCommissionTypeName === "percent"
+                        ? t_campgrounds("form.commissionValuePercentHint")
+                        : t_campgrounds("form.commissionValueFixedHint")}
                 </p>
               </div>
             </div>

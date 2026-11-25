@@ -87,11 +87,21 @@ export function normalizeDecimalInput(
   return trimmed;
 }
 
+/** Strict decimal shape after optional `,` → `.` normalization (no exp/hex). */
+const STRICT_DECIMAL = /^\d+(?:\.\d{1,2})?$/;
+
 function parseNonNegativeNumber(
   raw: number | string | null | undefined,
 ): number | undefined {
+  if (typeof raw === "number") {
+    if (!Number.isFinite(raw) || raw < 0) return undefined;
+    if (!hasAtMostFractionDigits(raw, MAX_FRACTION_DIGITS)) return undefined;
+    return raw;
+  }
   const normalized = normalizeDecimalInput(raw);
   if (normalized == null) return undefined;
+  // Reject scientific / hex / binary / octal that Number() would accept.
+  if (!STRICT_DECIMAL.test(normalized)) return undefined;
   const num = Number(normalized);
   if (!Number.isFinite(num) || num < 0) return undefined;
   return num;
