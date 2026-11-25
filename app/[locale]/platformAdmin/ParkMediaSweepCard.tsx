@@ -59,10 +59,14 @@ export function ParkMediaSweepCard() {
           skippedUnknownAge: result.data.skippedUnknownAge,
         })}`;
       }
+      // One run-again hint only (stoppedEarly takes precedence over hasMore).
       if (result.data.stoppedEarly) {
-        summary = `${summary} ${t("stoppedEarlyHint")}`;
-      }
-      if (result.data.hasMore) {
+        summary = `${summary} ${
+          result.data.removed > 0
+            ? t("stoppedEarlyHint")
+            : t("stoppedEarlyNoRemovalsHint")
+        }`;
+      } else if (result.data.hasMore) {
         summary = `${summary} ${t("hasMoreHint")}`;
       }
       setSummary(summary);

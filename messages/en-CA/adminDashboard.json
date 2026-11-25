@@ -14,6 +14,7 @@
     "result": "Scanned {scanned, plural, one {# object} other {# objects}}. Removed {removed, number}. Not removed {notRemoved, number}. Skipped recent {skippedYoung, number}.",
     "skippedUnknownAgeHint": "Skipped unknown age {skippedUnknownAge, number}.",
     "stoppedEarlyHint": "Stopped early after a mid-sweep listing error; removals so far are kept — run again.",
+    "stoppedEarlyNoRemovalsHint": "Stopped early after a mid-sweep listing error — run again.",
     "hasMoreHint": "More orphans remain — run again."
   },
 

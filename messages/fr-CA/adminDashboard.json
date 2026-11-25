@@ -14,6 +14,7 @@
     "result": "{scanned, plural, one {# objet analysé} many {# objets analysés} other {# objets analysés}}. Supprimés\u00A0: {removed, number}. Non retirés\u00A0: {notRemoved, number}. Récents ignorés\u00A0: {skippedYoung, number}.",
     "skippedUnknownAgeHint": "Sans date (ignorés)\u00A0: {skippedUnknownAge, number}.",
     "stoppedEarlyHint": "Arrêt anticipé après une erreur de listage en cours de balayage; les suppressions déjà faites sont conservées — relancez.",
+    "stoppedEarlyNoRemovalsHint": "Arrêt anticipé après une erreur de listage en cours de balayage — relancez.",
     "hasMoreHint": "D’autres orphelins restent — relancez."
   },
 
