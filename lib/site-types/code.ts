@@ -49,7 +49,12 @@ export function isProtectedSiteTypeCode(
   return PROTECTED_SITE_TYPE_CODES.has((code ?? "").trim().toUpperCase());
 }
 
-/** Localized join of protected codes for admin copy (`{codes}` ICU arg). */
-export function formatProtectedSiteTypeCodes(): string {
-  return SITE_TYPE_CODES.join(", ");
+/**
+ * Locale-aware conjunction list of protected codes for admin copy (`{codes}`).
+ * Pass a BCP 47 locale (e.g. `en-CA` / `fr-CA`) so fr gets "et", en gets "and".
+ */
+export function formatProtectedSiteTypeCodes(locale: string): string {
+  return new Intl.ListFormat(locale, { type: "conjunction" }).format(
+    SITE_TYPE_CODES,
+  );
 }

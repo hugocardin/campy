@@ -98,10 +98,14 @@ describe("isProtectedSiteTypeCode", () => {
 });
 
 describe("formatProtectedSiteTypeCodes", () => {
-  it("joins SITE_TYPE_CODES for i18n interpolation", () => {
+  it("formats a conjunction list for en-CA and fr-CA", () => {
     assert.equal(
-      formatProtectedSiteTypeCodes(),
-      "TENT, RV, RV_AND_TENT, LODGING",
+      formatProtectedSiteTypeCodes("en-CA"),
+      "TENT, RV, RV_AND_TENT and LODGING",
+    );
+    assert.equal(
+      formatProtectedSiteTypeCodes("fr-CA"),
+      "TENT, RV, RV_AND_TENT et LODGING",
     );
   });
 });

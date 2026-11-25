@@ -32,7 +32,7 @@ import {
   isProtectedSiteTypeCode,
   SITE_TYPE_CODE_MAX_LENGTH,
 } from "@/lib/site-types/code";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 type Props = {
   initialSiteTypes: SiteType[];
@@ -42,13 +42,14 @@ export default function SiteTypesClient({ initialSiteTypes }: Props) {
   const tc = useTranslations("common");
   const t_siteTypes = useTranslations("siteTypes");
   const t_errors = useTranslations("errors");
+  const locale = useLocale();
 
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
-  const protectedCodesLabel = formatProtectedSiteTypeCodes();
+  const protectedCodesLabel = formatProtectedSiteTypeCodes(locale);
 
   const siteTypeFieldMessages = {
     [SiteTypeMissingField.code]: t_siteTypes("errors.codeRequired"),
@@ -172,22 +173,26 @@ export default function SiteTypesClient({ initialSiteTypes }: Props) {
             <TableBody>
               {initialSiteTypes.map((siteType) => {
                 const protectedCode = isProtectedSiteTypeCode(siteType.code);
+                const protectedDescId = `site-type-protected-${siteType.id}`;
+                const protectedReason = t_siteTypes("badges.systemTitle", {
+                  codes: protectedCodesLabel,
+                });
                 return (
                   <TableRow key={siteType.id}>
                     <TableCell className="font-medium">
                       <span className="inline-flex items-center gap-2">
                         {siteType.code}
                         {protectedCode ? (
-                          <Badge
-                            variant="secondary"
-                            title={t_siteTypes("badges.systemTitle", {
-                              codes: protectedCodesLabel,
-                            })}
-                          >
+                          <Badge variant="secondary">
                             {t_siteTypes("badges.system")}
                           </Badge>
                         ) : null}
                       </span>
+                      {protectedCode ? (
+                        <span id={protectedDescId} className="sr-only">
+                          {protectedReason}
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-right">
                       <DeleteButtonWithConfirmation
@@ -200,6 +205,9 @@ export default function SiteTypesClient({ initialSiteTypes }: Props) {
                         )}
                         onConfirm={() => handleDelete(siteType.id)}
                         disabled={submitting || protectedCode}
+                        ariaDescribedBy={
+                          protectedCode ? protectedDescId : undefined
+                        }
                       ></DeleteButtonWithConfirmation>
                     </TableCell>
                   </TableRow>
