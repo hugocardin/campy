@@ -5,6 +5,7 @@ Migrations:
 - `20261125181703_seed_commission_types_booking_statuses.sql` (exact live-applied seed body)
 - `20261125182054_seed_lookups_review_fix.sql` (assert / setval / lookup RLS)
 - `20261125182425_booking_statuses_select_only_grants.sql` (REVOKE ALL + GRANT SELECT)
+- `20261125182654_commission_types_select_only_grants.sql` (REVOKE ALL; GRANT SELECT to authenticated only)
 
 ## Before apply (service role)
 
@@ -59,6 +60,13 @@ FROM information_schema.role_table_grants
 WHERE table_schema = 'public' AND table_name = 'booking_statuses'
   AND grantee = 'anon';
 -- {SELECT} only
+
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public' AND table_name = 'commission_types'
+  AND grantee IN ('anon', 'authenticated')
+ORDER BY grantee, privilege_type;
+-- authenticated SELECT only; anon has no grants
 
 -- Re-apply review_fix / select_only_grants must succeed (idempotent).
 ```
