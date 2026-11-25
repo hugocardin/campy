@@ -6,7 +6,12 @@ import { PARK_MEDIA_BUCKET } from "@/lib/park-media";
 const LIST_PAGE = 100;
 const REMOVE_CHUNK = 100;
 
-/** Objects older than this may be treated as orphan candidates (upload→commit race). */
+/**
+ * Objects older than this may be treated as orphan candidates.
+ * Assumes browser upload → Server Action commit finishes well within this
+ * window (seconds/minutes in normal use). Same grace for admin + unattended
+ * cron; do not lengthen without product sign-off.
+ */
 export const PARK_MEDIA_ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export type ParkMediaListedObject = {

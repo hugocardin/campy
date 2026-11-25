@@ -18,6 +18,7 @@ import {
   parkMediaUrlMatchesPrefix,
   sitePhotoPathPrefix,
 } from "@/lib/park-media";
+import type { OrphanParkMediaSweepTotals } from "@/lib/park-media-orphan-sweep";
 import { executeOrphanParkMediaSweep } from "@/lib/park-media-orphan-sweep-run";
 import { revalidateLocalizedPath } from "@/lib/revalidate-localized-path";
 import { routes } from "@/lib/routes";
@@ -504,23 +505,11 @@ export async function removeSitePhotoAction(
 }
 
 /**
- * Admin orphan sweep (#57): remove park-media objects not referenced by
- * `campgrounds.cover_photo` or `sites.photos`.
- *
- * Shares `executeOrphanParkMediaSweep` with the cron route (service-role +
- * `list_orphan_park_media`). Fail-closed listing; keyset pages capped per
- * click. Periodic schedule: `/api/cron/park-media-orphan-sweep`.
+ * Admin orphan sweep (#57). Shares {@link executeOrphanParkMediaSweep} with
+ * `/api/cron/park-media-orphan-sweep` (see that helper for full semantics).
  */
 export async function sweepOrphanParkMediaAction(): Promise<
-  ActionResult<{
-    scanned: number;
-    removed: number;
-    notRemoved: number;
-    skippedYoung: number;
-    skippedUnknownAge: number;
-    hasMore: boolean;
-    stoppedEarly: string | null;
-  }>
+  ActionResult<OrphanParkMediaSweepTotals>
 > {
   const auth = await requirePlatformAdmin();
   if (!auth.success) return auth;
@@ -546,15 +535,9 @@ export async function sweepOrphanParkMediaAction(): Promise<
       });
     }
 
-    return resultSuccess({
-      scanned: result.scanned,
-      removed: result.removed,
-      notRemoved: result.notRemoved,
-      skippedYoung: result.skippedYoung,
-      skippedUnknownAge: result.skippedUnknownAge,
-      hasMore: result.hasMore,
-      stoppedEarly: result.stoppedEarly,
-    });
+    const { kind, ...totals } = result;
+    void kind;
+    return resultSuccess(totals);
   } catch (err) {
     return handleUnexpectedError(err);
   }

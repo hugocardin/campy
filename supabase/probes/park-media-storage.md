@@ -75,7 +75,8 @@ ROLLBACK;
 Same fail-closed path as the admin button (`executeOrphanParkMediaSweep` →
 `list_orphan_park_media` + Storage remove), gated by `CRON_SECRET` then
 service-role. Route: `GET|POST /api/cron/park-media-orphan-sweep`
-(page budget `ORPHAN_CRON_MAX_PAGES` = 20).
+(page budget `ORPHAN_CRON_MAX_PAGES` = 8 + `ORPHAN_CRON_DEADLINE_MS` = 40s
+under `maxDuration` 60). Mid-sweep `stoppedEarly` → HTTP 503 (not green).
 
 ### Secrets / env
 
@@ -88,17 +89,20 @@ service-role. Route: `GET|POST /api/cron/park-media-orphan-sweep`
 
 Generate `CRON_SECRET` with a long random string (`openssl rand -hex 32`).
 
-### Enable (pick one schedule)
+### Enable (single primary schedule)
 
-**A. Vercel Cron** (if the app is on Vercel): `vercel.json` already schedules
-`15 12 * * *` (12:15 UTC daily) against the route. Set `CRON_SECRET` in the
-Vercel project env — Vercel sends `Authorization: Bearer <CRON_SECRET>`.
+**Primary — Vercel Cron:** `vercel.json` schedules `15 12 * * *` (12:15 UTC
+daily). Set `CRON_SECRET` in the Vercel project env — Vercel sends
+`Authorization: Bearer <CRON_SECRET>` on GET. (Repo handles
+`x-vercel-forwarded-for` elsewhere; treat Vercel as the intended host until
+proven otherwise.)
 
-**B. GitHub Actions**: workflow `.github/workflows/park-media-orphan-cron.yml`
-(`schedule` + `workflow_dispatch`). Add repo secrets `CAMPY_APP_URL` and
-`CRON_SECRET` (same secret as the app). Without both secrets the job no-ops.
+**Backup — GitHub Actions:** `.github/workflows/park-media-orphan-cron.yml` is
+`workflow_dispatch` **only** (no `schedule`) so it cannot double-fire with
+Vercel. Add secrets `CAMPY_APP_URL` + `CRON_SECRET` to run manually. Job fails
+on non-200 or payload `stoppedEarly`.
 
-**C. Supabase Cron / pg_net** (optional): Dashboard → Integrations → Cron, or:
+**Optional — Supabase Cron / pg_net:** Dashboard → Integrations → Cron, or:
 
 ```sql
 -- Store the app URL + cron secret in Vault first, then:

@@ -7,9 +7,12 @@ import {
   requireNonNegInt,
 } from "@/lib/park-media-orphan-rpc";
 import {
+  ORPHAN_CRON_DEADLINE_MS,
+  ORPHAN_CRON_MAX_PAGES,
   ORPHAN_SWEEP_LIMIT,
   ORPHAN_SWEEP_MAX_PAGES,
   runOrphanParkMediaSweepLoop,
+  type OrphanParkMediaSweepTotals,
   type OrphanSweepListOutcome,
   type OrphanSweepLoopResult,
 } from "@/lib/park-media-orphan-sweep";
@@ -19,20 +22,10 @@ import {
 } from "@/lib/park-media-storage";
 import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 
-/**
- * Unattended cron page budget. Higher than the admin click cap so one
- * scheduled run clears a moderate backlog; still bounded for serverless time.
- */
-export const ORPHAN_CRON_MAX_PAGES = 20;
-
-export type OrphanParkMediaSweepTotals = {
-  scanned: number;
-  removed: number;
-  notRemoved: number;
-  skippedYoung: number;
-  skippedUnknownAge: number;
-  hasMore: boolean;
-  stoppedEarly: string | null;
+export {
+  ORPHAN_CRON_DEADLINE_MS,
+  ORPHAN_CRON_MAX_PAGES,
+  type OrphanParkMediaSweepTotals,
 };
 
 export type OrphanParkMediaSweepRunResult =
@@ -45,12 +38,30 @@ export type OrphanParkMediaSweepRunResult =
     }
   | ({ kind: "success" } & OrphanParkMediaSweepTotals);
 
+/** Sample size for structured run logs (audit / “missing photo” traces). */
+const REMOVED_PATH_SAMPLE = 5;
+
 /**
  * Fail-closed orphan sweep shared by the platform-admin action and the cron
  * route. Uses service-role + `list_orphan_park_media` (same path as #65).
+ *
+ * Listing + orphan math run in SQL (`list_orphan_park_media` over
+ * `storage.objects` anti-joined to cover/photos). Fail-closed: aborts (no
+ * deletes) on missing project URL, unparseable media URLs, or RPC shape
+ * errors. Skips objects younger than the grace window (upload→commit race;
+ * assumes browser upload → Server Action commit finishes well within
+ * {@link PARK_MEDIA_ORPHAN_GRACE_MS} — typically seconds, not hours) and
+ * NULL `created_at` (counted separately). Keyset-batched via `p_limit` /
+ * `p_after` / `next_after` (auto-advances; stuck pages skip ahead via
+ * `nextAfter` and count as `notRemoved`). `scanned` / skipped counts are
+ * pinned from page 0 (bucket at start). A failure after page 0 returns
+ * success with totals so far + `stoppedEarly` instead of discarding deletes.
+ * Storage remove failures are `notRemoved`. Cron also applies a wall-clock
+ * deadline so the platform does not kill the process mid-loop.
  */
 export async function executeOrphanParkMediaSweep(opts?: {
   maxPages?: number;
+  deadlineMs?: number;
 }): Promise<OrphanParkMediaSweepRunResult> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
   if (!supabaseUrl) {
@@ -61,10 +72,13 @@ export async function executeOrphanParkMediaSweep(opts?: {
   const supabase = getSupabaseAdmin();
   const graceSeconds = Math.floor(PARK_MEDIA_ORPHAN_GRACE_MS / 1000);
   const maxPages = opts?.maxPages ?? ORPHAN_SWEEP_MAX_PAGES;
+  const deadlineMs = opts?.deadlineMs;
+  const removedSample: string[] = [];
 
   const loop: OrphanSweepLoopResult<PostgrestError> =
     await runOrphanParkMediaSweepLoop<PostgrestError>({
       maxPages,
+      ...(deadlineMs != null ? { deadlineMs } : {}),
       listPage: async (
         after,
       ): Promise<OrphanSweepListOutcome<PostgrestError>> => {
@@ -98,7 +112,16 @@ export async function executeOrphanParkMediaSweep(opts?: {
         if (!parsed) return { kind: "invalid_payload" };
         return { kind: "ok", page: parsed };
       },
-      removePaths: (paths) => removeParkMediaObjectPaths(supabase, paths),
+      removePaths: async (paths) => {
+        const batch = await removeParkMediaObjectPaths(supabase, paths);
+        if (batch.removed > 0 && removedSample.length < REMOVED_PATH_SAMPLE) {
+          for (const path of paths) {
+            if (removedSample.length >= REMOVED_PATH_SAMPLE) break;
+            removedSample.push(path);
+          }
+        }
+        return batch;
+      },
     });
 
   if (loop.kind === "rpc_error") {
@@ -114,8 +137,7 @@ export async function executeOrphanParkMediaSweep(opts?: {
     };
   }
 
-  return {
-    kind: "success",
+  const totals: OrphanParkMediaSweepTotals = {
     scanned: loop.scanned,
     removed: loop.removed,
     notRemoved: loop.notRemoved,
@@ -123,5 +145,16 @@ export async function executeOrphanParkMediaSweep(opts?: {
     skippedUnknownAge: loop.skippedUnknownAge,
     hasMore: loop.hasMore,
     stoppedEarly: loop.stoppedEarly,
+    hitDeadline: loop.hitDeadline,
   };
+
+  console.info("[park-media] orphan sweep run", {
+    ...totals,
+    removedSample,
+    maxPages,
+    deadlineMs: deadlineMs ?? null,
+    graceSeconds,
+  });
+
+  return { kind: "success", ...totals };
 }

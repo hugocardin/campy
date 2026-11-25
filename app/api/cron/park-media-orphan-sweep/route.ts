@@ -1,10 +1,5 @@
-import { NextResponse } from "next/server";
-import { authorizeCronRequest } from "@/lib/cron-auth";
-import { MediaErrorCode } from "@/lib/errors";
-import {
-  executeOrphanParkMediaSweep,
-  ORPHAN_CRON_MAX_PAGES,
-} from "@/lib/park-media-orphan-sweep-run";
+import { handleParkMediaOrphanCron } from "@/lib/park-media-orphan-cron-handler";
+import { executeOrphanParkMediaSweep } from "@/lib/park-media-orphan-sweep-run";
 import {
   handleUnexpectedError,
   mapPostgrestError,
@@ -15,79 +10,28 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 async function handleCron(request: Request): Promise<Response> {
-  if (!authorizeCronRequest(request)) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const result = await executeOrphanParkMediaSweep({
-      maxPages: ORPHAN_CRON_MAX_PAGES,
-    });
-
-    if (result.kind === "missing_supabase_url") {
-      return NextResponse.json(
-        {
-          ok: false,
-          errorCode: MediaErrorCode.MEDIA_SWEEP_ABORTED,
-          details: { reason: "missing_supabase_url" },
-        },
-        { status: 500 },
-      );
-    }
-
-    if (result.kind === "rpc_error") {
-      const mapped = mapPostgrestError(result.error);
-      return NextResponse.json(
-        {
-          ok: false,
-          errorCode: mapped.success ? undefined : mapped.errorCode,
-          details: mapped.success ? undefined : mapped.details,
-        },
-        { status: 502 },
-      );
-    }
-
-    if (result.kind === "aborted") {
-      return NextResponse.json(
-        {
-          ok: false,
-          errorCode: MediaErrorCode.MEDIA_SWEEP_ABORTED,
-          details: {
-            reason: result.reason,
-            ...(result.unparsedCount != null
-              ? { unparsedCount: result.unparsedCount }
-              : {}),
-          },
-        },
-        { status: 409 },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      scanned: result.scanned,
-      removed: result.removed,
-      notRemoved: result.notRemoved,
-      skippedYoung: result.skippedYoung,
-      skippedUnknownAge: result.skippedUnknownAge,
-      hasMore: result.hasMore,
-      stoppedEarly: result.stoppedEarly,
-      maxPages: ORPHAN_CRON_MAX_PAGES,
-    });
-  } catch (err) {
-    const mapped = handleUnexpectedError(err);
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: mapped.success ? undefined : mapped.errorCode,
-        details: mapped.success ? undefined : mapped.details,
-      },
-      { status: 500 },
-    );
-  }
+  return handleParkMediaOrphanCron(request, {
+    sweep: executeOrphanParkMediaSweep,
+    mapRpcError: (error) => {
+      const mapped = mapPostgrestError(error as never);
+      return mapped.success
+        ? {}
+        : { errorCode: mapped.errorCode, details: mapped.details };
+    },
+    mapUnexpected: (err) => {
+      const mapped = handleUnexpectedError(err);
+      return mapped.success
+        ? {}
+        : { errorCode: mapped.errorCode, details: mapped.details };
+    },
+  });
 }
 
-/** Vercel Cron invokes GET; allow POST for manual / pg_net smoke. */
+/**
+ * Vercel Cron only sends GET, so GET is intentionally state-changing here.
+ * Bearer `CRON_SECRET` is required; crawlers/prefetch without it get 401.
+ * Prefer POST for manual / pg_net / Actions smoke.
+ */
 export async function GET(request: Request): Promise<Response> {
   return handleCron(request);
 }

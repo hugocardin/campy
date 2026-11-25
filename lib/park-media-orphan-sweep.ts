@@ -11,6 +11,31 @@ export const ORPHAN_SWEEP_LIMIT = 1000;
  */
 export const ORPHAN_SWEEP_MAX_PAGES = 5;
 
+/**
+ * Cron page budget. Near the admin click cap: each page re-scans the bucket
+ * then runs Storage removes. Paired with {@link ORPHAN_CRON_DEADLINE_MS} so
+ * the loop finishes under route `maxDuration` (60s).
+ */
+export const ORPHAN_CRON_MAX_PAGES = 8;
+
+/**
+ * Wall-clock stop for unattended runs (~20s headroom under `maxDuration` 60).
+ * Deadline stops are clean (`stoppedEarly` stays null; `hitDeadline` true).
+ */
+export const ORPHAN_CRON_DEADLINE_MS = 40_000;
+
+/** Totals returned by a successful orphan sweep run (admin + cron). */
+export type OrphanParkMediaSweepTotals = {
+  scanned: number;
+  removed: number;
+  notRemoved: number;
+  skippedYoung: number;
+  skippedUnknownAge: number;
+  hasMore: boolean;
+  stoppedEarly: string | null;
+  hitDeadline: boolean;
+};
+
 export type OrphanSweepPage = {
   scanned: number;
   skippedYoung: number;
@@ -44,6 +69,8 @@ export type OrphanSweepLoopSuccess = {
   /** Invite another click (hasMore && removed > 0). */
   hasMore: boolean;
   stoppedEarly: string | null;
+  /** True when the wall-clock deadline stopped the loop before page/error stops. */
+  hitDeadline: boolean;
 };
 
 export type OrphanSweepLoopResult<E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure> =
@@ -63,6 +90,14 @@ export async function runOrphanParkMediaSweepLoop<
   E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure,
 >(opts: {
   maxPages?: number;
+  /**
+   * Wall-clock budget (ms) from loop start. Before each new page, if elapsed
+   * time exceeds this, stop cleanly (no `stoppedEarly`) so the platform does
+   * not kill the process mid-remove. Prefer under serverless maxDuration.
+   */
+  deadlineMs?: number;
+  /** Injectable clock for tests; defaults to Date.now. */
+  now?: () => number;
   listPage: (after: string | null) => Promise<OrphanSweepListOutcome<E>>;
   removePaths: (
     paths: readonly string[],
@@ -71,6 +106,14 @@ export async function runOrphanParkMediaSweepLoop<
 }): Promise<OrphanSweepLoopResult<E>> {
   const maxPages = opts.maxPages ?? ORPHAN_SWEEP_MAX_PAGES;
   const warn = opts.warn ?? console.warn;
+  const now = opts.now ?? Date.now;
+  const startedAt = now();
+  const deadlineMs =
+    typeof opts.deadlineMs === "number" &&
+    Number.isFinite(opts.deadlineMs) &&
+    opts.deadlineMs > 0
+      ? opts.deadlineMs
+      : null;
 
   let after: string | null = null;
   let scanned = 0;
@@ -80,6 +123,7 @@ export async function runOrphanParkMediaSweepLoop<
   let notRemoved = 0;
   let hasMore = false;
   let stoppedEarly: string | null = null;
+  let hitDeadline = false;
 
   const logPartialAndStop = (reason: string, page: number, detail?: string) => {
     warn(
@@ -98,6 +142,20 @@ export async function runOrphanParkMediaSweepLoop<
   };
 
   for (let page = 0; page < maxPages; page += 1) {
+    if (deadlineMs != null && now() - startedAt >= deadlineMs) {
+      hitDeadline = true;
+      hasMore = true;
+      warn(
+        "[park-media] orphan sweep hit wall-clock deadline",
+        `deadlineMs=${deadlineMs}`,
+        `page=${page}`,
+        `scanned=${scanned}`,
+        `removed=${removed}`,
+        `notRemoved=${notRemoved}`,
+      );
+      break;
+    }
+
     const listed = await opts.listPage(after);
 
     if (listed.kind === "rpc_error") {
@@ -174,9 +232,10 @@ export async function runOrphanParkMediaSweepLoop<
 
   // Invite another click only when more remain AND this run made progress
   // (avoids a forever "run again" loop when every page removes 0).
+  // Deadline exhaustion also invites another run when progress was made.
   const inviteMore = hasMore && removed > 0;
 
-  if (notRemoved > 0 || inviteMore || stoppedEarly) {
+  if (notRemoved > 0 || inviteMore || stoppedEarly || hitDeadline) {
     warn(
       "[park-media] orphan sweep incomplete",
       `scanned=${scanned}`,
@@ -186,6 +245,7 @@ export async function runOrphanParkMediaSweepLoop<
       `skippedUnknownAge=${skippedUnknownAge}`,
       `hasMore=${hasMore}`,
       `stoppedEarly=${stoppedEarly ?? ""}`,
+      `hitDeadline=${hitDeadline}`,
       `inviteMore=${inviteMore}`,
     );
   }
@@ -199,5 +259,6 @@ export async function runOrphanParkMediaSweepLoop<
     skippedUnknownAge,
     hasMore: inviteMore,
     stoppedEarly,
+    hitDeadline,
   };
 }

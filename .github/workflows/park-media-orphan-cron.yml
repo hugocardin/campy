@@ -1,12 +1,12 @@
-# Periodic park-media orphan sweep (#57).
-# Preferred when the app is not on Vercel Cron: call the deployed route with CRON_SECRET.
-# Vercel deployments can use vercel.json crons instead (same route + CRON_SECRET).
+# Manual / backup invoke of park-media orphan sweep (#57).
+#
+# Primary schedule is Vercel Cron (`vercel.json` → GET the route with CRON_SECRET).
+# This workflow is workflow_dispatch only so both schedulers cannot fire at once.
+# Note: if a schedule is ever re-added, GitHub disables unused scheduled workflows
+# after ~60 days of repo inactivity, and `schedule` only runs from the default branch.
 name: Park-media orphan cron
 
 on:
-  schedule:
-    # Daily 12:15 UTC — same cadence as vercel.json.
-    - cron: "15 12 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -61,3 +61,8 @@ jobs:
               exit 1
               ;;
           esac
+          # Defense in depth: fail if payload marks a degraded mid-sweep stop.
+          if printf '%s' "${payload}" | grep -Eq '"stoppedEarly"[[:space:]]*:[[:space:]]*"[^"]+"'; then
+            echo "Cron sweep reported stoppedEarly — treating as failure"
+            exit 1
+          fi
