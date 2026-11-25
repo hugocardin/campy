@@ -140,6 +140,13 @@ export default function SiteFormClient({
 
   const initialPricingRulesText = initialData?.pricing_rules ?? "";
   const isEdit = Boolean(initialData?.id);
+  // Unexpected legacy shapes are treated as dirty so Save repairs to {}.
+  const pricingRulesDirty =
+    form.pricing_rules !== initialPricingRulesText ||
+    Boolean(form.pricing_rules_unexpected);
+  // Unchanged invalid stored text must not block editing other fields.
+  const pricingRulesBlocking =
+    (!isEdit || pricingRulesDirty) && !pricingRulesParsed.ok;
 
   const pricingRulesErrorText = (
     reason: ParsePricingRulesReason,
@@ -156,7 +163,7 @@ export default function SiteFormClient({
 
   const showPricingRulesInlineError =
     (pricingRulesTouched || pricingRulesSubmitAttempted) &&
-    !pricingRulesParsed.ok;
+    pricingRulesBlocking;
 
   const isFormValid = Boolean(
     form.name.trim() &&
@@ -165,7 +172,7 @@ export default function SiteFormClient({
     !isNaN(parseFloat(form.price_per_night)) &&
     !isNaN(parseFloat(form.min_stay_nights || "0")) &&
     (!requiresMaxRig || maxRigParsed.ok) &&
-    pricingRulesParsed.ok,
+    !pricingRulesBlocking,
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -203,18 +210,18 @@ export default function SiteFormClient({
       return setError(t_sites("errors.typeRequired"));
     }
 
-    if (!pricingRulesParsed.ok) {
+    if (pricingRulesBlocking && !pricingRulesParsed.ok) {
       return setError(pricingRulesErrorText(pricingRulesParsed.reason));
     }
 
-    const pricingRulesDirty =
-      form.pricing_rules !== initialPricingRulesText;
     // Edit: omit unchanged column (avoids lost updates / JS round-trip drift).
-    // Create: always send the parsed object (blank → {}).
+    // Unexpected → dirty → send {} to repair. Create always sends parsed object.
     const pricingRulesForPayload =
       isEdit && !pricingRulesDirty
         ? undefined
-        : pricingRulesParsed.data;
+        : pricingRulesParsed.ok
+          ? pricingRulesParsed.data
+          : undefined;
 
     const driveway: DrivewayType | null = isLodging
       ? null

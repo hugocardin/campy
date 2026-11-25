@@ -16,7 +16,10 @@ export const PRICING_RULES_MAX_CHARS = 8_192;
  */
 export const PRICING_RULES_RAW_TEXT_MAX_CHARS = PRICING_RULES_MAX_CHARS * 8;
 
-/** Max nesting depth for objects/arrays (inclusive of root = depth 0). */
+/**
+ * Max nesting depth for containers (objects/arrays). Root is depth 0.
+ * Scalar leaves do not consume a level.
+ */
 export const PRICING_RULES_MAX_DEPTH = 32;
 
 /** Empty rules document — matches DB default. */
@@ -121,9 +124,6 @@ export function walkPricingRulesValue(
   depth = 0,
   seen: WeakSet<object> = new WeakSet(),
 ): ParsePricingRulesFailure | null {
-  if (depth > PRICING_RULES_MAX_DEPTH) {
-    return { ok: false, reason: "too_deep" };
-  }
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
       return { ok: false, reason: "non_finite_number" };
@@ -139,6 +139,10 @@ export function walkPricingRulesValue(
   }
   if (value === null || typeof value === "string" || typeof value === "boolean") {
     return null;
+  }
+  // Depth counts containers (objects/arrays) only — not scalar leaves.
+  if (depth > PRICING_RULES_MAX_DEPTH) {
+    return { ok: false, reason: "too_deep" };
   }
   if (typeof value === "object") {
     if (seen.has(value)) {

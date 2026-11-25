@@ -170,9 +170,19 @@ describe("parsePricingRulesInput", () => {
     if (!result.ok) assert.equal(result.reason, "non_finite_number");
   });
 
-  it("rejects nesting deeper than PRICING_RULES_MAX_DEPTH", () => {
-    let nested: unknown = {};
-    for (let i = 0; i <= PRICING_RULES_MAX_DEPTH + 1; i++) {
+  it("accepts exactly MAX_DEPTH containers with a scalar leaf", () => {
+    // Root depth 0 … wrap MAX_DEPTH times → innermost container at depth MAX.
+    let nested: unknown = { x: 1 };
+    for (let i = 0; i < PRICING_RULES_MAX_DEPTH; i++) {
+      nested = { c: nested };
+    }
+    const result = validatePricingRulesValue(nested);
+    assert.equal(result.ok, true, "scalar leaf must not count as a depth level");
+  });
+
+  it("rejects MAX_DEPTH + 1 containers", () => {
+    let nested: unknown = { x: 1 };
+    for (let i = 0; i < PRICING_RULES_MAX_DEPTH + 1; i++) {
       nested = { c: nested };
     }
     const result = validatePricingRulesValue(nested);
