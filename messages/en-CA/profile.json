@@ -45,5 +45,26 @@
       "title": "Edit profile | Campy",
       "description": "Edit your Campy profile name and default rig length."
     }
+  },
+
+  "BookingsPage": {
+    "pageHeader": {
+      "title": "My bookings",
+      "description": "Past and upcoming reservations"
+    },
+    "meta": {
+      "title": "My bookings | Campy",
+      "description": "View your Campy reservations. Online booking is coming soon."
+    },
+    "empty": {
+      "title": "No reservations yet",
+      "description": "You do not have any bookings. Online booking is coming soon — browse campgrounds while we finish it.",
+      "browseCta": "Browse campgrounds"
+    },
+    "comingSoon": {
+      "title": "Booking list coming soon",
+      "description": "Your reservations will show up here once online booking ships. Browse campgrounds in the meantime."
+    },
+    "navLink": "My bookings"
   }
 }

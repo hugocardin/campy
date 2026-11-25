@@ -29,6 +29,8 @@ export const routes = {
   auth: () => "/auth",
   profile: () => "/profile",
   profileEdit: () => "/profile/edit",
+  /** Guest “My bookings” shell (empty state until Phase D). */
+  profileBookings: () => "/profile/bookings",
   platformAdmin: {
     root: () => "/platformAdmin",
     amenities: () => "/platformAdmin/amenities",

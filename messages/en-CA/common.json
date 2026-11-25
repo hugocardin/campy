@@ -22,6 +22,7 @@
 
   "header": {
     "profile": "Profile",
+    "myBookings": "My bookings",
     "plateformAdminDashboard": "Plateform Admin Dashboard"
   }
 }

@@ -45,5 +45,26 @@
       "title": "Modifier le profil | Campy",
       "description": "Modifiez votre nom et la longueur de véhicule par défaut sur Campy."
     }
+  },
+
+  "BookingsPage": {
+    "pageHeader": {
+      "title": "Mes réservations",
+      "description": "Réservations passées et à venir"
+    },
+    "meta": {
+      "title": "Mes réservations | Campy",
+      "description": "Consultez vos réservations Campy. La réservation en ligne arrive bientôt."
+    },
+    "empty": {
+      "title": "Aucune réservation pour le moment",
+      "description": "Vous n'avez aucune réservation. La réservation en ligne arrive bientôt — parcourez les terrains de camping en attendant.",
+      "browseCta": "Parcourir les terrains de camping"
+    },
+    "comingSoon": {
+      "title": "Liste des réservations bientôt disponible",
+      "description": "Vos réservations apparaîtront ici lorsque la réservation en ligne sera offerte. Parcourez les terrains de camping en attendant."
+    },
+    "navLink": "Mes réservations"
   }
 }
