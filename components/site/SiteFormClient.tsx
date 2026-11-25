@@ -43,7 +43,9 @@ import type { GuestPriceCurrency } from "@/lib/campground-price";
 import { GUEST_PRICE_CURRENCY } from "@/lib/campground-price";
 import {
   PRICING_RULES_MAX_CHARS,
+  PRICING_RULES_MAX_DEPTH,
   type ParsePricingRulesReason,
+  isParsePricingRulesReason,
   parsePricingRulesInput,
   pricingRulesErrorMessageKey,
 } from "@/lib/site-pricing-rules";
@@ -136,12 +138,18 @@ export default function SiteFormClient({
     [form.pricing_rules],
   );
 
+  const initialPricingRulesText = initialData?.pricing_rules ?? "";
+  const isEdit = Boolean(initialData?.id);
+
   const pricingRulesErrorText = (
     reason: ParsePricingRulesReason,
   ): string => {
     const key = pricingRulesErrorMessageKey(reason);
     if (key === "pricingRulesTooLong") {
       return t_sites(`errors.${key}`, { max: PRICING_RULES_MAX_CHARS });
+    }
+    if (key === "pricingRulesTooDeep") {
+      return t_sites(`errors.${key}`, { max: PRICING_RULES_MAX_DEPTH });
     }
     return t_sites(`errors.${key}`);
   };
@@ -199,6 +207,15 @@ export default function SiteFormClient({
       return setError(pricingRulesErrorText(pricingRulesParsed.reason));
     }
 
+    const pricingRulesDirty =
+      form.pricing_rules !== initialPricingRulesText;
+    // Edit: omit unchanged column (avoids lost updates / JS round-trip drift).
+    // Create: always send the parsed object (blank → {}).
+    const pricingRulesForPayload =
+      isEdit && !pricingRulesDirty
+        ? undefined
+        : pricingRulesParsed.data;
+
     const driveway: DrivewayType | null = isLodging
       ? null
       : form.driveway_type === ""
@@ -219,7 +236,7 @@ export default function SiteFormClient({
       min_stay_nights: isNaN(minStayNightsNum) ? undefined : minStayNightsNum,
       electricity_amps: normalizeElectricityAmps(form.electricity_amps),
       driveway_type: driveway,
-      pricing_rules: pricingRulesParsed.data,
+      pricing_rules: pricingRulesForPayload,
     };
 
     startTransition(async () => {
@@ -227,14 +244,9 @@ export default function SiteFormClient({
 
       if (!result.success) {
         const serverReason = result.details?.reason;
-        const pricingFieldMessage =
-          typeof serverReason === "string" &&
-          (serverReason === "not_object" ||
-            serverReason === "forbidden_key" ||
-            serverReason === "non_finite_number" ||
-            serverReason === "invalid_json")
-            ? pricingRulesErrorText(serverReason)
-            : t_sites("errors.pricingRulesInvalidJson");
+        const pricingFieldMessage = isParsePricingRulesReason(serverReason)
+          ? pricingRulesErrorText(serverReason)
+          : t_sites("errors.pricingRulesInvalidJson");
 
         setError(
           withErrorReference(
@@ -458,10 +470,7 @@ export default function SiteFormClient({
                 id="pricing_rules"
                 name="pricing_rules"
                 value={form.pricing_rules}
-                onChange={(e) => {
-                  handleChange(e);
-                  setPricingRulesTouched(true);
-                }}
+                onChange={handleChange}
                 onBlur={() => setPricingRulesTouched(true)}
                 rows={8}
                 spellCheck={false}

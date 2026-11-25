@@ -16,19 +16,35 @@ export const PRICING_RULES_MAX_CHARS = 8_192;
  */
 export const PRICING_RULES_RAW_TEXT_MAX_CHARS = PRICING_RULES_MAX_CHARS * 8;
 
+/** Max nesting depth for objects/arrays (inclusive of root = depth 0). */
+export const PRICING_RULES_MAX_DEPTH = 32;
+
 /** Empty rules document — matches DB default. */
 export const EMPTY_PRICING_RULES: Readonly<Record<string, never>> = {};
 
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
-export type PricingRulesObject = Record<string, unknown>;
+export const PARSE_PRICING_RULES_REASONS = [
+  "invalid_json",
+  "not_object",
+  "too_large",
+  "forbidden_key",
+  "non_finite_number",
+  "too_deep",
+  "shared_ref",
+] as const;
 
-export type ParsePricingRulesReason =
-  | "invalid_json"
-  | "not_object"
-  | "too_large"
-  | "forbidden_key"
-  | "non_finite_number";
+export type ParsePricingRulesReason = (typeof PARSE_PRICING_RULES_REASONS)[number];
+
+const PARSE_PRICING_RULES_REASON_SET = new Set<string>(PARSE_PRICING_RULES_REASONS);
+
+export function isParsePricingRulesReason(
+  value: unknown,
+): value is ParsePricingRulesReason {
+  return typeof value === "string" && PARSE_PRICING_RULES_REASON_SET.has(value);
+}
+
+export type PricingRulesObject = Record<string, unknown>;
 
 export type ParsePricingRulesFailure = {
   ok: false;
@@ -97,14 +113,16 @@ export function formatPricingRulesForEditor(value: unknown): string {
 }
 
 /**
- * Walk a parsed JSON value and reject dangerous keys / non-finite numbers.
+ * Walk a parsed JSON value and reject dangerous keys / non-finite numbers /
+ * excessive depth / shared object references (decoder DAG bombs).
  */
 export function walkPricingRulesValue(
   value: unknown,
   depth = 0,
+  seen: WeakSet<object> = new WeakSet(),
 ): ParsePricingRulesFailure | null {
-  if (depth > 32) {
-    return { ok: false, reason: "invalid_json" };
+  if (depth > PRICING_RULES_MAX_DEPTH) {
+    return { ok: false, reason: "too_deep" };
   }
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
@@ -122,9 +140,15 @@ export function walkPricingRulesValue(
   if (value === null || typeof value === "string" || typeof value === "boolean") {
     return null;
   }
+  if (typeof value === "object") {
+    if (seen.has(value)) {
+      return { ok: false, reason: "shared_ref" };
+    }
+    seen.add(value);
+  }
   if (Array.isArray(value)) {
     for (const item of value) {
-      const nested = walkPricingRulesValue(item, depth + 1);
+      const nested = walkPricingRulesValue(item, depth + 1, seen);
       if (nested) return nested;
     }
     return null;
@@ -136,7 +160,7 @@ export function walkPricingRulesValue(
     if (FORBIDDEN_KEYS.has(key)) {
       return { ok: false, reason: "forbidden_key" };
     }
-    const nested = walkPricingRulesValue(value[key], depth + 1);
+    const nested = walkPricingRulesValue(value[key], depth + 1, seen);
     if (nested) return nested;
   }
   return null;
@@ -144,7 +168,7 @@ export function walkPricingRulesValue(
 
 /**
  * Validate an already-parsed unknown value (server-action trust boundary).
- * Safe against BigInt / cycles via try/catch around stringify.
+ * Safe against BigInt / cycles / shared refs via walk + try/catch stringify.
  */
 export function validatePricingRulesValue(
   value: unknown,
@@ -248,7 +272,9 @@ export function pricingRulesErrorMessageKey(
   | "pricingRulesNotObject"
   | "pricingRulesTooLong"
   | "pricingRulesForbiddenKey"
-  | "pricingRulesNonFiniteNumber" {
+  | "pricingRulesNonFiniteNumber"
+  | "pricingRulesTooDeep"
+  | "pricingRulesSharedRef" {
   switch (reason) {
     case "too_large":
       return "pricingRulesTooLong";
@@ -258,6 +284,10 @@ export function pricingRulesErrorMessageKey(
       return "pricingRulesForbiddenKey";
     case "non_finite_number":
       return "pricingRulesNonFiniteNumber";
+    case "too_deep":
+      return "pricingRulesTooDeep";
+    case "shared_ref":
+      return "pricingRulesSharedRef";
     case "invalid_json":
     default:
       return "pricingRulesInvalidJson";

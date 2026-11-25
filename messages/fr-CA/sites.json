@@ -68,7 +68,9 @@
     "pricingRulesNotObject": "Les règles de prix doivent être un objet JSON (pas un tableau ni une valeur seule)",
     "pricingRulesTooLong": "Les règles de prix doivent compter au plus {max, number} caractères une fois minifiées",
     "pricingRulesForbiddenKey": "Les règles de prix ne peuvent pas utiliser les clés __proto__, constructor ou prototype",
-    "pricingRulesNonFiniteNumber": "Les règles de prix ne peuvent pas contenir Infinity ni NaN"
+    "pricingRulesNonFiniteNumber": "Les règles de prix ne peuvent pas contenir Infinity ni NaN",
+    "pricingRulesTooDeep": "Les règles de prix peuvent être imbriquées sur au plus {max, number} niveaux",
+    "pricingRulesSharedRef": "Les règles de prix ne peuvent pas réutiliser le même objet à plusieurs endroits"
   },
 
   "actions": {

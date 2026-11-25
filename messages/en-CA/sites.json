@@ -68,7 +68,9 @@
     "pricingRulesNotObject": "Pricing rules must be a JSON object (not an array or bare value)",
     "pricingRulesTooLong": "Pricing rules must be at most {max, number} characters when minified",
     "pricingRulesForbiddenKey": "Pricing rules cannot use __proto__, constructor, or prototype keys",
-    "pricingRulesNonFiniteNumber": "Pricing rules cannot contain Infinity or NaN"
+    "pricingRulesNonFiniteNumber": "Pricing rules cannot contain Infinity or NaN",
+    "pricingRulesTooDeep": "Pricing rules can be nested at most {max, number} levels",
+    "pricingRulesSharedRef": "Pricing rules cannot reuse the same object in more than one place"
   },
 
   "actions": {
