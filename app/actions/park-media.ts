@@ -30,7 +30,6 @@ import {
 } from "@/lib/supabase/db-utils";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
-import type { PostgrestError } from "@supabase/supabase-js";
 
 const SITE_PHOTO_CAP_MARKER = "park_media_site_photos_at_cap";
 
@@ -525,8 +524,7 @@ export async function sweepOrphanParkMediaAction(): Promise<
       });
     }
     if (result.kind === "rpc_error") {
-      // Live RPC failures are PostgrestError; shared result type is structural.
-      return mapPostgrestError(result.error as PostgrestError);
+      return mapPostgrestError(result.error);
     }
     if (result.kind === "aborted") {
       return resultError(MediaErrorCode.MEDIA_SWEEP_ABORTED, {

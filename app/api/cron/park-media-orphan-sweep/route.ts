@@ -11,11 +11,10 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 async function handleCron(request: Request): Promise<Response> {
-  return handleParkMediaOrphanCron(request, {
+  return handleParkMediaOrphanCron<PostgrestError>(request, {
     sweep: executeOrphanParkMediaSweep,
     mapRpcError: (error) => {
-      // CronSweep error shape matches PostgrestError fields used by the mapper.
-      const mapped = mapPostgrestError(error as PostgrestError);
+      const mapped = mapPostgrestError(error);
       return mapped.success
         ? {}
         : { errorCode: mapped.errorCode, details: mapped.details };

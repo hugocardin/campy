@@ -54,7 +54,7 @@ const REMOVED_PATH_SAMPLE = 5;
 export async function executeOrphanParkMediaSweep(opts?: {
   maxPages?: number;
   deadlineMs?: number;
-}): Promise<OrphanParkMediaSweepRunResult> {
+}): Promise<OrphanParkMediaSweepRunResult<PostgrestError>> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
   if (!supabaseUrl) {
     console.warn("[park-media] orphan sweep aborted — missing project URL");

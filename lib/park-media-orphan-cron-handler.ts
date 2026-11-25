@@ -7,27 +7,29 @@ import {
   type OrphanSweepRpcFailure,
 } from "@/lib/park-media-orphan-sweep";
 
-export type CronSweepFn = (opts?: {
-  maxPages?: number;
-  deadlineMs?: number;
-}) => Promise<OrphanParkMediaSweepRunResult>;
+export type CronSweepFn<E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure> =
+  (opts?: {
+    maxPages?: number;
+    deadlineMs?: number;
+  }) => Promise<OrphanParkMediaSweepRunResult<E>>;
 
-export type CronErrorMapper = (
-  error: OrphanSweepRpcFailure,
-) => { errorCode?: string; details?: Record<string, unknown> };
+export type CronErrorMapper<E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure> =
+  (error: E) => { errorCode?: string; details?: Record<string, unknown> };
 
 export type CronUnexpectedMapper = (
   err: unknown,
 ) => { errorCode?: string; details?: Record<string, unknown> };
 
-export type ParkMediaOrphanCronDeps = {
+export type ParkMediaOrphanCronDeps<
+  E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure,
+> = {
   /**
    * Test-only override. Production route must omit this so the real
    * `authorizeCronRequest` (Bearer `CRON_SECRET`) runs.
    */
   authorize?: (request: Request) => boolean;
-  sweep: CronSweepFn;
-  mapRpcError?: CronErrorMapper;
+  sweep: CronSweepFn<E>;
+  mapRpcError?: CronErrorMapper<E>;
   mapUnexpected?: CronUnexpectedMapper;
   maxPages?: number;
   deadlineMs?: number;
@@ -47,9 +49,11 @@ function jsonResponse(
  * Cron HTTP contract for park-media orphan sweep.
  * Injectable deps keep the route unit-testable without `server-only` / Supabase.
  */
-export async function handleParkMediaOrphanCron(
+export async function handleParkMediaOrphanCron<
+  E extends OrphanSweepRpcFailure = OrphanSweepRpcFailure,
+>(
   request: Request,
-  deps: ParkMediaOrphanCronDeps,
+  deps: ParkMediaOrphanCronDeps<E>,
 ): Promise<Response> {
   const authorize = deps.authorize ?? ((req) => authorizeCronRequest(req));
   if (!authorize(request)) {

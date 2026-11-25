@@ -145,8 +145,8 @@ export async function removeParkMediaByPrefix(
 
 /**
  * Best-effort remove of specific object paths (orphan sweep).
- * Paths already gone (not returned by `remove`) count as removed, not failed.
- * `removedPaths` lists only paths from chunks that completed without error.
+ * Paths already gone (not returned by `remove`) still count toward `removed`.
+ * `removedPaths` prefers names Storage reports in `data` (audit sample).
  */
 export async function removeParkMediaObjectPaths(
   supabase: SupabaseClient,
@@ -162,7 +162,7 @@ export async function removeParkMediaObjectPaths(
     async (chunk) => {
       chunkIndex += 1;
       try {
-        const { error } = await supabase.storage
+        const { data, error } = await supabase.storage
           .from(PARK_MEDIA_BUCKET)
           .remove([...chunk]);
         if (error) {
@@ -173,7 +173,11 @@ export async function removeParkMediaObjectPaths(
           );
           return { ok: false };
         }
-        return { ok: true };
+        // Exact names Storage reports as deleted (may be empty if already gone).
+        const removedPaths = (data ?? [])
+          .map((obj) => (typeof obj.name === "string" ? obj.name : ""))
+          .filter(Boolean);
+        return { ok: true, removedPaths };
       } catch (err) {
         console.warn("[park-media] orphan sweep remove threw", err);
         return { ok: false };
