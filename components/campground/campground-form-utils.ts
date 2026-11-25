@@ -21,6 +21,9 @@ export type CampgroundFormData = {
     lat: string;
     lng: string;
   };
+  /** Empty string = no commission type. */
+  commission_type_id: string;
+  commission_value: string;
 };
 
 /**
@@ -51,5 +54,13 @@ export function toCampgroundFormData(
       lat: String(campground.location?.lat ?? ""),
       lng: String(campground.location?.lng ?? ""),
     },
+    commission_type_id:
+      campground.commission_type_id != null
+        ? String(campground.commission_type_id)
+        : "",
+    commission_value:
+      campground.commission_type_id != null
+        ? String(campground.commission_value ?? 0)
+        : "",
   };
 }

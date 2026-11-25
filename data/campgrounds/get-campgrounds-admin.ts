@@ -29,10 +29,23 @@ type CampgroundAdminRow = {
   website: string | null;
   phone: string | null;
   active: boolean;
+  commission_type_id?: number | null;
+  commission_value?: number | string | null;
+  /** From `v_campgrounds_admin` join on `commission_types`. */
+  commission_type_name?: string | null;
   cover_photo?: string | null;
 };
 
 function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
+  const typeId =
+    row.commission_type_id == null ? null : Number(row.commission_type_id);
+  const resolvedTypeId =
+    typeId != null && Number.isInteger(typeId) && typeId > 0 ? typeId : null;
+  const rawValue = row.commission_value;
+  const valueNum =
+    rawValue == null || rawValue === "" ? 0 : Number(rawValue);
+  const rawTypeName = row.commission_type_name?.trim().toLowerCase() ?? "";
+
   return {
     id: row.id,
     owner_id: row.owner_id,
@@ -54,6 +67,10 @@ function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
     website: row.website ?? "",
     phone: row.phone ?? "",
     active: row.active,
+    commission_type_id: resolvedTypeId,
+    commission_type_name:
+      resolvedTypeId != null && rawTypeName !== "" ? rawTypeName : null,
+    commission_value: Number.isFinite(valueNum) ? valueNum : 0,
     coverPhoto: normalizeParkMediaUrl(row.cover_photo),
   };
 }

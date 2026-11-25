@@ -17,7 +17,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update_input";
+import { CommissionType } from "@/entities/commission-type";
 import { UserProfileNoRole } from "@/entities/user-profile";
+import {
+  normalizeCommissionInput,
+  parseCommissionTypeName,
+} from "@/lib/campground-commission";
 import {
   CAMPGROUND_CURRENCY_LOCKED_FIELD,
   type CampgroundCurrencyLockState,
@@ -36,8 +41,11 @@ import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 
+const COMMISSION_TYPE_NONE = "__none__";
+
 type CampgroundFormProps = {
   owners: UserProfileNoRole[];
+  commissionTypes: CommissionType[];
   initialData?: CampgroundFormData;
   onSubmit: (data: CampgroundCreateUpdateInput) => Promise<ActionResult>;
   /** When set on edit, listing currency control is disabled (#24/#51). */
@@ -62,8 +70,19 @@ function currencyLockHintMessage(
   return t("form.currencyLockedHintSites");
 }
 
+function commissionTypeLabel(
+  name: string,
+  t: (key: string) => string,
+): string {
+  const parsed = parseCommissionTypeName(name);
+  if (parsed === "percent") return t("commissionTypes.percent");
+  if (parsed === "fixed") return t("commissionTypes.fixed");
+  return name;
+}
+
 export default function CampgroundFormClient({
   owners,
+  commissionTypes,
   initialData,
   onSubmit,
   currencyLockReason = null,
@@ -90,6 +109,8 @@ export default function CampgroundFormClient({
       lat: initialData?.location?.lat ?? "",
       lng: initialData?.location?.lng ?? "",
     },
+    commission_type_id: initialData?.commission_type_id ?? "",
+    commission_value: initialData?.commission_value ?? "",
   }));
 
   const isFormValid = Boolean(
@@ -119,6 +140,47 @@ export default function CampgroundFormClient({
       return setError(t_campgrounds("errors.websiteInvalid"));
     if (!parseGuestPriceCurrency(form.currency))
       return setError(t_campgrounds("errors.currencyInvalid"));
+
+    const commissionTypeId =
+      form.commission_type_id.trim() === ""
+        ? null
+        : Number.parseInt(form.commission_type_id, 10);
+    if (
+      commissionTypeId != null &&
+      (!Number.isInteger(commissionTypeId) ||
+        !knownCommissionTypes.some((t) => t.id === commissionTypeId))
+    ) {
+      return setError(t_campgrounds("errors.commissionTypeInvalid"));
+    }
+
+    const selectedTypeRow =
+      commissionTypeId == null
+        ? null
+        : knownCommissionTypes.find((t) => t.id === commissionTypeId);
+    const selectedKnownType = parseCommissionTypeName(selectedTypeRow?.name);
+    const selectedTypeName = selectedKnownType ?? null;
+    if (commissionTypeId != null && selectedTypeName == null) {
+      return setError(t_campgrounds("errors.commissionTypeInvalid"));
+    }
+
+    const commissionNormalized = normalizeCommissionInput({
+      commission_type_id: commissionTypeId,
+      commission_value: form.commission_value,
+      typeName: selectedTypeName,
+    });
+    if (!commissionNormalized.ok) {
+      if (commissionNormalized.field === "commission_type_id") {
+        return setError(t_campgrounds("errors.commissionTypeInvalid"));
+      }
+      if (commissionNormalized.reason === "value_out_of_range") {
+        return setError(
+          selectedKnownType === "percent"
+            ? t_campgrounds("errors.commissionValuePercentRange")
+            : t_campgrounds("errors.commissionValueFixedRange"),
+        );
+      }
+      return setError(t_campgrounds("errors.commissionValueInvalid"));
+    }
 
     // Locked parks cannot change currency (DB trigger also rejects).
     if (
@@ -164,6 +226,8 @@ export default function CampgroundFormClient({
         lat: latNum,
         lng: lngNum,
       },
+      commission_type_id: commissionNormalized.data.commission_type_id,
+      commission_value: commissionNormalized.data.commission_value,
     };
 
     startTransition(async () => {
@@ -181,6 +245,20 @@ export default function CampgroundFormClient({
                 fieldMessages: {
                   "campground.website": t_campgrounds("errors.websiteInvalid"),
                   "campground.currency": t_campgrounds("errors.currencyInvalid"),
+                  "campground.commission_type_id": t_campgrounds(
+                    "errors.commissionTypeInvalid",
+                  ),
+                  "campground.commission_value":
+                    result.details?.reason === "value_out_of_range"
+                      ? parseCommissionTypeName(
+                          knownCommissionTypes.find(
+                            (t) =>
+                              String(t.id) === form.commission_type_id,
+                          )?.name,
+                        ) === "percent"
+                        ? t_campgrounds("errors.commissionValuePercentRange")
+                        : t_campgrounds("errors.commissionValueFixedRange")
+                      : t_campgrounds("errors.commissionValueInvalid"),
                   [CAMPGROUND_CURRENCY_LOCKED_FIELD]:
                     result.details?.reason === "currency_locked_bookings"
                       ? t_campgrounds("errors.currencyLockedBookings")
@@ -210,6 +288,32 @@ export default function CampgroundFormClient({
     setForm((prev) => ({ ...prev, owner_id: value }));
     setError(null);
   };
+
+  const knownCommissionTypes = commissionTypes.filter((type) =>
+    Boolean(parseCommissionTypeName(type.name)),
+  );
+  /** Current id not in the closed percent/fixed set (e.g. future lookup row). */
+  const orphanCommissionTypeId =
+    form.commission_type_id &&
+    !knownCommissionTypes.some((t) => String(t.id) === form.commission_type_id)
+      ? form.commission_type_id
+      : null;
+
+  const handleCommissionTypeChange = (value: string) => {
+    const nextId = value === COMMISSION_TYPE_NONE ? "" : value;
+    setForm((prev) => ({
+      ...prev,
+      commission_type_id: nextId,
+      // Reset amount whenever the type changes (percent ↔ fixed ↔ none).
+      commission_value: nextId === "" ? "" : "0",
+    }));
+    setError(null);
+  };
+
+  const selectedCommissionTypeName = parseCommissionTypeName(
+    knownCommissionTypes.find((t) => String(t.id) === form.commission_type_id)
+      ?.name,
+  );
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -465,6 +569,105 @@ export default function CampgroundFormClient({
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {t_campgrounds("form.longitudeRange")}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="commission_type_id">
+                  {t_campgrounds("form.commissionTypeLabel")}
+                </Label>
+                <Select
+                  value={
+                    form.commission_type_id
+                      ? form.commission_type_id
+                      : COMMISSION_TYPE_NONE
+                  }
+                  onValueChange={handleCommissionTypeChange}
+                >
+                  <SelectTrigger
+                    id="commission_type_id"
+                    className="mt-1.5"
+                    aria-describedby="commission-type-hint"
+                  >
+                    <SelectValue
+                      placeholder={t_campgrounds(
+                        "form.commissionTypePlaceholder",
+                      )}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={COMMISSION_TYPE_NONE}>
+                      {t_campgrounds("form.commissionTypeNone")}
+                    </SelectItem>
+                    {orphanCommissionTypeId ? (
+                      <SelectItem value={orphanCommissionTypeId}>
+                        {t_campgrounds("commissionTypes.unknown")}
+                      </SelectItem>
+                    ) : null}
+                    {[...knownCommissionTypes]
+                      .sort((a, b) => a.id - b.id)
+                      .map((type) => (
+                        <SelectItem key={type.id} value={String(type.id)}>
+                          {commissionTypeLabel(type.name, t_campgrounds)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p
+                  id="commission-type-hint"
+                  className="mt-1 text-xs text-muted-foreground"
+                >
+                  {orphanCommissionTypeId
+                    ? t_campgrounds("form.commissionTypeUnknownHint")
+                    : t_campgrounds("form.commissionTypeHint")}
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="commission_value">
+                  {selectedCommissionTypeName === "percent"
+                    ? t_campgrounds("form.commissionValuePercentLabel")
+                    : selectedCommissionTypeName === "fixed"
+                      ? t_campgrounds("form.commissionValueFixedLabel")
+                      : t_campgrounds("form.commissionValueLabel")}
+                </Label>
+                <Input
+                  id="commission_value"
+                  name="commission_value"
+                  type="text"
+                  inputMode="decimal"
+                  value={form.commission_value}
+                  onChange={handleChange}
+                  disabled={
+                    !form.commission_type_id || Boolean(orphanCommissionTypeId)
+                  }
+                  className="mt-1.5"
+                  placeholder={
+                    orphanCommissionTypeId || !form.commission_type_id
+                      ? t_campgrounds("form.commissionValuePlaceholder")
+                      : selectedCommissionTypeName === "percent"
+                        ? t_campgrounds(
+                            "form.commissionValuePercentPlaceholder",
+                          )
+                        : t_campgrounds(
+                            "form.commissionValueFixedPlaceholder",
+                          )
+                  }
+                  aria-describedby="commission-value-hint"
+                />
+                <p
+                  id="commission-value-hint"
+                  className="mt-1 text-xs text-muted-foreground"
+                >
+                  {orphanCommissionTypeId
+                    ? t_campgrounds("form.commissionValueHintUnknown")
+                    : !form.commission_type_id
+                      ? t_campgrounds("form.commissionValueHintNone")
+                      : selectedCommissionTypeName === "percent"
+                        ? t_campgrounds("form.commissionValuePercentHint")
+                        : t_campgrounds("form.commissionValueFixedHint")}
                 </p>
               </div>
             </div>

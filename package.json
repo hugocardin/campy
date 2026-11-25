@@ -12,7 +12,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/revalidate-localized-path.test.ts lib/safe-internal-href.test.ts lib/safe-http-url.test.ts lib/message-locale-parity.test.ts lib/supabase/db-utils.test.ts lib/errors/action-error-ui.test.ts lib/amenities/code.test.ts lib/amenities/hookup-codes.test.ts lib/electricity-amps.test.ts lib/driveway-type.test.ts lib/site-rig-length.test.ts lib/stay-kind.test.ts lib/guest-site-types.test.ts lib/guest-amenity-codes.test.ts lib/campground-price.test.ts lib/campground-currency-lock.test.ts lib/campground-search.test.ts lib/campground-search-query.test.ts lib/search-hover-sync.test.ts lib/canadian-provinces.test.ts lib/geocoding/photon.test.ts lib/geocoding/photon-client-key.test.ts lib/person-initials.test.ts lib/profile-validation.test.ts lib/park-media.test.ts"
+    "test": "tsx --test lib/revalidate-localized-path.test.ts lib/safe-internal-href.test.ts lib/safe-http-url.test.ts lib/message-locale-parity.test.ts lib/supabase/db-utils.test.ts lib/errors/action-error-ui.test.ts lib/amenities/code.test.ts lib/amenities/hookup-codes.test.ts lib/electricity-amps.test.ts lib/driveway-type.test.ts lib/site-rig-length.test.ts lib/stay-kind.test.ts lib/guest-site-types.test.ts lib/guest-amenity-codes.test.ts lib/campground-price.test.ts lib/campground-currency-lock.test.ts lib/campground-commission.test.ts lib/campground-search.test.ts lib/campground-search-query.test.ts lib/search-hover-sync.test.ts lib/canadian-provinces.test.ts lib/geocoding/photon.test.ts lib/geocoding/photon-client-key.test.ts lib/person-initials.test.ts lib/profile-validation.test.ts lib/park-media.test.ts"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.2.7",
