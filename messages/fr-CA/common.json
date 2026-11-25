@@ -22,6 +22,7 @@
 
   "header": {
     "profile": "Profil",
+    "myBookings": "Mes réservations",
     "plateformAdminDashboard": "Tableau de bord administrateur de la plateforme"
   }
 }

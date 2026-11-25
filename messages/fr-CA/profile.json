@@ -25,6 +25,10 @@
     "invalidRigUnit": "Choisissez une unité de longueur valide (pi ou m)"
   },
 
+  "accountLinks": {
+    "title": "Compte"
+  },
+
   "ProfilePage": {
     "pageHeader": {
       "title": "Votre profil",
@@ -45,5 +49,30 @@
       "title": "Modifier le profil | Campy",
       "description": "Modifiez votre nom et la longueur de véhicule par défaut sur Campy."
     }
+  },
+
+  "BookingsPage": {
+    "pageHeader": {
+      "title": "Mes réservations",
+      "description": "Vos réservations Campy"
+    },
+    "meta": {
+      "title": "Mes réservations | Campy",
+      "description": "Consultez vos réservations Campy. La réservation en ligne arrive bientôt."
+    },
+    "browseCta": "Parcourir les terrains de camping",
+    "empty": {
+      "title": "Aucune réservation pour le moment",
+      "description": "Vous n'avez aucune réservation. La réservation en ligne arrive bientôt — parcourez les terrains de camping en attendant."
+    },
+    "comingSoon": {
+      "title": "Liste des réservations bientôt disponible",
+      "description": "Vos réservations apparaîtront ici lorsque la réservation en ligne sera offerte. Parcourez les terrains de camping en attendant."
+    },
+    "unavailable": {
+      "title": "Impossible de charger vos réservations",
+      "description": "Une erreur est survenue lors du chargement des réservations. Réessayez dans un moment, ou parcourez les terrains de camping en attendant."
+    },
+    "navLink": "Mes réservations"
   }
 }

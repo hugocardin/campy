@@ -198,6 +198,12 @@ export default function Header() {
                   <Link href={routes.profile()}>{tc("header.profile")}</Link>
                 </DropdownMenuItem>
 
+                <DropdownMenuItem asChild>
+                  <Link href={routes.profileBookings()}>
+                    {tc("header.myBookings")}
+                  </Link>
+                </DropdownMenuItem>
+
                 {!roleLoading && roleName === USER_ROLE_PLATEFORMADMIN && (
                   <DropdownMenuItem asChild>
                     <Link href={routes.platformAdmin.root()}>

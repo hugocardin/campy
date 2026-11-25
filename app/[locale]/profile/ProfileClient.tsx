@@ -4,8 +4,10 @@ import { EditButton } from "@/components/buttons/EditButton";
 import FormattedRigLength from "@/components/rig-length/FormattedRigLength";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserProfile } from "@/entities/user-profile";
+import { Link } from "@/i18n/navigation";
 import { getInitials } from "@/lib/person-initials";
 import { routes } from "@/lib/routes";
 import { User } from "@supabase/supabase-js";
@@ -98,6 +100,23 @@ export default function ProfileClient({ profile, user }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Account links — keep nav out of the identity column as sections grow */}
+      <section className="space-y-3" aria-labelledby="profile-account-links">
+        <h2
+          id="profile-account-links"
+          className="text-sm font-medium text-muted-foreground"
+        >
+          {t_profile("accountLinks.title")}
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.profileBookings()}>
+              {t_profile("BookingsPage.navLink")}
+            </Link>
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }
