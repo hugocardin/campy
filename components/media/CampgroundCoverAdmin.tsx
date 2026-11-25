@@ -79,33 +79,36 @@ export default function CampgroundCoverAdmin({
         return;
       }
 
-      try {
-        const result = await commitCampgroundCoverAction(
-          campgroundId,
-          uploaded.publicUrl,
-          coverPhoto,
-        );
-        if (!result.success) {
-          await removeParkMediaPublicUrlBestEffort(uploaded.publicUrl);
-          setError(
-            withErrorReference(
-              translateErrorCode(
-                result.errorCode,
-                tErrors,
-                tc("error"),
-                result.details,
-              ),
-              result.details,
-              (errorId) => tc("errorReference", { errorId }),
-            ),
-          );
-          return;
-        }
-        router.refresh();
-      } catch {
-        await removeParkMediaPublicUrlBestEffort(uploaded.publicUrl);
+      // Only delete on an explicit !success (server guarantees that means
+      // not committed). A thrown/lost response may still have committed —
+      // leave any orphan for the #57 sweep rather than risk wiping a live cover.
+      const result = await commitCampgroundCoverAction(
+        campgroundId,
+        uploaded.publicUrl,
+        coverPhoto,
+      ).catch(() => null);
+
+      if (!result) {
         setError(tc("error"));
+        return;
       }
+      if (!result.success) {
+        await removeParkMediaPublicUrlBestEffort(uploaded.publicUrl);
+        setError(
+          withErrorReference(
+            translateErrorCode(
+              result.errorCode,
+              tErrors,
+              tc("error"),
+              result.details,
+            ),
+            result.details,
+            (errorId) => tc("errorReference", { errorId }),
+          ),
+        );
+        return;
+      }
+      router.refresh();
     });
   };
 

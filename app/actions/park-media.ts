@@ -50,6 +50,23 @@ function revalidateSiteMedia(campgroundId: string, siteId: string) {
   revalidateLocalizedPath(routes.platformAdmin.campgroundSites(campgroundId));
 }
 
+/** Best-effort revalidate; never fail a committed media write. */
+function safeRevalidateCampgroundMedia(campgroundId: string) {
+  try {
+    revalidateCampgroundMedia(campgroundId);
+  } catch (err) {
+    console.warn("[park-media] revalidate campground threw", err);
+  }
+}
+
+function safeRevalidateSiteMedia(campgroundId: string, siteId: string) {
+  try {
+    revalidateSiteMedia(campgroundId, siteId);
+  } catch (err) {
+    console.warn("[park-media] revalidate site threw", err);
+  }
+}
+
 async function removeStorageObjectIfOurs(
   publicUrl: string | null | undefined,
   expectedPrefix: string,
@@ -81,21 +98,10 @@ async function removeStorageObjectIfOurs(
 }
 
 /**
- * Delete `candidate` only when it is not already referenced by the row.
- * Avoids wiping a live cover/photo after a successful commit + retry/conflict.
- */
-async function removeUnreferencedUpload(
-  candidate: string,
-  expectedPrefix: string,
-  isReferenced: boolean,
-): Promise<void> {
-  if (isReferenced) return;
-  await removeStorageObjectIfOurs(candidate, expectedPrefix);
-}
-
-/**
  * Commit a browser-uploaded cover URL with optimistic concurrency.
  * `expectedCoverPhoto` must match the row's current `cover_photo` (null if empty).
+ * Once the row references `publicUrl`, this action returns success even if
+ * revalidation / old-object cleanup throws (`!success` ⇒ not committed).
  */
 export async function commitCampgroundCoverAction(
   campgroundId: string,
@@ -132,7 +138,7 @@ export async function commitCampgroundCoverAction(
 
   // Idempotent retry: URL already committed as the live cover.
   if (expected != null && expected === nextUrl) {
-    revalidateCampgroundMedia(campgroundId);
+    safeRevalidateCampgroundMedia(campgroundId);
     return resultSuccess({ coverPhoto: nextUrl });
   }
 
@@ -158,7 +164,7 @@ export async function commitCampgroundCoverAction(
       .maybeSingle();
 
     if (error) {
-      await removeUnreferencedUpload(nextUrl, coverPrefix, false);
+      await removeStorageObjectIfOurs(nextUrl, coverPrefix);
       return mapPostgrestError(error);
     }
 
@@ -171,33 +177,41 @@ export async function commitCampgroundCoverAction(
           .single(),
       );
       if (!current.success) {
-        await removeUnreferencedUpload(nextUrl, coverPrefix, false);
+        await removeStorageObjectIfOurs(nextUrl, coverPrefix);
         return current;
       }
       const live = normalizeParkMediaUrl(
         (current.data as { cover_photo?: string | null }).cover_photo,
       );
       if (live === nextUrl) {
-        // Prior attempt already committed this URL (lost response / retry).
-        revalidateCampgroundMedia(campgroundId);
+        committed = true;
+        safeRevalidateCampgroundMedia(campgroundId);
         return resultSuccess({ coverPhoto: nextUrl });
       }
-      await removeUnreferencedUpload(nextUrl, coverPrefix, false);
+      await removeStorageObjectIfOurs(nextUrl, coverPrefix);
       return resultError(MediaErrorCode.MEDIA_COVER_CONFLICT);
     }
 
     committed = true;
 
     if (expected && expected !== nextUrl) {
-      await removeStorageObjectIfOurs(expected, coverPrefix);
+      try {
+        await removeStorageObjectIfOurs(expected, coverPrefix);
+      } catch (err) {
+        console.warn("[park-media] old cover cleanup threw", err);
+      }
     }
 
-    revalidateCampgroundMedia(campgroundId);
+    safeRevalidateCampgroundMedia(campgroundId);
     return resultSuccess({ coverPhoto: nextUrl });
   } catch (err) {
-    if (!committed) {
-      await removeUnreferencedUpload(nextUrl, coverPrefix, false);
+    if (committed) {
+      // Row already references nextUrl — never report failure (client must not delete).
+      console.warn("[park-media] post-commit cover path threw", err);
+      safeRevalidateCampgroundMedia(campgroundId);
+      return resultSuccess({ coverPhoto: nextUrl });
     }
+    await removeStorageObjectIfOurs(nextUrl, coverPrefix);
     return handleUnexpectedError(err);
   }
 }
@@ -260,7 +274,7 @@ export async function clearCampgroundCoverAction(
 
     await removeStorageObjectIfOurs(expected, coverPrefix);
 
-    revalidateCampgroundMedia(campgroundId);
+    safeRevalidateCampgroundMedia(campgroundId);
     return resultSuccess();
   } catch (err) {
     return handleUnexpectedError(err);
@@ -270,6 +284,7 @@ export async function clearCampgroundCoverAction(
 /**
  * Append a browser-uploaded site photo URL via atomic RPC.
  * Soft cap uses the raw array length (including foreign entries).
+ * Once the URL is in `sites.photos`, returns success even if revalidation throws.
  */
 export async function appendSitePhotoAction(
   campgroundId: string,
@@ -294,6 +309,7 @@ export async function appendSitePhotoAction(
   }
 
   let committed = false;
+  let committedPhotos: string[] | null = null;
   try {
     const supabase = await createClient();
 
@@ -313,12 +329,14 @@ export async function appendSitePhotoAction(
 
     // Idempotent retry: URL already in the array.
     if (currentRaw.includes(nextUrl)) {
-      revalidateSiteMedia(campgroundId, siteId);
+      committed = true;
+      committedPhotos = currentRaw;
+      safeRevalidateSiteMedia(campgroundId, siteId);
       return resultSuccess({ photos: currentRaw });
     }
 
     if (currentRaw.length >= PARK_MEDIA_MAX_SITE_PHOTOS) {
-      await removeUnreferencedUpload(nextUrl, photoPrefix, false);
+      await removeStorageObjectIfOurs(nextUrl, photoPrefix);
       return resultError(MediaErrorCode.MEDIA_LIMIT_REACHED);
     }
 
@@ -329,7 +347,7 @@ export async function appendSitePhotoAction(
     });
 
     if (error) {
-      await removeUnreferencedUpload(nextUrl, photoPrefix, false);
+      await removeStorageObjectIfOurs(nextUrl, photoPrefix);
       if (
         typeof error.message === "string" &&
         error.message.includes(SITE_PHOTO_CAP_MARKER)
@@ -343,14 +361,18 @@ export async function appendSitePhotoAction(
     }
 
     committed = true;
-    revalidateSiteMedia(campgroundId, siteId);
-    return resultSuccess({
-      photos: coerceSitePhotoEntries(data),
-    });
+    committedPhotos = coerceSitePhotoEntries(data);
+    safeRevalidateSiteMedia(campgroundId, siteId);
+    return resultSuccess({ photos: committedPhotos });
   } catch (err) {
-    if (!committed) {
-      await removeUnreferencedUpload(nextUrl, photoPrefix, false);
+    if (committed) {
+      console.warn("[park-media] post-commit site photo path threw", err);
+      safeRevalidateSiteMedia(campgroundId, siteId);
+      return resultSuccess({
+        photos: committedPhotos ?? [nextUrl],
+      });
     }
+    await removeStorageObjectIfOurs(nextUrl, photoPrefix);
     return handleUnexpectedError(err);
   }
 }
@@ -400,7 +422,7 @@ export async function removeSitePhotoAction(
 
     await removeStorageObjectIfOurs(target, photoPrefix);
 
-    revalidateSiteMedia(campgroundId, siteId);
+    safeRevalidateSiteMedia(campgroundId, siteId);
     return resultSuccess({
       photos: coerceSitePhotoEntries(data),
     });
