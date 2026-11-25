@@ -1,15 +1,40 @@
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import {
   COMMISSION_FIXED_MAX,
+  COMMISSION_GUARD_DETAIL,
+  COMMISSION_GUARD_SQL_MESSAGE_PREFIXES,
   COMMISSION_PERCENT_MAX,
+  COMMISSION_TYPE_NAMES,
+  COMMISSION_TYPES_NAME_LOCKED_DETAIL,
   formatCommissionFixed,
   formatCommissionPercent,
   normalizeCommissionInput,
   normalizeDecimalInput,
+  parseCampgroundCommissionGuardError,
   parseCommissionTypeName,
   resolveCommissionDisplayKind,
 } from "./campground-commission";
+
+const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
+
+/** Latest migration whose body matches `pattern` (filename-sorted). */
+function latestMigrationMatching(pattern: RegExp): string {
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+  let latest: string | null = null;
+  for (const name of files) {
+    const body = readFileSync(join(MIGRATIONS_DIR, name), "utf8");
+    if (pattern.test(body)) {
+      latest = body;
+    }
+  }
+  assert.ok(latest, `expected a migration matching ${pattern}`);
+  return latest!;
+}
 
 describe("parseCommissionTypeName", () => {
   it("accepts known names case-insensitively", () => {
@@ -237,5 +262,144 @@ describe("formatCommission*", () => {
     assert.match(formatCommissionPercent(12.5, "fr-CA"), /12[,.]5/);
     assert.match(formatCommissionFixed(5, "en-CA", "CAD"), /5\.00/);
     assert.match(formatCommissionFixed(5.5, "fr-CA", "CAD"), /5[,.]50/);
+  });
+});
+
+describe("parseCampgroundCommissionGuardError", () => {
+  it("reads EXCEPTION DETAIL first", () => {
+    assert.deepEqual(
+      parseCampgroundCommissionGuardError({
+        message: "noise",
+        details: COMMISSION_GUARD_DETAIL.percentMax,
+      }),
+      {
+        field: "campground.commission_value",
+        reason: "value_out_of_range",
+      },
+    );
+    assert.deepEqual(
+      parseCampgroundCommissionGuardError({
+        details: COMMISSION_GUARD_DETAIL.fixedMax,
+      }),
+      {
+        field: "campground.commission_value",
+        reason: "value_out_of_range",
+      },
+    );
+    assert.deepEqual(
+      parseCampgroundCommissionGuardError({
+        details: COMMISSION_GUARD_DETAIL.typeMissing,
+      }),
+      {
+        field: "campground.commission_type_id",
+        reason: "type_mismatch",
+      },
+    );
+  });
+
+  it("matches pinned SQL message prefixes", () => {
+    assert.deepEqual(
+      parseCampgroundCommissionGuardError({
+        message: `${COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.percentMax} 101`,
+      }),
+      {
+        field: "campground.commission_value",
+        reason: "value_out_of_range",
+      },
+    );
+    assert.deepEqual(
+      parseCampgroundCommissionGuardError({
+        message: `${COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.fixedMax} too big`,
+      }),
+      {
+        field: "campground.commission_value",
+        reason: "value_out_of_range",
+      },
+    );
+    assert.deepEqual(
+      parseCampgroundCommissionGuardError({
+        message: `${COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.typeMissing} 9`,
+      }),
+      {
+        field: "campground.commission_type_id",
+        reason: "type_mismatch",
+      },
+    );
+  });
+
+  it("ignores unrelated errors", () => {
+    assert.equal(
+      parseCampgroundCommissionGuardError({
+        message: "some other check",
+        details: "unrelated",
+      }),
+      null,
+    );
+    assert.equal(parseCampgroundCommissionGuardError({}), null);
+  });
+});
+
+describe("commission DB guard migration pins", () => {
+  it("keeps enforce-function literals in sync with TS constants", () => {
+    // Latest CREATE OR REPLACE — not a fixed filename — so a redefine can't
+    // drift from COMMISSION_*_MAX while an older file still satisfies the pin.
+    const sql = latestMigrationMatching(
+      /CREATE OR REPLACE FUNCTION\s+public\.campgrounds_enforce_commission_value\s*\(/i,
+    );
+
+    assert.match(
+      sql,
+      new RegExp(`NEW\\.commission_value > ${COMMISSION_PERCENT_MAX}\\b`),
+      "percent cap must match COMMISSION_PERCENT_MAX",
+    );
+    assert.match(
+      sql,
+      new RegExp(
+        `NEW\\.commission_value > ${String(COMMISSION_FIXED_MAX).replace(".", "\\.")}\\b`,
+      ),
+      "fixed cap must match COMMISSION_FIXED_MAX",
+    );
+    assert.match(sql, /SECURITY DEFINER/);
+    assert.match(sql, /DETAIL = 'commission_percent_max'/);
+    assert.match(sql, /DETAIL = 'commission_fixed_max'/);
+    assert.match(sql, /DETAIL = 'commission_type_missing'/);
+    assert.ok(sql.includes(COMMISSION_GUARD_DETAIL.percentMax));
+    assert.ok(sql.includes(COMMISSION_GUARD_DETAIL.fixedMax));
+    assert.ok(sql.includes(COMMISSION_GUARD_DETAIL.typeMissing));
+    assert.ok(
+      sql.includes(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.percentMax),
+    );
+    assert.ok(sql.includes(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.fixedMax));
+    assert.ok(
+      sql.includes(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.typeMissing),
+    );
+  });
+
+  it("pins rename-lock DETAIL on latest refuse-rename function", () => {
+    // Intentionally unmapped in GUARD_RESULTS (admin/SQL-only path).
+    const sql = latestMigrationMatching(
+      /CREATE OR REPLACE FUNCTION\s+public\.commission_types_refuse_name_rename\s*\(/i,
+    );
+    assert.ok(sql.includes(COMMISSION_TYPES_NAME_LOCKED_DETAIL));
+  });
+
+  it("pins NaN clause on latest nonneg CHECK redefine", () => {
+    const sql = latestMigrationMatching(
+      /ADD CONSTRAINT\s+campgrounds_commission_value_nonneg_chk/i,
+    );
+    assert.match(sql, /commission_value <> 'NaN'::numeric/);
+  });
+
+  it("pins commission_types.name CHECK to COMMISSION_TYPE_NAMES", () => {
+    const sql = latestMigrationMatching(
+      /ADD CONSTRAINT\s+commission_types_name_chk/i,
+    );
+    const expected = [...COMMISSION_TYPE_NAMES]
+      .map((n) => `'${n}'`)
+      .join(",\\s*");
+    assert.match(
+      sql,
+      new RegExp(`CHECK\\s*\\(\\s*name\\s+IN\\s*\\(\\s*${expected}\\s*\\)\\s*\\)`, "i"),
+    );
   });
 });

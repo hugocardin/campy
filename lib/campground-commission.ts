@@ -25,6 +25,80 @@ export const COMMISSION_FIXED_MAX = 999_999.99;
 /** Max percent commission (inclusive). */
 export const COMMISSION_PERCENT_MAX = 100;
 
+/**
+ * Structured EXCEPTION DETAIL markers from
+ * `campgrounds_enforce_commission_value` (and related guards).
+ * Prefer DETAIL over message text when mapping PostgREST errors.
+ */
+export const COMMISSION_GUARD_DETAIL = {
+  percentMax: "commission_percent_max",
+  fixedMax: "commission_fixed_max",
+  typeMissing: "commission_type_missing",
+} as const;
+
+/** DETAIL from rename-refuse trigger — admin/SQL-only; intentionally unmapped. */
+export const COMMISSION_TYPES_NAME_LOCKED_DETAIL =
+  "commission_types_name_locked";
+
+export type CommissionGuardDetail =
+  (typeof COMMISSION_GUARD_DETAIL)[keyof typeof COMMISSION_GUARD_DETAIL];
+
+/** Exact SQL message prefixes (pin against migration). */
+export const COMMISSION_GUARD_SQL_MESSAGE_PREFIXES = {
+  percentMax: "campgrounds_commission_percent_max:",
+  fixedMax: "campgrounds_commission_fixed_max:",
+  typeMissing: "campgrounds_commission_type_missing:",
+} as const;
+
+export type CommissionGuardParseResult = {
+  field: "campground.commission_type_id" | "campground.commission_value";
+  reason: "value_out_of_range" | "type_mismatch";
+};
+
+type CommissionGuardKey = keyof typeof COMMISSION_GUARD_DETAIL;
+
+/** Single source for DETAIL + message-prefix → ActionResult mapping. */
+const GUARD_RESULTS = {
+  percentMax: {
+    field: "campground.commission_value",
+    reason: "value_out_of_range",
+  },
+  fixedMax: {
+    field: "campground.commission_value",
+    reason: "value_out_of_range",
+  },
+  typeMissing: {
+    field: "campground.commission_type_id",
+    reason: "type_mismatch",
+  },
+} as const satisfies Record<CommissionGuardKey, CommissionGuardParseResult>;
+
+/**
+ * Parse PostgREST trigger/CHECK error → commission field ActionResult shape.
+ * Prefer structured `details` (EXCEPTION DETAIL); fall back to message prefix.
+ */
+export function parseCampgroundCommissionGuardError(options: {
+  message?: string | null;
+  details?: string | null;
+}): CommissionGuardParseResult | null {
+  const detail = options.details?.trim();
+  if (detail) {
+    for (const key of Object.keys(GUARD_RESULTS) as CommissionGuardKey[]) {
+      if (detail === COMMISSION_GUARD_DETAIL[key]) {
+        return GUARD_RESULTS[key];
+      }
+    }
+  }
+
+  const message = options.message ?? "";
+  for (const key of Object.keys(GUARD_RESULTS) as CommissionGuardKey[]) {
+    if (message.startsWith(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES[key])) {
+      return GUARD_RESULTS[key];
+    }
+  }
+  return null;
+}
+
 const MAX_FRACTION_DIGITS = 2;
 
 export function isCommissionTypeName(
