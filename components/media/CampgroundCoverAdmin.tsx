@@ -79,9 +79,9 @@ export default function CampgroundCoverAdmin({
         return;
       }
 
-      // Only delete on an explicit !success (server guarantees that means
-      // not committed). A thrown/lost response may still have committed —
-      // leave any orphan for the #57 sweep rather than risk wiping a live cover.
+      // Delete only on a clean !success. MEDIA_COMMIT_UNCERTAIN or a
+      // thrown/lost response may have committed, so leave any orphan for
+      // the #57 sweep rather than risk wiping a live cover.
       const result = await commitCampgroundCoverAction(
         campgroundId,
         uploaded.publicUrl,
