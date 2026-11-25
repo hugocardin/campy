@@ -51,6 +51,24 @@ export type CommissionGuardParseResult = {
   reason: "value_out_of_range" | "type_mismatch";
 };
 
+type CommissionGuardKey = keyof typeof COMMISSION_GUARD_DETAIL;
+
+/** Single source for DETAIL + message-prefix → ActionResult mapping. */
+const GUARD_RESULTS = {
+  percentMax: {
+    field: "campground.commission_value",
+    reason: "value_out_of_range",
+  },
+  fixedMax: {
+    field: "campground.commission_value",
+    reason: "value_out_of_range",
+  },
+  typeMissing: {
+    field: "campground.commission_type_id",
+    reason: "type_mismatch",
+  },
+} as const satisfies Record<CommissionGuardKey, CommissionGuardParseResult>;
+
 /**
  * Parse PostgREST trigger/CHECK error → commission field ActionResult shape.
  * Prefer structured `details` (EXCEPTION DETAIL); fall back to message prefix.
@@ -60,43 +78,19 @@ export function parseCampgroundCommissionGuardError(options: {
   details?: string | null;
 }): CommissionGuardParseResult | null {
   const detail = options.details?.trim();
-  if (detail === COMMISSION_GUARD_DETAIL.percentMax) {
-    return {
-      field: "campground.commission_value",
-      reason: "value_out_of_range",
-    };
-  }
-  if (detail === COMMISSION_GUARD_DETAIL.fixedMax) {
-    return {
-      field: "campground.commission_value",
-      reason: "value_out_of_range",
-    };
-  }
-  if (detail === COMMISSION_GUARD_DETAIL.typeMissing) {
-    return {
-      field: "campground.commission_type_id",
-      reason: "type_mismatch",
-    };
+  if (detail) {
+    for (const key of Object.keys(GUARD_RESULTS) as CommissionGuardKey[]) {
+      if (detail === COMMISSION_GUARD_DETAIL[key]) {
+        return GUARD_RESULTS[key];
+      }
+    }
   }
 
   const message = options.message ?? "";
-  if (message.startsWith(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.percentMax)) {
-    return {
-      field: "campground.commission_value",
-      reason: "value_out_of_range",
-    };
-  }
-  if (message.startsWith(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.fixedMax)) {
-    return {
-      field: "campground.commission_value",
-      reason: "value_out_of_range",
-    };
-  }
-  if (message.startsWith(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES.typeMissing)) {
-    return {
-      field: "campground.commission_type_id",
-      reason: "type_mismatch",
-    };
+  for (const key of Object.keys(GUARD_RESULTS) as CommissionGuardKey[]) {
+    if (message.startsWith(COMMISSION_GUARD_SQL_MESSAGE_PREFIXES[key])) {
+      return GUARD_RESULTS[key];
+    }
   }
   return null;
 }

@@ -34,10 +34,57 @@ import {
 } from "@/lib/supabase/db-utils";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { getLocale } from "next-intl/server";
+
+/**
+ * Map campground insert/update PostgREST errors → field ActionResults.
+ * Order: currency lock → commission DETAIL/prefix → numeric overflow (22003)
+ * → generic mapPostgrestError.
+ *
+ * At `commission_value numeric(8,2)`, values above COMMISSION_FIXED_MAX fail as
+ * 22003 during type conversion *before* the fixed-max trigger branch runs; that
+ * branch is for future column widening. Postgres also silently rounds extra
+ * fraction digits (`12.345` → `12.35`); the app rejects them in
+ * normalizeCommissionInput.
+ */
+function mapCampgroundWriteError(error: PostgrestError): ActionResult<never> {
+  if (error.code === "23514") {
+    const lockReason = parseCampgroundCurrencyLockError({
+      message: error.message,
+      details: error.details,
+    });
+    if (lockReason) {
+      return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+        field: CAMPGROUND_CURRENCY_LOCKED_FIELD,
+        reason: `currency_locked_${lockReason}`,
+      });
+    }
+  }
+
+  const commissionGuard = parseCampgroundCommissionGuardError({
+    message: error.message,
+    details: error.details,
+  });
+  if (commissionGuard) {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: commissionGuard.field,
+      reason: commissionGuard.reason,
+    });
+  }
+
+  // numeric_value_out_of_range — e.g. commission_value beyond numeric(8,2).
+  if (error.code === "22003") {
+    return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
+      field: "campground.commission_value",
+      reason: "value_out_of_range",
+    });
+  }
+
+  return mapPostgrestError(error);
+}
 
 function normalizeWebsiteInput(
   website: string | null | undefined,
@@ -275,32 +322,7 @@ export async function updateCampgroundAction(
       .single();
 
     if (updateError) {
-      // Trigger protect_campground_currency_change → check_violation (23514)
-      if (updateError.code === "23514") {
-        const lockReason = parseCampgroundCurrencyLockError({
-          message: updateError.message,
-          details: updateError.details,
-        });
-        if (lockReason) {
-          return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
-            field: CAMPGROUND_CURRENCY_LOCKED_FIELD,
-            reason: `currency_locked_${lockReason}`,
-          });
-        }
-      }
-      // Commission guards (23514 percent/fixed max; 23503 type missing) —
-      // backstop when pre-validation is skipped; DETAIL markers from #62.
-      const commissionGuard = parseCampgroundCommissionGuardError({
-        message: updateError.message,
-        details: updateError.details,
-      });
-      if (commissionGuard) {
-        return resultError(CommonErrorCode.COMMON_INVALID_FIELD, {
-          field: commissionGuard.field,
-          reason: commissionGuard.reason,
-        });
-      }
-      return mapPostgrestError(updateError);
+      return mapCampgroundWriteError(updateError);
     }
 
     if (!updated) {
@@ -349,35 +371,37 @@ export async function createCampgroundAction(
       return commissionResult;
     }
 
-    const result = await handleDbSingle(
-      supabase
-        .from("campgrounds")
-        .insert({
-          name: input.name.trim(),
-          owner_id: input.owner_id,
-          description: input.description?.trim() || null,
-          address: input.address?.trim() || null,
-          city: input.city?.trim() || null,
-          province: input.province?.trim() || null,
-          country: input.country?.trim() || null,
-          currency: currencyResult.data,
-          website: websiteResult.data,
-          phone: input.phone?.trim() || null,
-          commission_type_id: commissionResult.data.commission_type_id,
-          commission_value: commissionResult.data.commission_value,
-          location: `SRID=4326;${locationWKT}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select("id")
-        .single(),
-    );
+    const { data: created, error: insertError } = await supabase
+      .from("campgrounds")
+      .insert({
+        name: input.name.trim(),
+        owner_id: input.owner_id,
+        description: input.description?.trim() || null,
+        address: input.address?.trim() || null,
+        city: input.city?.trim() || null,
+        province: input.province?.trim() || null,
+        country: input.country?.trim() || null,
+        currency: currencyResult.data,
+        website: websiteResult.data,
+        phone: input.phone?.trim() || null,
+        commission_type_id: commissionResult.data.commission_type_id,
+        commission_value: commissionResult.data.commission_value,
+        location: `SRID=4326;${locationWKT}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
 
-    if (!result.success) {
-      return result;
+    if (insertError) {
+      return mapCampgroundWriteError(insertError);
     }
 
-    newCampgroundId = result.data.id;
+    if (!created) {
+      return resultError(DbErrorCode.DB_NOT_FOUND);
+    }
+
+    newCampgroundId = created.id;
 
     revalidateLocalizedPath(routes.home());
     revalidateLocalizedPath(routes.campgroundDetail(newCampgroundId));

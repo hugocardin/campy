@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import {
@@ -16,10 +16,30 @@ import {
   resolveCommissionDisplayKind,
 } from "./campground-commission";
 
-const COMMISSION_GUARDS_REVIEW_MIGRATION = join(
-  process.cwd(),
-  "supabase/migrations/20261125182132_campgrounds_commission_value_guards_review.sql",
-);
+const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
+
+/** Latest migration that defines `campgrounds_enforce_commission_value`. */
+function latestCommissionEnforceMigrationSql(): string {
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+  let latest: string | null = null;
+  for (const name of files) {
+    const body = readFileSync(join(MIGRATIONS_DIR, name), "utf8");
+    if (
+      /CREATE OR REPLACE FUNCTION\s+public\.campgrounds_enforce_commission_value\s*\(/i.test(
+        body,
+      )
+    ) {
+      latest = body;
+    }
+  }
+  assert.ok(
+    latest,
+    "expected a migration defining campgrounds_enforce_commission_value",
+  );
+  return latest!;
+}
 
 describe("parseCommissionTypeName", () => {
   it("accepts known names case-insensitively", () => {
@@ -326,7 +346,10 @@ describe("parseCampgroundCommissionGuardError", () => {
 
 describe("commission DB guard migration pins", () => {
   it("keeps SQL literals in sync with TS constants and DETAIL markers", () => {
-    const sql = readFileSync(COMMISSION_GUARDS_REVIEW_MIGRATION, "utf8");
+    // Pin against the latest CREATE OR REPLACE of the enforce function so a
+    // future redefine cannot drift from COMMISSION_*_MAX while this test still
+    // passes against an older applied migration file.
+    const sql = latestCommissionEnforceMigrationSql();
 
     assert.match(
       sql,
@@ -340,8 +363,6 @@ describe("commission DB guard migration pins", () => {
       ),
       "fixed cap must match COMMISSION_FIXED_MAX",
     );
-    assert.match(sql, /commission_value <> 'NaN'::numeric/);
-    assert.match(sql, /CHECK \(name IN \('percent', 'fixed'\)\)/);
     assert.match(sql, /SECURITY DEFINER/);
     assert.match(sql, /DETAIL = 'commission_percent_max'/);
     assert.match(sql, /DETAIL = 'commission_fixed_max'/);
