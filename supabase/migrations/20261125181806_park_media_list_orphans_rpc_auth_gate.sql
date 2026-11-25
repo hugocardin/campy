@@ -1,5 +1,7 @@
--- Fix list_orphan_park_media auth gate: SECURITY DEFINER makes current_user the
--- owner, so gate on auth.role() / is_platform_admin() instead (#57).
+-- Only change vs 20261125181714: auth gate.
+-- SECURITY DEFINER makes current_user the owner, so gate on auth.role() /
+-- is_platform_admin() instead of current_user (#57 / PR #65).
+-- Body otherwise identical to 181714 as applied.
 
 BEGIN;
 

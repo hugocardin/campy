@@ -48,13 +48,15 @@ export function ParkMediaSweepCard() {
         );
         return;
       }
+      const base = t("result", {
+        scanned: result.data.scanned,
+        removed: result.data.removed,
+        notRemoved: result.data.notRemoved,
+        skippedYoung: result.data.skippedYoung,
+        skippedUnknownAge: result.data.skippedUnknownAge,
+      });
       setSummary(
-        t("result", {
-          scanned: result.data.scanned,
-          removed: result.data.removed,
-          notRemoved: result.data.notRemoved,
-          skippedYoung: result.data.skippedYoung,
-        }),
+        result.data.hasMore ? `${base} ${t("hasMoreHint")}` : base,
       );
     });
   };

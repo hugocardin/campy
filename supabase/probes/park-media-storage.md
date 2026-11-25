@@ -64,17 +64,21 @@ ROLLBACK;
 6. Admin dashboard → “Sweep orphan media”: fail-closed; only objects older than
    24h and unreferenced are removed. Listing uses
    `list_orphan_park_media` (SQL over `storage.objects`; migrations
-   `20261125181714_park_media_list_orphans_rpc` +
-   `20261125181806_park_media_list_orphans_rpc_auth_gate`). Periodic cron
-   still parked (#57).
+   `20261125181714` -> `181806` auth gate -> `20261125182801` harden).
+   Periodic cron still parked (#57).
 
 ```sql
 -- Probe listing RPC (service_role JWT claim; MCP/SQL editor has no JWT by default):
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 SELECT public.list_orphan_park_media(
   'https://<project-ref>.supabase.co',
-  86400
+  86400,
+  1000
 );
+
+-- Decoder parity with decodeURIComponent (truncated % → NULL):
+SELECT private.uri_percent_decode('abc%2') IS NULL AS truncated_pct;
+SELECT private.uri_percent_decode('cg%2Fcover%2Fa.jpg') = 'cg/cover/a.jpg' AS decoded;
 ```
 
 ## Dashboard fallback (if Storage policies fail in SQL Editor)

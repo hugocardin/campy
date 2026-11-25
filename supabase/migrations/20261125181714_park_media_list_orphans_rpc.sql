@@ -9,9 +9,6 @@ REVOKE ALL ON SCHEMA private FROM PUBLIC;
 REVOKE ALL ON SCHEMA private FROM anon;
 REVOKE ALL ON SCHEMA private FROM authenticated;
 
--- ---------------------------------------------------------------------------
--- Percent-decode a URL path segment string (ASCII-safe; fail → NULL).
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.uri_percent_decode(p_value text)
 RETURNS text
 LANGUAGE plpgsql
@@ -54,9 +51,6 @@ $$;
 
 REVOKE ALL ON FUNCTION private.uri_percent_decode(text) FROM PUBLIC;
 
--- ---------------------------------------------------------------------------
--- Mirror lib/park-media.ts parkMediaObjectPathFromPublicUrl (origin + prefix).
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.park_media_object_path_from_public_url(
   p_url text,
   p_project_url text
@@ -117,9 +111,6 @@ $$;
 REVOKE ALL ON FUNCTION private.park_media_object_path_from_public_url(text, text)
   FROM PUBLIC;
 
--- ---------------------------------------------------------------------------
--- Platform-admin (or service_role) orphan listing for the manual admin sweep.
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.list_orphan_park_media(
   p_project_url text,
   p_grace_seconds integer DEFAULT 86400
@@ -139,8 +130,7 @@ DECLARE
   v_skipped_young integer := 0;
   v_orphans jsonb := '[]'::jsonb;
 BEGIN
-  -- SECURITY DEFINER: current_user is the owner; use JWT role / admin helper.
-  IF coalesce(auth.role(), '') IS DISTINCT FROM 'service_role'
+  IF current_user IS DISTINCT FROM 'service_role'
      AND NOT public.is_platform_admin() THEN
     RAISE EXCEPTION 'platform_admin required'
       USING ERRCODE = '42501';

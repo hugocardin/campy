@@ -174,15 +174,3 @@ export async function removeParkMediaObjectPaths(
 
   return { removed, notRemoved };
 }
-
-/** True when the object is old enough to be an orphan candidate. */
-export function isOlderThanParkMediaGrace(
-  createdAt: string | null | undefined,
-  nowMs = Date.now(),
-  graceMs = PARK_MEDIA_ORPHAN_GRACE_MS,
-): boolean {
-  if (!createdAt) return false;
-  const t = Date.parse(createdAt);
-  if (Number.isNaN(t)) return false;
-  return t < nowMs - graceMs;
-}
