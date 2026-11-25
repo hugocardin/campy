@@ -4,6 +4,8 @@ export const MediaErrorCode = {
   MEDIA_LIMIT_REACHED: "MEDIA_LIMIT_REACHED",
   MEDIA_STORAGE_FAILED: "MEDIA_STORAGE_FAILED",
   MEDIA_COVER_CONFLICT: "MEDIA_COVER_CONFLICT",
+  /** Ambiguous: write may have committed; client must not delete the object. */
+  MEDIA_COMMIT_UNCERTAIN: "MEDIA_COMMIT_UNCERTAIN",
 } as const;
 
 export type MediaErrorCodeType =

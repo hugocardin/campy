@@ -112,7 +112,9 @@ async function removeStorageObjectIfOurs(
  * Commit a browser-uploaded cover URL with optimistic concurrency.
  * `expectedCoverPhoto` must match the row's current `cover_photo` (null if empty).
  * Once the row references `publicUrl`, this action returns success even if
- * revalidation / old-object cleanup throws (`!success` ⇒ not committed).
+ * revalidation / old-object cleanup throws.
+ * Client cleanup contract: delete Storage only on clean `!success` that is
+ * not `MEDIA_COMMIT_UNCERTAIN` (ambiguous outcomes must not delete).
  */
 export async function commitCampgroundCoverAction(
   campgroundId: string,
@@ -194,12 +196,12 @@ export async function commitCampgroundCoverAction(
             return resultSuccess({ coverPhoto: nextUrl });
           }
         }
-        // Ambiguous — leave object for #57 sweep rather than risk wiping a live cover.
+        // Ambiguous — leave object for #57 sweep; client must not delete either.
         console.warn(
           "[park-media] cover update transport error; skipping delete",
           error.message,
         );
-        return mapPostgrestError(error);
+        return resultError(MediaErrorCode.MEDIA_COMMIT_UNCERTAIN);
       }
       await removeStorageObjectIfOurs(nextUrl, coverPrefix);
       return mapPostgrestError(error);
@@ -218,7 +220,7 @@ export async function commitCampgroundCoverAction(
         console.warn(
           "[park-media] cover conflict re-read failed; skipping delete",
         );
-        return current;
+        return resultError(MediaErrorCode.MEDIA_COMMIT_UNCERTAIN);
       }
       const live = normalizeParkMediaUrl(
         (current.data as { cover_photo?: string | null }).cover_photo,
@@ -423,7 +425,7 @@ export async function appendSitePhotoAction(
           "[park-media] append_site_photo transport error; skipping delete",
           error.message,
         );
-        return mapPostgrestError(error);
+        return resultError(MediaErrorCode.MEDIA_COMMIT_UNCERTAIN);
       }
       await removeStorageObjectIfOurs(nextUrl, photoPrefix);
       return mapPostgrestError(error);

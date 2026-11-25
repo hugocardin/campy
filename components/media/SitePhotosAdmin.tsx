@@ -96,6 +96,19 @@ export default function SitePhotosAdmin({
         return;
       }
       if (!result.success) {
+        // Ambiguous commit — do not delete; refresh so a live photo can show.
+        if (result.errorCode === MediaErrorCode.MEDIA_COMMIT_UNCERTAIN) {
+          setError(
+            translateErrorCode(
+              result.errorCode,
+              tErrors,
+              t("confirmUncertain"),
+              result.details,
+            ),
+          );
+          router.refresh();
+          return;
+        }
         await removeParkMediaPublicUrlBestEffort(uploaded.publicUrl);
         setError(
           withErrorReference(
