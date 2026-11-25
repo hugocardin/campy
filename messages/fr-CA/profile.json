@@ -25,6 +25,10 @@
     "invalidRigUnit": "Choisissez une unité de longueur valide (pi ou m)"
   },
 
+  "accountLinks": {
+    "title": "Compte"
+  },
+
   "ProfilePage": {
     "pageHeader": {
       "title": "Votre profil",
@@ -69,7 +73,6 @@
       "title": "Impossible de charger vos réservations",
       "description": "Une erreur est survenue lors du chargement des réservations. Réessayez dans un moment, ou parcourez les terrains de camping en attendant."
     },
-    "navLink": "Mes réservations",
-    "accountLinksTitle": "Compte"
+    "navLink": "Mes réservations"
   }
 }

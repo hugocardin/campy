@@ -25,6 +25,10 @@
     "invalidRigUnit": "Choose a valid length unit (ft or m)"
   },
 
+  "accountLinks": {
+    "title": "Account"
+  },
+
   "ProfilePage": {
     "pageHeader": {
       "title": "Your Profile",
@@ -69,7 +73,6 @@
       "title": "Couldn't load your bookings",
       "description": "Something went wrong while loading reservations. Try again in a moment, or browse campgrounds in the meantime."
     },
-    "navLink": "My bookings",
-    "accountLinksTitle": "Account"
+    "navLink": "My bookings"
   }
 }

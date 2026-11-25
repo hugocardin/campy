@@ -107,7 +107,7 @@ export default function ProfileClient({ profile, user }: Props) {
           id="profile-account-links"
           className="text-sm font-medium text-muted-foreground"
         >
-          {t_profile("BookingsPage.accountLinksTitle")}
+          {t_profile("accountLinks.title")}
         </h2>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">

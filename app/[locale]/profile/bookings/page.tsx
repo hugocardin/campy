@@ -15,6 +15,22 @@ export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
 type ShellKind = "empty" | "comingSoon" | "unavailable";
 
+/** Explicit keys so greps / i18n lint see each message path. */
+const SHELL_COPY = {
+  empty: { title: "empty.title", description: "empty.description" },
+  comingSoon: {
+    title: "comingSoon.title",
+    description: "comingSoon.description",
+  },
+  unavailable: {
+    title: "unavailable.title",
+    description: "unavailable.description",
+  },
+} as const satisfies Record<
+  ShellKind,
+  { title: string; description: string }
+>;
+
 export default async function ProfileBookingsPage() {
   const t = await getTranslations(PAGE_NAMESPACE);
   const { user } = await requireCurrentProfile();
@@ -25,6 +41,7 @@ export default async function ProfileBookingsPage() {
     : count > 0
       ? "comingSoon"
       : "empty";
+  const copy = SHELL_COPY[kind];
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -42,10 +59,10 @@ export default async function ProfileBookingsPage() {
 
           <div className="space-y-2 max-w-md">
             <h2 className="text-xl font-semibold tracking-tight">
-              {t(`${kind}.title`)}
+              {t(copy.title)}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {t(`${kind}.description`)}
+              {t(copy.description)}
             </p>
           </div>
 
