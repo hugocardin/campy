@@ -20,8 +20,6 @@ import { CampgroundCreateUpdateInput } from "@/entities/campground_create_update
 import { CommissionType } from "@/entities/commission-type";
 import { UserProfileNoRole } from "@/entities/user-profile";
 import {
-  COMMISSION_FIXED_MAX,
-  COMMISSION_PERCENT_MAX,
   normalizeCommissionInput,
   parseCommissionTypeName,
 } from "@/lib/campground-commission";
@@ -150,7 +148,7 @@ export default function CampgroundFormClient({
     if (
       commissionTypeId != null &&
       (!Number.isInteger(commissionTypeId) ||
-        !commissionTypes.some((t) => t.id === commissionTypeId))
+        !knownCommissionTypes.some((t) => t.id === commissionTypeId))
     ) {
       return setError(t_campgrounds("errors.commissionTypeInvalid"));
     }
@@ -158,15 +156,12 @@ export default function CampgroundFormClient({
     const selectedTypeRow =
       commissionTypeId == null
         ? null
-        : commissionTypes.find((t) => t.id === commissionTypeId);
-    const selectedTypeName =
-      selectedTypeRow == null
-        ? null
-        : selectedTypeRow.name.trim().toLowerCase() || null;
+        : knownCommissionTypes.find((t) => t.id === commissionTypeId);
+    const selectedKnownType = parseCommissionTypeName(selectedTypeRow?.name);
+    const selectedTypeName = selectedKnownType ?? null;
     if (commissionTypeId != null && selectedTypeName == null) {
       return setError(t_campgrounds("errors.commissionTypeInvalid"));
     }
-    const selectedKnownType = parseCommissionTypeName(selectedTypeName);
 
     const commissionNormalized = normalizeCommissionInput({
       commission_type_id: commissionTypeId,
@@ -255,9 +250,8 @@ export default function CampgroundFormClient({
                   ),
                   "campground.commission_value":
                     result.details?.reason === "value_out_of_range"
-                      ? form.commission_type_id &&
-                        parseCommissionTypeName(
-                          commissionTypes.find(
+                      ? parseCommissionTypeName(
+                          knownCommissionTypes.find(
                             (t) =>
                               String(t.id) === form.commission_type_id,
                           )?.name,
@@ -295,19 +289,23 @@ export default function CampgroundFormClient({
     setError(null);
   };
 
+  const knownCommissionTypes = commissionTypes.filter((type) =>
+    Boolean(parseCommissionTypeName(type.name)),
+  );
+
   const handleCommissionTypeChange = (value: string) => {
     const nextId = value === COMMISSION_TYPE_NONE ? "" : value;
     setForm((prev) => ({
       ...prev,
       commission_type_id: nextId,
-      // Clearing type clears the amount field for the next save (server forces 0).
-      commission_value: nextId === "" ? "" : prev.commission_value || "0",
+      // Reset amount whenever the type changes (percent ↔ fixed ↔ none).
+      commission_value: nextId === "" ? "" : "0",
     }));
     setError(null);
   };
 
   const selectedCommissionTypeName = parseCommissionTypeName(
-    commissionTypes.find((t) => String(t.id) === form.commission_type_id)
+    knownCommissionTypes.find((t) => String(t.id) === form.commission_type_id)
       ?.name,
   );
 
@@ -597,7 +595,7 @@ export default function CampgroundFormClient({
                     <SelectItem value={COMMISSION_TYPE_NONE}>
                       {t_campgrounds("form.commissionTypeNone")}
                     </SelectItem>
-                    {[...commissionTypes]
+                    {[...knownCommissionTypes]
                       .sort((a, b) => a.id - b.id)
                       .map((type) => (
                         <SelectItem key={type.id} value={String(type.id)}>
@@ -625,15 +623,8 @@ export default function CampgroundFormClient({
                 <Input
                   id="commission_value"
                   name="commission_value"
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  max={
-                    selectedCommissionTypeName === "percent"
-                      ? COMMISSION_PERCENT_MAX
-                      : COMMISSION_FIXED_MAX
-                  }
                   value={form.commission_value}
                   onChange={handleChange}
                   disabled={!form.commission_type_id}

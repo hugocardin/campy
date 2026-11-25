@@ -5,9 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
-import { parseCommissionTypeName } from "@/lib/campground-commission";
+import {
+  formatCommissionFixed,
+  formatCommissionPercent,
+  formatCommissionUnknownValue,
+  resolveCommissionDisplayKind,
+} from "@/lib/campground-commission";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 type Props = {
   campground: CampgroundAdmin;
@@ -18,6 +23,7 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
   const tc = useTranslations("common");
   const t_campgrounds = useTranslations("campgrounds");
   const t_amenities = useTranslations("amenities");
+  const locale = useLocale();
 
   const groupedAndSorted = amenities.reduce(
     (acc, amenity) => {
@@ -39,32 +45,39 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
       ]),
   );
 
-  const commissionTypeName = parseCommissionTypeName(
+  const commissionKind = resolveCommissionDisplayKind(
+    campground.commission_type_id,
     campground.commission_type_name,
   );
   const commissionTypeLabel =
-    commissionTypeName === "percent"
+    commissionKind === "percent"
       ? t_campgrounds("commissionTypes.percent")
-      : commissionTypeName === "fixed"
+      : commissionKind === "fixed"
         ? t_campgrounds("commissionTypes.fixed")
-        : t_campgrounds("form.commissionTypeNone");
+        : commissionKind === "unknown"
+          ? t_campgrounds("commissionTypes.unknown")
+          : t_campgrounds("form.commissionTypeNone");
   const commissionValueLabel =
-    commissionTypeName === "percent"
+    commissionKind === "percent"
       ? t_campgrounds("form.commissionValuePercentLabel")
-      : commissionTypeName === "fixed"
+      : commissionKind === "fixed"
         ? t_campgrounds("form.commissionValueFixedLabel")
         : t_campgrounds("form.commissionValueLabel");
   const commissionValueDisplay =
-    campground.commission_type_id == null
+    commissionKind === "none"
       ? t_campgrounds("form.commissionValueUnset")
-      : commissionTypeName === "percent"
-        ? t_campgrounds("form.commissionValuePercentDisplay", {
-            value: campground.commission_value,
-          })
-        : t_campgrounds("form.commissionValueFixedDisplay", {
-            value: campground.commission_value,
-            currency: campground.currency,
-          });
+      : commissionKind === "percent"
+        ? formatCommissionPercent(campground.commission_value, locale)
+        : commissionKind === "fixed"
+          ? formatCommissionFixed(
+              campground.commission_value,
+              locale,
+              campground.currency,
+            )
+          : formatCommissionUnknownValue(
+              campground.commission_value,
+              locale,
+            );
 
   return (
     <div className="space-y-10">

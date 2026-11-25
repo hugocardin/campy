@@ -5,14 +5,22 @@
  * Known type names in `commission_types.name`: `percent` | `fixed`.
  */
 
+import {
+  formatCampgroundPricePerNight,
+  resolveCampgroundPriceCurrency,
+} from "@/lib/campground-price";
+
 export const COMMISSION_TYPE_NAMES = ["percent", "fixed"] as const;
 
 export type CommissionTypeName = (typeof COMMISSION_TYPE_NAMES)[number];
 
 const NAME_SET = new Set<string>(COMMISSION_TYPE_NAMES);
 
-/** Max fixed commission amount (listing currency units). */
-export const COMMISSION_FIXED_MAX = 1_000_000;
+/**
+ * Max fixed commission amount (listing currency units).
+ * Tied to `campgrounds.commission_value numeric(8,2)` → max 999,999.99.
+ */
+export const COMMISSION_FIXED_MAX = 999_999.99;
 
 /** Max percent commission (inclusive). */
 export const COMMISSION_PERCENT_MAX = 100;
@@ -34,18 +42,52 @@ export function parseCommissionTypeName(
   return undefined;
 }
 
+/**
+ * Display kind for admin detail/form labels.
+ * - none: no type set
+ * - percent / fixed: known type
+ * - unknown: type id set but name missing or not in the closed union
+ */
+export function resolveCommissionDisplayKind(
+  typeId: number | null | undefined,
+  typeName: string | null | undefined,
+): "none" | CommissionTypeName | "unknown" {
+  if (typeId == null) return "none";
+  const known = parseCommissionTypeName(typeName);
+  if (known) return known;
+  return "unknown";
+}
+
 function hasAtMostFractionDigits(value: number, maxDigits: number): boolean {
   if (!Number.isFinite(value)) return false;
   const factor = 10 ** maxDigits;
   return Math.abs(value * factor - Math.round(value * factor)) < 1e-8;
 }
 
+/** Normalize decimal separators (`,` → `.`) for locale-typed form values. */
+export function normalizeDecimalInput(
+  raw: number | string | null | undefined,
+): string | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw === "number") {
+    if (!Number.isFinite(raw)) return undefined;
+    return String(raw);
+  }
+  const trimmed = raw.trim();
+  if (trimmed === "") return undefined;
+  // Allow a single comma as decimal separator (fr-CA style).
+  if (/^\d+,\d+$/.test(trimmed)) {
+    return trimmed.replace(",", ".");
+  }
+  return trimmed;
+}
+
 function parseNonNegativeNumber(
   raw: number | string | null | undefined,
 ): number | undefined {
-  if (raw == null) return undefined;
-  if (typeof raw === "string" && raw.trim() === "") return undefined;
-  const num = typeof raw === "number" ? raw : Number(String(raw).trim());
+  const normalized = normalizeDecimalInput(raw);
+  if (normalized == null) return undefined;
+  const num = Number(normalized);
   if (!Number.isFinite(num) || num < 0) return undefined;
   return num;
 }
@@ -55,10 +97,7 @@ export type NormalizeCommissionInput = {
   commission_type_id: number | null | undefined;
   /** Numeric or string from forms; ignored when type is cleared. */
   commission_value: number | string | null | undefined;
-  /**
-   * Resolved `commission_types.name` when type_id is set.
-   * Known names use typed ranges; any other non-null name uses the fixed max.
-   */
+  /** Resolved `commission_types.name` when type_id is set (`percent` | `fixed`). */
   typeName: string | null;
 };
 
@@ -72,6 +111,7 @@ export type NormalizedCommission = {
  * - No type → type null, value 0 (matches column default / demo rows).
  * - percent → 0..100, ≤2 decimal places.
  * - fixed → 0..COMMISSION_FIXED_MAX, ≤2 decimal places.
+ * - Unknown type names fail closed (`type_mismatch`).
  */
 export function normalizeCommissionInput(
   input: NormalizeCommissionInput,
@@ -111,6 +151,15 @@ export function normalizeCommissionInput(
     };
   }
 
+  const known = parseCommissionTypeName(input.typeName);
+  if (!known) {
+    return {
+      ok: false,
+      reason: "type_mismatch",
+      field: "commission_type_id",
+    };
+  }
+
   const num = parseNonNegativeNumber(input.commission_value);
   if (num == null) {
     return { ok: false, reason: "value_invalid", field: "commission_value" };
@@ -119,9 +168,16 @@ export function normalizeCommissionInput(
     return { ok: false, reason: "value_invalid", field: "commission_value" };
   }
 
-  const known = parseCommissionTypeName(input.typeName);
   const max =
-    known === "percent" ? COMMISSION_PERCENT_MAX : COMMISSION_FIXED_MAX;
+    known === "percent"
+      ? COMMISSION_PERCENT_MAX
+      : known === "fixed"
+        ? COMMISSION_FIXED_MAX
+        : (() => {
+            const _never: never = known;
+            throw new Error(`Unhandled commission type: ${_never}`);
+          })();
+
   if (num > max) {
     return {
       ok: false,
@@ -134,4 +190,41 @@ export function normalizeCommissionInput(
     ok: true,
     data: { commission_type_id: typeId, commission_value: num },
   };
+}
+
+/** Locale-aware percent display (value is 0–100, not a fraction). */
+export function formatCommissionPercent(
+  value: number,
+  locale: string,
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value / 100);
+}
+
+/** Locale-aware fixed commission amount (always 2 fraction digits). */
+export function formatCommissionFixed(
+  value: number,
+  locale: string,
+  currency: string,
+): string {
+  return (
+    formatCampgroundPricePerNight(value, locale, currency, {
+      fractionDigits: 2,
+    }) ??
+    `${value.toFixed(2)} ${resolveCampgroundPriceCurrency(currency)}`
+  );
+}
+
+/** Raw numeric fallback when the type is unknown. */
+export function formatCommissionUnknownValue(
+  value: number,
+  locale: string,
+): string {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
 }

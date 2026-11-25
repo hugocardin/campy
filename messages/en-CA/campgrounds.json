@@ -46,17 +46,16 @@
     "commissionValueFixedPlaceholder": "e.g. 5.00",
     "commissionValueHintNone": "Choose a commission type to set a value.",
     "commissionValuePercentHint": "Percent of booking total (0–100).",
-    "commissionValueFixedHint": "Fixed amount in the listing currency (0 or more).",
+    "commissionValueFixedHint": "Fixed amount in the listing currency (0–999,999.99).",
     "commissionValueUnset": "—",
-    "commissionValuePercentDisplay": "{value}%",
-    "commissionValueFixedDisplay": "{value} {currency}",
     "active": "Active",
     "inactive": "Inactive"
   },
 
   "commissionTypes": {
     "percent": "Percent",
-    "fixed": "Fixed amount"
+    "fixed": "Fixed amount",
+    "unknown": "Unknown type"
   },
 
   "errors": {
@@ -72,7 +71,7 @@
     "commissionTypeInvalid": "Choose a valid commission type, or none.",
     "commissionValueInvalid": "Enter a valid commission value (up to 2 decimal places).",
     "commissionValuePercentRange": "Percent commission must be between 0 and 100.",
-    "commissionValueFixedRange": "Fixed commission must be between 0 and 1,000,000."
+    "commissionValueFixedRange": "Fixed commission must be between 0 and 999,999.99."
   },
 
   "actions": {

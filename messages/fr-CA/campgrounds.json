@@ -43,20 +43,19 @@
     "commissionValuePercentLabel": "Pourcentage de commission",
     "commissionValueFixedLabel": "Montant de commission",
     "commissionValuePercentPlaceholder": "ex. 10",
-    "commissionValueFixedPlaceholder": "ex. 5,00",
+    "commissionValueFixedPlaceholder": "ex. 5.00",
     "commissionValueHintNone": "Choisissez un type de commission pour définir une valeur.",
     "commissionValuePercentHint": "Pourcentage du total de la réservation (0–100).",
-    "commissionValueFixedHint": "Montant fixe dans la devise des tarifs (0 ou plus).",
+    "commissionValueFixedHint": "Montant fixe dans la devise des tarifs (0–999\u00A0999,99).",
     "commissionValueUnset": "—",
-    "commissionValuePercentDisplay": "{value}\u00A0%",
-    "commissionValueFixedDisplay": "{value}\u00A0{currency}",
     "active": "Actif",
     "inactive": "Inactif"
   },
 
   "commissionTypes": {
     "percent": "Pourcentage",
-    "fixed": "Montant fixe"
+    "fixed": "Montant fixe",
+    "unknown": "Type inconnu"
   },
 
   "errors": {
@@ -72,7 +71,7 @@
     "commissionTypeInvalid": "Choisissez un type de commission valide, ou aucun.",
     "commissionValueInvalid": "Entrez une valeur de commission valide (jusqu’à 2 décimales).",
     "commissionValuePercentRange": "Le pourcentage de commission doit être entre 0 et 100.",
-    "commissionValueFixedRange": "La commission fixe doit être entre 0 et 1\u00A0000\u00A0000."
+    "commissionValueFixedRange": "La commission fixe doit être entre 0 et 999\u00A0999,99."
   },
 
   "actions": {
