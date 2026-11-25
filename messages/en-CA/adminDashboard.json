@@ -10,7 +10,7 @@
     "running": "Sweeping…",
     "confirmTitle": "Sweep orphan media?",
     "confirm": "Delete park-media objects that are not referenced by any cover or site photo and are older than 24 hours? Referenced media is kept. The sweep aborts if checks look incomplete.",
-    "result": "Scanned {scanned, plural, one {# object} other {# objects}}. {removed, plural, one {Removed #} other {Removed #}}. {notRemoved, plural, one {Not removed #} other {Not removed #}}. {skippedYoung, plural, one {Skipped recent #} other {Skipped recent #}}."
+    "result": "Scanned {scanned, plural, one {# object} other {# objects}}. Removed {removed, number}. Not removed {notRemoved, number}. Skipped recent {skippedYoung, number}."
   },
 
   "AdminDashboardPage": {
