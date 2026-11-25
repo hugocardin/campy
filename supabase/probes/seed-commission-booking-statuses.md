@@ -1,6 +1,9 @@
 # Probe: seed `commission_types` / `booking_statuses`
 
-Migration: `20261125182000_seed_commission_types_booking_statuses.sql`
+Migrations:
+
+- `20261125181703_seed_commission_types_booking_statuses.sql` (matches live version)
+- `20261125182054_seed_lookups_review_fix.sql` (assert / setval / lookup RLS)
 
 ## Before apply (service role)
 
@@ -9,13 +12,13 @@ SELECT id, name FROM public.commission_types ORDER BY id;
 -- Expect (already live): 1 percent, 2 fixed — or empty on a fresh DB.
 
 SELECT id, name FROM public.booking_statuses ORDER BY id;
--- Expect: empty (0 rows) before this seed.
+-- Expect: empty (0 rows) before the seed.
 
-SELECT commission_type_id, COUNT(*) AS n
-FROM public.campgrounds
-GROUP BY 1
-ORDER BY 1 NULLS FIRST;
--- Live had FKs to 1 and 2 before the in-repo seed existed.
+SELECT relrowsecurity
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relname = 'booking_statuses';
+-- Expect: false before review_fix.
 ```
 
 Anon may see 0 `commission_types` rows: RLS allows SELECT only for
@@ -25,20 +28,36 @@ Anon may see 0 `commission_types` rows: RLS allows SELECT only for
 
 ```sql
 SELECT id, name FROM public.commission_types ORDER BY id;
--- 1 percent, 2 fixed (unchanged if already present).
+-- 1 percent, 2 fixed.
 
 SELECT id, name FROM public.booking_statuses ORDER BY id;
 -- 1 pending, 2 confirmed, 3 cancelled, 4 refunded.
 
-SELECT last_value, is_called FROM public.commission_types_id_seq;
-SELECT last_value, is_called FROM public.booking_statuses_id_seq;
--- Sequences ≥ MAX(id).
+SELECT last_value FROM public.commission_types_id_seq;
+SELECT last_value FROM public.booking_statuses_id_seq;
+-- Sequences ≥ MAX(id) (never rewound).
 
--- Re-apply must be a no-op (row counts unchanged):
--- re-run the migration SQL / apply_migration with the same script.
+SELECT relrowsecurity
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relname = 'booking_statuses';
+-- true
+
+SELECT policyname, cmd, roles
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'booking_statuses';
+-- booking_statuses_select_all, SELECT, {anon,authenticated}
+
+SELECT has_table_privilege('anon', 'public.booking_statuses', 'INSERT') AS anon_ins,
+       has_table_privilege('authenticated', 'public.booking_statuses', 'UPDATE') AS auth_upd;
+-- both false
+
+-- Re-apply review_fix must succeed (assert passes; RLS/policy idempotent).
 ```
+
+App contract: `lib/booking-status.ts` `BOOKING_STATUS_NAMES` (resolve by name).
 
 ## Out of scope
 
-- `booking_statuses` / `bookings` RLS + grant harden → [#55](https://github.com/hugocardin/campy/issues/55) (Phase D)
+- Full `bookings` RLS + grant harden → [#55](https://github.com/hugocardin/campy/issues/55) (Phase D)
 - Commission value CHECKs → [#61](https://github.com/hugocardin/campy/issues/61)
