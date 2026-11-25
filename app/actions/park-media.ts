@@ -81,6 +81,19 @@ async function removeStorageObjectIfOurs(
 }
 
 /**
+ * Delete `candidate` only when it is not already referenced by the row.
+ * Avoids wiping a live cover/photo after a successful commit + retry/conflict.
+ */
+async function removeUnreferencedUpload(
+  candidate: string,
+  expectedPrefix: string,
+  isReferenced: boolean,
+): Promise<void> {
+  if (isReferenced) return;
+  await removeStorageObjectIfOurs(candidate, expectedPrefix);
+}
+
+/**
  * Commit a browser-uploaded cover URL with optimistic concurrency.
  * `expectedCoverPhoto` must match the row's current `cover_photo` (null if empty).
  */
@@ -117,6 +130,13 @@ export async function commitCampgroundCoverAction(
     });
   }
 
+  // Idempotent retry: URL already committed as the live cover.
+  if (expected != null && expected === nextUrl) {
+    revalidateCampgroundMedia(campgroundId);
+    return resultSuccess({ coverPhoto: nextUrl });
+  }
+
+  let committed = false;
   try {
     const supabase = await createClient();
 
@@ -138,18 +158,35 @@ export async function commitCampgroundCoverAction(
       .maybeSingle();
 
     if (error) {
-      await removeStorageObjectIfOurs(nextUrl, coverPrefix);
+      await removeUnreferencedUpload(nextUrl, coverPrefix, false);
       return mapPostgrestError(error);
     }
 
     if (!data) {
-      await removeStorageObjectIfOurs(nextUrl, coverPrefix);
-      const exists = await handleDbSingle(
-        supabase.from("campgrounds").select("id").eq("id", campgroundId).single(),
+      const current = await handleDbSingle(
+        supabase
+          .from("campgrounds")
+          .select("id, cover_photo")
+          .eq("id", campgroundId)
+          .single(),
       );
-      if (!exists.success) return exists;
+      if (!current.success) {
+        await removeUnreferencedUpload(nextUrl, coverPrefix, false);
+        return current;
+      }
+      const live = normalizeParkMediaUrl(
+        (current.data as { cover_photo?: string | null }).cover_photo,
+      );
+      if (live === nextUrl) {
+        // Prior attempt already committed this URL (lost response / retry).
+        revalidateCampgroundMedia(campgroundId);
+        return resultSuccess({ coverPhoto: nextUrl });
+      }
+      await removeUnreferencedUpload(nextUrl, coverPrefix, false);
       return resultError(MediaErrorCode.MEDIA_COVER_CONFLICT);
     }
+
+    committed = true;
 
     if (expected && expected !== nextUrl) {
       await removeStorageObjectIfOurs(expected, coverPrefix);
@@ -158,7 +195,9 @@ export async function commitCampgroundCoverAction(
     revalidateCampgroundMedia(campgroundId);
     return resultSuccess({ coverPhoto: nextUrl });
   } catch (err) {
-    await removeStorageObjectIfOurs(nextUrl, coverPrefix);
+    if (!committed) {
+      await removeUnreferencedUpload(nextUrl, coverPrefix, false);
+    }
     return handleUnexpectedError(err);
   }
 }
@@ -254,6 +293,7 @@ export async function appendSitePhotoAction(
     });
   }
 
+  let committed = false;
   try {
     const supabase = await createClient();
 
@@ -270,11 +310,16 @@ export async function appendSitePhotoAction(
     const currentRaw = coerceSitePhotoEntries(
       (existing.data as { photos?: unknown }).photos,
     );
+
+    // Idempotent retry: URL already in the array.
+    if (currentRaw.includes(nextUrl)) {
+      revalidateSiteMedia(campgroundId, siteId);
+      return resultSuccess({ photos: currentRaw });
+    }
+
     if (currentRaw.length >= PARK_MEDIA_MAX_SITE_PHOTOS) {
-      await removeStorageObjectIfOurs(nextUrl, photoPrefix);
-      return resultError(MediaErrorCode.MEDIA_LIMIT_REACHED, {
-        max: PARK_MEDIA_MAX_SITE_PHOTOS,
-      });
+      await removeUnreferencedUpload(nextUrl, photoPrefix, false);
+      return resultError(MediaErrorCode.MEDIA_LIMIT_REACHED);
     }
 
     const { data, error } = await supabase.rpc("append_site_photo", {
@@ -284,14 +329,12 @@ export async function appendSitePhotoAction(
     });
 
     if (error) {
-      await removeStorageObjectIfOurs(nextUrl, photoPrefix);
+      await removeUnreferencedUpload(nextUrl, photoPrefix, false);
       if (
         typeof error.message === "string" &&
         error.message.includes(SITE_PHOTO_CAP_MARKER)
       ) {
-        return resultError(MediaErrorCode.MEDIA_LIMIT_REACHED, {
-          max: PARK_MEDIA_MAX_SITE_PHOTOS,
-        });
+        return resultError(MediaErrorCode.MEDIA_LIMIT_REACHED);
       }
       if (error.code === "P0002") {
         return resultError(DbErrorCode.DB_NOT_FOUND);
@@ -299,12 +342,15 @@ export async function appendSitePhotoAction(
       return mapPostgrestError(error);
     }
 
+    committed = true;
     revalidateSiteMedia(campgroundId, siteId);
     return resultSuccess({
       photos: coerceSitePhotoEntries(data),
     });
   } catch (err) {
-    await removeStorageObjectIfOurs(nextUrl, photoPrefix);
+    if (!committed) {
+      await removeUnreferencedUpload(nextUrl, photoPrefix, false);
+    }
     return handleUnexpectedError(err);
   }
 }

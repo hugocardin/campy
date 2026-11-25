@@ -4,7 +4,10 @@ import {
   appendSitePhotoAction,
   removeSitePhotoAction,
 } from "@/app/actions/park-media";
-import { uploadSitePhotoFile } from "@/components/media/uploadParkMediaFile";
+import {
+  removeParkMediaPublicUrlBestEffort,
+  uploadSitePhotoFile,
+} from "@/components/media/uploadParkMediaFile";
 import { ErrorAlert } from "@/components/alerts/ErrorAlert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,27 +81,33 @@ export default function SitePhotosAdmin({
         return;
       }
 
-      const result = await appendSitePhotoAction(
-        campgroundId,
-        siteId,
-        uploaded.publicUrl,
-      );
-      if (!result.success) {
-        setError(
-          withErrorReference(
-            translateErrorCode(
-              result.errorCode,
-              tErrors,
-              tc("error"),
-              result.details,
-            ),
-            result.details,
-            (errorId) => tc("errorReference", { errorId }),
-          ),
+      try {
+        const result = await appendSitePhotoAction(
+          campgroundId,
+          siteId,
+          uploaded.publicUrl,
         );
-        return;
+        if (!result.success) {
+          await removeParkMediaPublicUrlBestEffort(uploaded.publicUrl);
+          setError(
+            withErrorReference(
+              translateErrorCode(
+                result.errorCode,
+                tErrors,
+                tc("error"),
+                result.details,
+              ),
+              result.details,
+              (errorId) => tc("errorReference", { errorId }),
+            ),
+          );
+          return;
+        }
+        router.refresh();
+      } catch {
+        await removeParkMediaPublicUrlBestEffort(uploaded.publicUrl);
+        setError(tc("error"));
       }
-      router.refresh();
     });
   };
 

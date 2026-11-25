@@ -10,6 +10,7 @@ import {
   PARK_MEDIA_MAX_BYTES,
   campgroundCoverObjectPath,
   parkMediaMaxMb,
+  parkMediaObjectPathFromPublicUrl,
   parkMediaPublicUrl,
   sitePhotoObjectPath,
   sniffParkMediaMime,
@@ -85,6 +86,28 @@ async function uploadPrepared(
     publicUrl: parkMediaPublicUrl(objectPath),
     mime,
   };
+}
+
+/**
+ * Best-effort delete of a park-media public URL from the browser session.
+ * Harmless if the server already removed the object (or it was never ours).
+ */
+export async function removeParkMediaPublicUrlBestEffort(
+  publicUrl: string,
+): Promise<void> {
+  const path = parkMediaObjectPathFromPublicUrl(publicUrl);
+  if (!path) return;
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.storage
+      .from(PARK_MEDIA_BUCKET)
+      .remove([path]);
+    if (error) {
+      console.warn("[park-media] browser remove failed", error.message);
+    }
+  } catch (err) {
+    console.warn("[park-media] browser remove threw", err);
+  }
 }
 
 /** Upload a campground cover directly to Storage (browser session + RLS). */
