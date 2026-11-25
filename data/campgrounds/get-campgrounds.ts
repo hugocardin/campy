@@ -121,6 +121,9 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
 /**
  * Search RPCs do not return cover_photo yet — batch-enrich from v_campgrounds
  * so guest cards can render real covers without rewriting search SQL.
+ *
+ * TODO(Phase C follow-up): return cover_photo from search_campgrounds_* and
+ * remove this second round trip (track in next-plan parked leftovers).
  */
 async function enrichCampgroundCovers(
   supabase: SupabaseClient,

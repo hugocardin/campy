@@ -37,6 +37,11 @@ export function extensionForParkMediaMime(mime: ParkMediaMime): string {
   return MIME_TO_EXT[mime];
 }
 
+/** MiB ceiling shown in UI / MEDIA_FILE_TOO_LARGE (`{mb}`). */
+export function parkMediaMaxMb(): number {
+  return Math.round(PARK_MEDIA_MAX_BYTES / (1024 * 1024));
+}
+
 /** Object path for a new campground cover upload. */
 export function campgroundCoverObjectPath(
   campgroundId: string,
@@ -56,6 +61,67 @@ export function sitePhotoObjectPath(
   return `${campgroundId}/sites/${siteId}/${objectId}.${extensionForParkMediaMime(mime)}`;
 }
 
+export function campgroundCoverPathPrefix(campgroundId: string): string {
+  return `${campgroundId}/cover/`;
+}
+
+export function sitePhotoPathPrefix(
+  campgroundId: string,
+  siteId: string,
+): string {
+  return `${campgroundId}/sites/${siteId}/`;
+}
+
+/**
+ * Sniff JPEG / PNG / WebP from magic bytes (ignore client-declared MIME).
+ * Returns null when the bytes are not a supported image.
+ */
+export function sniffParkMediaMime(
+  bytes: ArrayBuffer | Uint8Array,
+): ParkMediaMime | null {
+  const view =
+    bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+
+  // JPEG: FF D8 FF
+  if (
+    view.length >= 3 &&
+    view[0] === 0xff &&
+    view[1] === 0xd8 &&
+    view[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    view.length >= 8 &&
+    view[0] === 0x89 &&
+    view[1] === 0x50 &&
+    view[2] === 0x4e &&
+    view[3] === 0x47 &&
+    view[4] === 0x0d &&
+    view[5] === 0x0a &&
+    view[6] === 0x1a &&
+    view[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  // WebP: RIFF....WEBP
+  if (
+    view.length >= 12 &&
+    view[0] === 0x52 &&
+    view[1] === 0x49 &&
+    view[2] === 0x46 &&
+    view[3] === 0x46 &&
+    view[8] === 0x57 &&
+    view[9] === 0x45 &&
+    view[10] === 0x42 &&
+    view[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
+
 /**
  * Build the public object URL for a path in `park-media`.
  * Uses the project URL from env (server or public).
@@ -72,6 +138,14 @@ export function parkMediaPublicUrl(
   return `${base}/storage/v1/object/public/${PARK_MEDIA_BUCKET}/${encoded}`;
 }
 
+function safeDecodeURIComponent(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * True when `url` is a public object URL for this project's `park-media` bucket.
  * Rejects other hosts / buckets so DB columns cannot point at arbitrary images.
@@ -80,28 +154,7 @@ export function isParkMediaPublicUrl(
   url: string | null | undefined,
   supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
 ): boolean {
-  if (!url || !supabaseUrl) return false;
-  const trimmed = url.trim();
-  if (!trimmed) return false;
-
-  let parsed: URL;
-  let expectedOrigin: string;
-  try {
-    parsed = new URL(trimmed);
-    expectedOrigin = new URL(supabaseUrl).origin;
-  } catch {
-    return false;
-  }
-
-  if (parsed.origin !== expectedOrigin) return false;
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
-
-  const prefix = `/storage/v1/object/public/${PARK_MEDIA_BUCKET}/`;
-  if (!parsed.pathname.startsWith(prefix)) return false;
-
-  const objectPath = decodeURIComponent(parsed.pathname.slice(prefix.length));
-  if (!objectPath || objectPath.includes("..")) return false;
-  return true;
+  return parkMediaObjectPathFromPublicUrl(url ?? "", supabaseUrl) != null;
 }
 
 /** Extract Storage object path from a park-media public URL, or null. */
@@ -109,10 +162,43 @@ export function parkMediaObjectPathFromPublicUrl(
   url: string,
   supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
 ): string | null {
-  if (!isParkMediaPublicUrl(url, supabaseUrl)) return null;
-  const parsed = new URL(url.trim());
+  if (!url || !supabaseUrl) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  let parsed: URL;
+  let expectedOrigin: string;
+  try {
+    parsed = new URL(trimmed);
+    expectedOrigin = new URL(supabaseUrl).origin;
+  } catch {
+    return null;
+  }
+
+  if (parsed.origin !== expectedOrigin) return null;
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+
   const prefix = `/storage/v1/object/public/${PARK_MEDIA_BUCKET}/`;
-  return decodeURIComponent(parsed.pathname.slice(prefix.length));
+  if (!parsed.pathname.startsWith(prefix)) return null;
+
+  const objectPath = safeDecodeURIComponent(
+    parsed.pathname.slice(prefix.length),
+  );
+  if (!objectPath || objectPath.includes("..")) return null;
+  return objectPath;
+}
+
+/**
+ * True when a park-media public URL's object path starts with `expectedPrefix`
+ * (e.g. `{campgroundId}/cover/` or `{campgroundId}/sites/{siteId}/`).
+ */
+export function parkMediaUrlMatchesPrefix(
+  url: string | null | undefined,
+  expectedPrefix: string,
+  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+): boolean {
+  const path = url ? parkMediaObjectPathFromPublicUrl(url, supabaseUrl) : null;
+  return path != null && path.startsWith(expectedPrefix);
 }
 
 /**
@@ -151,6 +237,21 @@ export function normalizeSitePhotoUrls(
     if (typeof item !== "string") continue;
     const safe = normalizeParkMediaUrl(item, supabaseUrl);
     if (safe) out.push(safe);
+  }
+  return out;
+}
+
+/**
+ * Preserve non-string / foreign URLs when writing so seed/staging values are
+ * not silently deleted; display still filters via {@link normalizeSitePhotoUrls}.
+ */
+export function coerceSitePhotoEntries(photos: unknown): string[] {
+  if (!Array.isArray(photos)) return [];
+  const out: string[] = [];
+  for (const item of photos) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (trimmed) out.push(trimmed);
   }
   return out;
 }

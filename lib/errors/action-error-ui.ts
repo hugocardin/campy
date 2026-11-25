@@ -14,6 +14,7 @@ export type ErrorTranslator = {
  * Empty on purpose: flat error codes do not interpolate `details`. Named
  * missing-field copy comes from caller-supplied `fieldMessages`, never from
  * forwarding raw namespaced ids like `amenity.code` into `{field}`.
+ * Media size/limit copy embeds constants in the catalogue (no ICU args).
  */
 const INTERPOLATABLE_DETAIL_KEYS = new Set<string>();
 
@@ -165,8 +166,7 @@ export function translateErrorCode(
       }
     }
 
-    // Never pass details into ICU — safeTranslationValues is always empty today
-    // and exists to keep the allowlist explicit for future keys.
+    // Only allowlisted detail keys reach ICU (see INTERPOLATABLE_DETAIL_KEYS).
     const values = safeTranslationValues(details);
     const message =
       Object.keys(values).length > 0

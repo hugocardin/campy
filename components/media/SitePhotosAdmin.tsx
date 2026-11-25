@@ -11,8 +11,10 @@ import {
   PARK_MEDIA_ALLOWED_MIME,
   PARK_MEDIA_MAX_BYTES,
   PARK_MEDIA_MAX_SITE_PHOTOS,
+  parkMediaMaxMb,
 } from "@/lib/park-media";
 import {
+  MediaErrorCode,
   translateErrorCode,
   withErrorReference,
 } from "@/lib/errors";
@@ -48,6 +50,18 @@ export default function SitePhotosAdmin({
     if (!file) return;
 
     setError(null);
+    if (file.size > PARK_MEDIA_MAX_BYTES) {
+      setError(
+        translateErrorCode(
+          MediaErrorCode.MEDIA_FILE_TOO_LARGE,
+          tErrors,
+          tc("error"),
+          { mb: parkMediaMaxMb() },
+        ),
+      );
+      return;
+    }
+
     const formData = new FormData();
     formData.set("file", file);
 
@@ -168,7 +182,7 @@ export default function SitePhotosAdmin({
 
         <p className="text-xs text-muted-foreground">
           {t("fileConstraints", {
-            mb: Math.round(PARK_MEDIA_MAX_BYTES / (1024 * 1024)),
+            mb: parkMediaMaxMb(),
           })}
         </p>
 

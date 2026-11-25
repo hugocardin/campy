@@ -24,7 +24,10 @@ Expect: no `cover_photo`, no bucket, no `park_media%` policies.
 1. `campgrounds.cover_photo` exists (nullable text).
 2. `v_campgrounds` / `v_campgrounds_admin` expose `cover_photo`.
 3. Bucket `park-media` is public, 5 MiB, jpeg/png/webp.
-4. Policies: public SELECT; authenticated INSERT/UPDATE/DELETE gated by `is_platform_admin()`.
+4. Policies: authenticated SELECT/INSERT/UPDATE/DELETE gated by `is_platform_admin()`
+   (no public SELECT — public bucket CDN URLs do not need RLS; listing stays admin-only).
+5. RPCs `append_site_photo` / `remove_site_photo` for atomic `sites.photos` updates
+   (`20261125031029_park_media_review_followup.sql`).
 
 ## Manual smoke
 

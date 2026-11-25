@@ -22,7 +22,6 @@ import {
 import { formatCampgroundPricePerNight } from "@/lib/campground-price";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
 import { isUuid } from "@/lib/is-uuid";
-import { resolveCampgroundCoverSrc } from "@/lib/park-media";
 import { routes } from "@/lib/routes";
 import { toSafeHttpUrl } from "@/lib/safe-http-url";
 import { parseRigLengthUnit } from "@/lib/site-rig-length";
@@ -187,16 +186,18 @@ export default async function CampgroundDetailsPage({
         />
 
         <div className="space-y-10">
-          <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
-            <Image
-              src={resolveCampgroundCoverSrc(campground.coverPhoto)}
-              alt={campground.name}
-              fill
-              className="object-cover"
-              sizes="(max-width: 1280px) 100vw, 1280px"
-              priority
-            />
-          </div>
+          {campground.coverPhoto ? (
+            <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
+              <Image
+                src={campground.coverPhoto}
+                alt={campground.name}
+                fill
+                className="object-cover"
+                sizes="(max-width: 1280px) 100vw, 1280px"
+                priority
+              />
+            </div>
+          ) : null}
 
           <Card>
             <CardHeader>
