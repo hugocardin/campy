@@ -20,4 +20,6 @@ export interface CampgroundAdmin {
   website: string;
   phone: string;
   active: boolean;
+  /** Public park-media cover URL, or null when unset. */
+  coverPhoto: string | null;
 }

@@ -27,6 +27,7 @@ import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import { formatGuestAmenityCodesParam } from "@/lib/guest-amenity-codes";
 import { formatGuestSiteTypesParam } from "@/lib/guest-site-types";
+import { normalizeParkMediaUrl } from "@/lib/park-media";
 import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
 import { formatStayKindParam } from "@/lib/stay-kind";
 import { getSupabaseAnon } from "@/lib/supabase/anon-server";
@@ -35,6 +36,7 @@ import {
   handleUnexpectedError,
 } from "@/lib/supabase/db-utils";
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 
@@ -55,7 +57,7 @@ export type CampgroundSearchPayload = {
 
 /** Guest-safe columns — never select commission_* from v_campgrounds. */
 export const GUEST_CAMPGROUND_COLUMNS =
-  "id, name, description, address, city, province, country, currency, latitude, longitude, website, phone" as const;
+  "id, name, description, address, city, province, country, currency, latitude, longitude, website, phone, cover_photo" as const;
 
 type CampgroundRow = {
   id: string;
@@ -70,6 +72,7 @@ type CampgroundRow = {
   longitude: number | null;
   website: string | null;
   phone: string | null;
+  cover_photo?: string | null;
   distance_m?: number | null;
   min_price_per_night?: number | null;
   price_currency?: string | null;
@@ -111,7 +114,48 @@ export function toCampgroundDomain(row: CampgroundRow): Campground {
     priceCurrency,
     website: row.website ?? "",
     phone: row.phone ?? "",
+    coverPhoto: normalizeParkMediaUrl(row.cover_photo),
   };
+}
+
+/**
+ * Search RPCs do not return cover_photo yet — batch-enrich from v_campgrounds
+ * so guest cards can render real covers without rewriting search SQL.
+ *
+ * TODO(#57): return cover_photo from search_campgrounds_* and remove this enrichment.
+ */
+async function enrichCampgroundCovers(
+  supabase: SupabaseClient,
+  campgrounds: Campground[],
+): Promise<Campground[]> {
+  if (campgrounds.length === 0) return campgrounds;
+
+  const ids = campgrounds.map((c) => c.id);
+  const result = await handleDbResponse(
+    supabase
+      .from("v_campgrounds")
+      .select("id, cover_photo")
+      .in("id", ids),
+  );
+
+  if (!result.success) {
+    console.warn(
+      "[getCampgrounds] cover enrich failed",
+      result.errorCode,
+      result.details,
+    );
+    return campgrounds;
+  }
+
+  const byId = new Map<string, string | null>();
+  for (const row of result.data as { id: string; cover_photo: string | null }[]) {
+    byId.set(row.id, normalizeParkMediaUrl(row.cover_photo));
+  }
+
+  return campgrounds.map((c) => ({
+    ...c,
+    coverPhoto: byId.get(c.id) ?? c.coverPhoto,
+  }));
 }
 
 /**
@@ -325,7 +369,8 @@ export const getCampgrounds = cache(
         if (truncated) {
           rows = rows.slice(0, SEARCH_CAMPGROUNDS_LIMIT);
         }
-        return resultSuccess({ campgrounds: rows, truncated });
+        const withCovers = await enrichCampgroundCovers(supabase, rows);
+        return resultSuccess({ campgrounds: withCovers, truncated });
       }
 
       const nonGeoSort =
@@ -353,9 +398,10 @@ export const getCampgrounds = cache(
 
       const mapped = (result.data as CampgroundRow[]).map(toCampgroundDomain);
       const truncated = mapped.length > SEARCH_CAMPGROUNDS_LIMIT;
-      const campgrounds = truncated
+      const sliced = truncated
         ? mapped.slice(0, SEARCH_CAMPGROUNDS_LIMIT)
         : mapped;
+      const campgrounds = await enrichCampgroundCovers(supabase, sliced);
       return resultSuccess({ campgrounds, truncated });
     } catch (err) {
       return handleUnexpectedError(err);

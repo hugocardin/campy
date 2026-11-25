@@ -1,5 +1,6 @@
 "use client";
 
+import CampgroundCoverAdmin from "@/components/media/CampgroundCoverAdmin";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Amenity } from "@/entities/amenity";
@@ -39,6 +40,11 @@ export default function CampgroundDetail({ campground, amenities }: Props) {
 
   return (
     <div className="space-y-10">
+      <CampgroundCoverAdmin
+        campgroundId={campground.id}
+        coverPhoto={campground.coverPhoto}
+      />
+
       {/* Details */}
       <Card>
         <CardHeader>

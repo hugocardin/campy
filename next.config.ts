@@ -7,6 +7,34 @@ const withNextIntl =
   // Optional: path to your request config if not in default location
   // './i18n/request.ts'
 
+/** Mirror of next/image RemotePattern (avoid importing Next internal paths). */
+type ImageRemotePattern = {
+  protocol?: "http" | "https";
+  hostname: string;
+  port?: string;
+  pathname?: string;
+};
+
+function supabaseParkMediaRemotePattern(): ImageRemotePattern | null {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (!url.hostname) return null;
+    return {
+      protocol: url.protocol.replace(":", "") as "http" | "https",
+      hostname: url.hostname,
+      ...(url.port ? { port: url.port } : {}),
+      pathname: "/storage/v1/object/public/park-media/**",
+    };
+  } catch {
+    return null;
+  }
+}
+
+const supabasePattern = supabaseParkMediaRemotePattern();
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
@@ -14,19 +42,9 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
-      // Add more as needed, e.g. your Supabase storage
-      // {
-      //   protocol: 'https',
-      //   hostname: 'your-project-ref.supabase.co',
-      //   pathname: '/storage/v1/object/public/**',
-      // },
+      ...(supabasePattern ? [supabasePattern] : []),
     ],
   },
-
-  // Optional: if you're on Next.js 15+ and hit Turbopack issues with next-intl
-  // experimental: {
-  //   turbopack: {},
-  // },
 };
 
 export default withNextIntl(nextConfig);

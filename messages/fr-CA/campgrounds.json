@@ -113,8 +113,22 @@
     }
   },
 
+  "media": {
+    "coverTitle": "Photo de couverture",
+    "coverHint": "Affichée sur les cartes de recherche et la page du camping. JPEG, PNG ou WebP.",
+    "coverAlt": "Couverture du camping",
+    "coverEmpty": "Aucune couverture pour l'instant — les visiteurs voient un espace réservé.",
+    "coverUpload": "Téléverser une couverture",
+    "coverReplace": "Remplacer la couverture",
+    "coverClear": "Retirer la couverture",
+    "coverClearConfirm": "Retirer cette photo de couverture ? Les visiteurs verront à nouveau l'espace réservé.",
+    "confirmUncertain": "Impossible de confirmer le téléversement. Vérifiez ci-dessous — il est peut-être déjà enregistré.",
+    "fileConstraints": "Maximum {mb} Mo. JPEG, PNG ou WebP seulement."
+  },
+
   "CampgroundDetailsPage": {
     "sitesHeading": "Emplacements",
+    "sitePhotoAlt": "Photo de {name}",
     "noDescription": "Aucune description fournie.",
     "loadErrorTitle": "Impossible de charger ce camping",
     "loadErrorDescription": "Une erreur s'est produite lors du chargement de cette page. Veuillez réessayer.",

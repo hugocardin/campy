@@ -4,6 +4,7 @@ import {
   resolveCampgroundPriceCurrency,
 } from "@/lib/campground-price";
 import { ActionResult, DbErrorCode, resultError, resultSuccess } from "@/lib/errors";
+import { normalizeParkMediaUrl } from "@/lib/park-media";
 import {
   handleDbResponse,
   handleUnexpectedError,
@@ -28,6 +29,7 @@ type CampgroundAdminRow = {
   website: string | null;
   phone: string | null;
   active: boolean;
+  cover_photo?: string | null;
 };
 
 function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
@@ -52,6 +54,7 @@ function toDomain(row: CampgroundAdminRow): CampgroundAdmin {
     website: row.website ?? "",
     phone: row.phone ?? "",
     active: row.active,
+    coverPhoto: normalizeParkMediaUrl(row.cover_photo),
   };
 }
 

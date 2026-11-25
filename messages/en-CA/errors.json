@@ -5,6 +5,13 @@
   "COMMON_FIELD_TOO_LONG": "A value is too long. Please shorten it and try again.",
   "COMMON_INVALID_FIELD": "One of the values you entered is not valid. Please check and try again.",
 
+  "MEDIA_FILE_TOO_LARGE": "That image is too large. Choose a file under 5 MB.",
+  "MEDIA_UNSUPPORTED_TYPE": "Unsupported image type. Use JPEG, PNG, or WebP.",
+  "MEDIA_LIMIT_REACHED": "This site already has the maximum of 12 photos.",
+  "MEDIA_STORAGE_FAILED": "We couldn't store that image. Please try again.",
+  "MEDIA_COVER_CONFLICT": "The cover photo was changed elsewhere. Refresh the page and try again.",
+  "MEDIA_COMMIT_UNCERTAIN": "Couldn't confirm the upload. Check below — it may already be saved.",
+
   "DB_DUPLICATE_VALUE": "This value already exists. Please choose a different one.",
   "DB_INVALID_REFERENCE": "The referenced record does not exist.",
   "DB_NOT_NULL_VIOLATION": "This field is required and cannot be empty.",
