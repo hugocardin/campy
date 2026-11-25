@@ -31,6 +31,17 @@ import { createClient } from "@/lib/supabase/server";
 
 const SITE_PHOTO_CAP_MARKER = "park_media_site_photos_at_cap";
 
+/** True when supabase-js surfaced a Postgres/PostgREST SQLSTATE (not a transport drop). */
+function isPostgresRejection(error: {
+  code?: string;
+  message?: string;
+}): boolean {
+  const code = error.code?.trim();
+  if (!code) return false;
+  // SQLSTATE is 5 alphanumeric chars (e.g. P0001, 23505, 42501).
+  return /^[A-Z0-9]{5}$/i.test(code);
+}
+
 function revalidateCampgroundMedia(campgroundId: string) {
   revalidateLocalizedPath(routes.home());
   revalidateLocalizedPath(routes.campgroundDetail(campgroundId));
@@ -164,6 +175,32 @@ export async function commitCampgroundCoverAction(
       .maybeSingle();
 
     if (error) {
+      // Transport / ambiguous errors: re-read before deleting (lost-response).
+      if (!isPostgresRejection(error)) {
+        const current = await handleDbSingle(
+          supabase
+            .from("campgrounds")
+            .select("id, cover_photo")
+            .eq("id", campgroundId)
+            .single(),
+        );
+        if (current.success) {
+          const live = normalizeParkMediaUrl(
+            (current.data as { cover_photo?: string | null }).cover_photo,
+          );
+          if (live === nextUrl) {
+            committed = true;
+            safeRevalidateCampgroundMedia(campgroundId);
+            return resultSuccess({ coverPhoto: nextUrl });
+          }
+        }
+        // Ambiguous — leave object for #57 sweep rather than risk wiping a live cover.
+        console.warn(
+          "[park-media] cover update transport error; skipping delete",
+          error.message,
+        );
+        return mapPostgrestError(error);
+      }
       await removeStorageObjectIfOurs(nextUrl, coverPrefix);
       return mapPostgrestError(error);
     }
@@ -177,7 +214,10 @@ export async function commitCampgroundCoverAction(
           .single(),
       );
       if (!current.success) {
-        await removeStorageObjectIfOurs(nextUrl, coverPrefix);
+        // Don't delete on a failed re-read — the UPDATE may have committed.
+        console.warn(
+          "[park-media] cover conflict re-read failed; skipping delete",
+        );
         return current;
       }
       const live = normalizeParkMediaUrl(
@@ -347,16 +387,45 @@ export async function appendSitePhotoAction(
     });
 
     if (error) {
-      await removeStorageObjectIfOurs(nextUrl, photoPrefix);
       if (
         typeof error.message === "string" &&
         error.message.includes(SITE_PHOTO_CAP_MARKER)
       ) {
+        await removeStorageObjectIfOurs(nextUrl, photoPrefix);
         return resultError(MediaErrorCode.MEDIA_LIMIT_REACHED);
       }
       if (error.code === "P0002") {
+        await removeStorageObjectIfOurs(nextUrl, photoPrefix);
         return resultError(DbErrorCode.DB_NOT_FOUND);
       }
+      if (!isPostgresRejection(error)) {
+        // Transport / ambiguous: re-read before deleting.
+        const again = await handleDbSingle(
+          supabase
+            .from("sites")
+            .select("id, photos")
+            .eq("id", siteId)
+            .eq("campground_id", campgroundId)
+            .single(),
+        );
+        if (again.success) {
+          const photos = coerceSitePhotoEntries(
+            (again.data as { photos?: unknown }).photos,
+          );
+          if (photos.includes(nextUrl)) {
+            committed = true;
+            committedPhotos = photos;
+            safeRevalidateSiteMedia(campgroundId, siteId);
+            return resultSuccess({ photos });
+          }
+        }
+        console.warn(
+          "[park-media] append_site_photo transport error; skipping delete",
+          error.message,
+        );
+        return mapPostgrestError(error);
+      }
+      await removeStorageObjectIfOurs(nextUrl, photoPrefix);
       return mapPostgrestError(error);
     }
 

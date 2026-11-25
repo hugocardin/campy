@@ -91,7 +91,8 @@ export default function SitePhotosAdmin({
       ).catch(() => null);
 
       if (!result) {
-        setError(tc("error"));
+        setError(t("confirmUncertain"));
+        router.refresh();
         return;
       }
       if (!result.success) {

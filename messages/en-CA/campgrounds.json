@@ -122,6 +122,7 @@
     "coverReplace": "Replace cover",
     "coverClear": "Remove cover",
     "coverClearConfirm": "Remove this cover photo? Guests will see the placeholder again.",
+    "confirmUncertain": "Couldn't confirm the upload. Check below — it may already be saved.",
     "fileConstraints": "Max {mb} MB. JPEG, PNG, or WebP only."
   },
 

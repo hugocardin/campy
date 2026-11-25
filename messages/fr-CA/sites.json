@@ -73,6 +73,7 @@
     "remove": "Retirer",
     "removeConfirm": "Retirer cette photo ?",
     "foreignPhoto": "URL externe (hors park-media). Retirez-la pour libérer un emplacement.",
+    "confirmUncertain": "Impossible de confirmer le téléversement. Vérifiez ci-dessous — il est peut-être déjà enregistré.",
     "count": "{current} sur {max}",
     "fileConstraints": "Maximum {mb} Mo chacune. JPEG, PNG ou WebP seulement."
   },

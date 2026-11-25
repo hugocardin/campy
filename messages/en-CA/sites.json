@@ -73,6 +73,7 @@
     "remove": "Remove",
     "removeConfirm": "Remove this photo?",
     "foreignPhoto": "External URL (not park-media). Remove to free a slot.",
+    "confirmUncertain": "Couldn't confirm the upload. Check below — it may already be saved.",
     "count": "{current} of {max}",
     "fileConstraints": "Max {mb} MB each. JPEG, PNG, or WebP only."
   },

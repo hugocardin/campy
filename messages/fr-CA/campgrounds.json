@@ -122,6 +122,7 @@
     "coverReplace": "Remplacer la couverture",
     "coverClear": "Retirer la couverture",
     "coverClearConfirm": "Retirer cette photo de couverture ? Les visiteurs verront à nouveau l'espace réservé.",
+    "confirmUncertain": "Impossible de confirmer le téléversement. Vérifiez ci-dessous — il est peut-être déjà enregistré.",
     "fileConstraints": "Maximum {mb} Mo. JPEG, PNG ou WebP seulement."
   },
 

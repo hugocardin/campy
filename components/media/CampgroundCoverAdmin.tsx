@@ -89,7 +89,8 @@ export default function CampgroundCoverAdmin({
       ).catch(() => null);
 
       if (!result) {
-        setError(tc("error"));
+        setError(t("confirmUncertain"));
+        router.refresh();
         return;
       }
       if (!result.success) {
