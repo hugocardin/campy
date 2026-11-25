@@ -677,8 +677,9 @@ export async function sweepOrphanParkMediaAction(): Promise<
       after = parsed.nextAfter;
     }
 
-    // Invite another click when more remain (page-cap or mid-loop stop).
-    const inviteMore = hasMore || stoppedEarly != null;
+    // Invite another click only when more remain AND this run made progress
+    // (avoids a forever "run again" loop when every page removes 0).
+    const inviteMore = hasMore && removed > 0;
 
     if (notRemoved > 0 || inviteMore) {
       console.warn(
