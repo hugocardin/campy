@@ -13,12 +13,18 @@ const PAGE_NAMESPACE = "profile.BookingsPage" as const;
 
 export const generateMetadata = () => generatePageMetadata(PAGE_NAMESPACE);
 
+type ShellKind = "empty" | "comingSoon" | "unavailable";
+
 export default async function ProfileBookingsPage() {
   const t = await getTranslations(PAGE_NAMESPACE);
   const { user } = await requireCurrentProfile();
-  const { count } = await countMyBookings(user.id);
+  const { count, unavailable } = await countMyBookings(user.id);
 
-  const hasBookings = count > 0;
+  const kind: ShellKind = unavailable
+    ? "unavailable"
+    : count > 0
+      ? "comingSoon"
+      : "empty";
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -36,17 +42,15 @@ export default async function ProfileBookingsPage() {
 
           <div className="space-y-2 max-w-md">
             <h2 className="text-xl font-semibold tracking-tight">
-              {hasBookings ? t("comingSoon.title") : t("empty.title")}
+              {t(`${kind}.title`)}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {hasBookings
-                ? t("comingSoon.description")
-                : t("empty.description")}
+              {t(`${kind}.description`)}
             </p>
           </div>
 
           <Button asChild className="mt-2">
-            <Link href={routes.home()}>{t("empty.browseCta")}</Link>
+            <Link href={routes.home()}>{t("browseCta")}</Link>
           </Button>
         </CardContent>
       </Card>

@@ -29,7 +29,7 @@ export const routes = {
   auth: () => "/auth",
   profile: () => "/profile",
   profileEdit: () => "/profile/edit",
-  /** Guest “My bookings” shell (empty state until Phase D). */
+  /** Guest “My bookings” shell (empty state until Phase D). TODO(#55): RLS. */
   profileBookings: () => "/profile/bookings",
   platformAdmin: {
     root: () => "/platformAdmin",

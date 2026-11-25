@@ -7,8 +7,10 @@ export type MyBookingsCount = {
   /** Rows for this user when the query succeeds. */
   count: number;
   /**
-   * True when PostgREST rejected the read (RLS/grants/schema) or threw.
-   * Callers should still treat the UI as empty; Phase D must harden bookings RLS.
+   * True when the read errored (missing grants / schema / transport) or threw.
+   * Note: an RLS policy denial returns 0 rows with `error: null`, not this flag.
+   * TODO(#55): harden bookings RLS before booking writes; pair with a seeded
+   * owner-visibility probe when the list ships.
    */
   unavailable: boolean;
 };
@@ -16,8 +18,9 @@ export type MyBookingsCount = {
 /**
  * Count the signed-in user's `bookings` rows.
  *
- * Filters by `user_id` in the app. Does not broaden grants. On any failure,
- * returns `{ count: 0, unavailable: true }` so the empty-state shell stays safe.
+ * Filters by `user_id` in the app. Does not broaden grants. On hard failures
+ * returns `{ count: 0, unavailable: true }` so the page can show a neutral
+ * “couldn't load” state instead of claiming there are no reservations.
  */
 export async function countMyBookings(
   userId: string,

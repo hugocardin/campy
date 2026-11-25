@@ -53,7 +53,7 @@ export default function ProfileClient({ profile, user }: Props) {
                 </AvatarFallback>
               </Avatar>
 
-              <div className="flex flex-col items-center sm:items-start gap-2">
+              <div className="flex flex-col items-center sm:items-start gap-1">
                 <Badge
                   variant="secondary"
                   className="text-xs font-medium px-2.5 py-0.5"
@@ -62,12 +62,6 @@ export default function ProfileClient({ profile, user }: Props) {
                 </Badge>
 
                 <EditButton href={routes.profileEdit()} />
-
-                <Button asChild variant="outline" size="sm">
-                  <Link href={routes.profileBookings()}>
-                    {t_profile("BookingsPage.navLink")}
-                  </Link>
-                </Button>
               </div>
             </div>
 
@@ -106,6 +100,23 @@ export default function ProfileClient({ profile, user }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Account links — keep nav out of the identity column as sections grow */}
+      <section className="space-y-3" aria-labelledby="profile-account-links">
+        <h2
+          id="profile-account-links"
+          className="text-sm font-medium text-muted-foreground"
+        >
+          {t_profile("BookingsPage.accountLinksTitle")}
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.profileBookings()}>
+              {t_profile("BookingsPage.navLink")}
+            </Link>
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

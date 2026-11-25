@@ -50,21 +50,26 @@
   "BookingsPage": {
     "pageHeader": {
       "title": "My bookings",
-      "description": "Past and upcoming reservations"
+      "description": "Your Campy reservations"
     },
     "meta": {
       "title": "My bookings | Campy",
       "description": "View your Campy reservations. Online booking is coming soon."
     },
+    "browseCta": "Browse campgrounds",
     "empty": {
       "title": "No reservations yet",
-      "description": "You do not have any bookings. Online booking is coming soon — browse campgrounds while we finish it.",
-      "browseCta": "Browse campgrounds"
+      "description": "You do not have any bookings. Online booking is coming soon — browse campgrounds while we finish it."
     },
     "comingSoon": {
       "title": "Booking list coming soon",
       "description": "Your reservations will show up here once online booking ships. Browse campgrounds in the meantime."
     },
-    "navLink": "My bookings"
+    "unavailable": {
+      "title": "Couldn't load your bookings",
+      "description": "Something went wrong while loading reservations. Try again in a moment, or browse campgrounds in the meantime."
+    },
+    "navLink": "My bookings",
+    "accountLinksTitle": "Account"
   }
 }

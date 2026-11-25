@@ -50,21 +50,26 @@
   "BookingsPage": {
     "pageHeader": {
       "title": "Mes réservations",
-      "description": "Réservations passées et à venir"
+      "description": "Vos réservations Campy"
     },
     "meta": {
       "title": "Mes réservations | Campy",
       "description": "Consultez vos réservations Campy. La réservation en ligne arrive bientôt."
     },
+    "browseCta": "Parcourir les terrains de camping",
     "empty": {
       "title": "Aucune réservation pour le moment",
-      "description": "Vous n'avez aucune réservation. La réservation en ligne arrive bientôt — parcourez les terrains de camping en attendant.",
-      "browseCta": "Parcourir les terrains de camping"
+      "description": "Vous n'avez aucune réservation. La réservation en ligne arrive bientôt — parcourez les terrains de camping en attendant."
     },
     "comingSoon": {
       "title": "Liste des réservations bientôt disponible",
       "description": "Vos réservations apparaîtront ici lorsque la réservation en ligne sera offerte. Parcourez les terrains de camping en attendant."
     },
-    "navLink": "Mes réservations"
+    "unavailable": {
+      "title": "Impossible de charger vos réservations",
+      "description": "Une erreur est survenue lors du chargement des réservations. Réessayez dans un moment, ou parcourez les terrains de camping en attendant."
+    },
+    "navLink": "Mes réservations",
+    "accountLinksTitle": "Compte"
   }
 }
