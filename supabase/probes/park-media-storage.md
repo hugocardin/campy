@@ -33,15 +33,23 @@ Expect: no `cover_photo`, no bucket, no `park_media%` policies.
    Server Actions only commit URLs (no raised `serverActions.bodySizeLimit`).
 7. Guest search RPCs return `cover_photo` (`20261125033810_search_rpc_cover_photo.sql`,
    [#57](https://github.com/hugocardin/campy/issues/57)) — no `enrichCampgroundCovers`.
+   Run as `anon` so column grants are exercised; expect 0 mismatches vs `v_campgrounds`.
 
 ```sql
-SELECT cover_photo IS NOT NULL AS has_cover
-FROM search_campgrounds(result_limit := 5)
-LIMIT 5;
+BEGIN;
+SET LOCAL ROLE anon;
 
-SELECT cover_photo IS NOT NULL AS has_cover
-FROM search_campgrounds_near(49.28, -123.12, 100000, result_limit := 5)
-LIMIT 5;
+SELECT count(*) AS mismatches
+FROM public.search_campgrounds(result_limit := 500) s
+JOIN public.v_campgrounds v USING (id)
+WHERE s.cover_photo IS DISTINCT FROM v.cover_photo;
+
+SELECT count(*) AS mismatches
+FROM public.search_campgrounds_near(49.28, -123.12, 200000, result_limit := 500) s
+JOIN public.v_campgrounds v USING (id)
+WHERE s.cover_photo IS DISTINCT FROM v.cover_photo;
+
+ROLLBACK;
 ```
 
 ## Manual smoke

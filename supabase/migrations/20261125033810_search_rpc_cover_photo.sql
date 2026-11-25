@@ -1,5 +1,9 @@
 -- #57: return cover_photo from guest search RPCs (drop enrichCampgroundCovers).
+-- Bodies copied verbatim from 20261116220335_campground_currency_price_sort_group_impl.sql;
+-- only change: + cover_photo (RETURNS TABLE, base CTE, final SELECT). Grants re-applied after DROP.
 -- OUT columns changed → DROP + recreate (CREATE OR REPLACE cannot alter RETURNS TABLE).
+-- Requires GRANT SELECT (cover_photo) ON public.campgrounds TO anon, authenticated
+-- (from 20261125025950_park_media_storage.sql); SECURITY INVOKER reads the column directly.
 
 BEGIN;
 
@@ -282,7 +286,7 @@ $$;
 COMMENT ON FUNCTION public.search_campgrounds(
   text, text[], smallint[], boolean, boolean, boolean, text, numeric, text, text[], numeric, text[], text, text, integer
 ) IS
-  'Guest list search (#24/#51/#57): filter_currency scopes only with max_price; price sort groups preferred currency first; returns cover_photo.';
+  'Guest list search (#24/#51/#57): filter_currency scopes only with max_price; price sort groups preferred currency first then amount within currency; unknown currency fail-closed; returns cover_photo.';
 
 REVOKE ALL ON FUNCTION public.search_campgrounds(
   text, text[], smallint[], boolean, boolean, boolean, text, numeric, text, text[], numeric, text[], text, text, integer
@@ -615,7 +619,7 @@ COMMENT ON FUNCTION public.search_campgrounds_near(
   double precision, double precision, double precision,
   text, text[], smallint[], boolean, boolean, boolean, text, numeric, text, text[], numeric, text[], text, text, integer
 ) IS
-  'Guest near search (#24/#51/#57): filter_currency scopes only with max_price; price sort groups preferred currency first; returns cover_photo.';
+  'Guest near search (#24/#51/#57): filter_currency scopes only with max_price; price sort groups preferred currency first; unknown currency fail-closed; returns cover_photo.';
 
 REVOKE ALL ON FUNCTION public.search_campgrounds_near(
   double precision, double precision, double precision,

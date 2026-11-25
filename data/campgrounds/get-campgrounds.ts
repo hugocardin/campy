@@ -19,7 +19,6 @@ import {
 import {
   formatGuestMaxPriceParam,
   formatGuestPriceCurrencyParam,
-  resolveCampgroundPriceCurrency,
   resolveGuestPriceCurrencyFilter,
 } from "@/lib/campground-price";
 import { formatDrivewayUrlParam } from "@/lib/driveway-type";
@@ -27,7 +26,6 @@ import { electricityAmpsToRpcArg } from "@/lib/electricity-amps";
 import { ActionResult, resultSuccess } from "@/lib/errors";
 import { formatGuestAmenityCodesParam } from "@/lib/guest-amenity-codes";
 import { formatGuestSiteTypesParam } from "@/lib/guest-site-types";
-import { normalizeParkMediaUrl } from "@/lib/park-media";
 import { formatGuestRigLengthParam } from "@/lib/site-rig-length";
 import { formatStayKindParam } from "@/lib/stay-kind";
 import { getSupabaseAnon } from "@/lib/supabase/anon-server";
@@ -38,6 +36,12 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
+import {
+  CampgroundRow,
+  toCampgroundDomain,
+} from "./to-campground-domain";
+
+export { toCampgroundDomain } from "./to-campground-domain";
 
 /** Tag for province DISTINCT cache — revalidate on campground writes. */
 export const CAMPGROUND_PROVINCES_CACHE_TAG = "campground-provinces";
@@ -57,65 +61,6 @@ export type CampgroundSearchPayload = {
 /** Guest-safe columns — never select commission_* from v_campgrounds. */
 export const GUEST_CAMPGROUND_COLUMNS =
   "id, name, description, address, city, province, country, currency, latitude, longitude, website, phone, cover_photo" as const;
-
-type CampgroundRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  address: string | null;
-  city: string | null;
-  province: string | null;
-  country: string | null;
-  currency?: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  website: string | null;
-  phone: string | null;
-  cover_photo?: string | null;
-  distance_m?: number | null;
-  min_price_per_night?: number | null;
-  price_currency?: string | null;
-};
-
-function toFiniteNumber(value: number | null | undefined): number | null {
-  if (value == null) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-export function toCampgroundDomain(row: CampgroundRow): Campground {
-  const lat = toFiniteNumber(row.latitude);
-  const lng = toFiniteNumber(row.longitude);
-  const location =
-    lat != null && lng != null ? { lat, lng } : null;
-  const distanceMeters =
-    row.distance_m == null ? undefined : toFiniteNumber(row.distance_m);
-  const minPrice =
-    row.min_price_per_night == null
-      ? undefined
-      : toFiniteNumber(Number(row.min_price_per_night));
-
-  const priceCurrency = resolveCampgroundPriceCurrency(
-    row.price_currency ?? row.currency,
-  );
-
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    address: row.address,
-    city: row.city,
-    province: row.province,
-    country: row.country,
-    location,
-    distanceMeters: distanceMeters ?? undefined,
-    minPricePerNight: minPrice ?? undefined,
-    priceCurrency,
-    website: row.website ?? "",
-    phone: row.phone ?? "",
-    coverPhoto: normalizeParkMediaUrl(row.cover_photo),
-  };
-}
 
 /**
  * Cross-request DISTINCT province spellings via RPC + `unstable_cache`.
