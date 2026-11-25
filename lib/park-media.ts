@@ -93,26 +93,47 @@ export function parkMediaOrphanObjectPaths(
   return orphans;
 }
 
-/** Collect Storage object paths referenced by cover / site photo URL columns. */
+export type ReferencedParkMediaResult = {
+  paths: Set<string>;
+  /** Non-empty URL strings that failed park-media path parse. */
+  unparsedCount: number;
+  /** Non-empty URL strings considered (covers + photo entries). */
+  urlCount: number;
+};
+
+/**
+ * Collect Storage object paths referenced by cover / site photo URL columns.
+ * Callers that delete must abort when `unparsedCount > 0` or when
+ * `urlCount > 0 && paths.size === 0` (env / origin mismatch).
+ */
 export function referencedParkMediaObjectPaths(
   coverPhotos: readonly (string | null | undefined)[],
   sitePhotoArrays: readonly unknown[],
-  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-): Set<string> {
-  const refs = new Set<string>();
+  supabaseUrl: string,
+): ReferencedParkMediaResult {
+  const paths = new Set<string>();
+  let unparsedCount = 0;
+  let urlCount = 0;
+
+  const consider = (raw: string | null | undefined) => {
+    if (typeof raw !== "string") return;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    urlCount += 1;
+    const path = parkMediaObjectPathFromPublicUrl(trimmed, supabaseUrl);
+    if (path) paths.add(path);
+    else unparsedCount += 1;
+  };
+
   for (const cover of coverPhotos) {
-    const path = cover
-      ? parkMediaObjectPathFromPublicUrl(cover, supabaseUrl)
-      : null;
-    if (path) refs.add(path);
+    consider(cover);
   }
   for (const photos of sitePhotoArrays) {
     for (const url of coerceSitePhotoEntries(photos)) {
-      const path = parkMediaObjectPathFromPublicUrl(url, supabaseUrl);
-      if (path) refs.add(path);
+      consider(url);
     }
   }
-  return refs;
+  return { paths, unparsedCount, urlCount };
 }
 
 /**

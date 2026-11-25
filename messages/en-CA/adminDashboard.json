@@ -5,11 +5,12 @@
 
   "parkMediaSweep": {
     "title": "Park media cleanup",
-    "description": "Remove Storage objects in park-media that are not referenced by any campground cover or site photo. Safe to re-run; does not delete live media.",
+    "description": "Remove unreferenced park-media Storage objects older than 24 hours. Aborts without deleting if listing or URL checks look incomplete. Recent uploads are skipped.",
     "run": "Sweep orphan media",
     "running": "Sweeping…",
-    "confirm": "Scan park-media and delete unreferenced objects? Referenced covers and site photos are kept.",
-    "result": "Scanned {scanned, number} objects. Removed {removed, number}. Failed {failed, number}."
+    "confirmTitle": "Sweep orphan media?",
+    "confirm": "Delete park-media objects that are not referenced by any cover or site photo and are older than 24 hours? Referenced media is kept. The sweep aborts if checks look incomplete.",
+    "result": "Scanned {scanned, plural, one {# object} other {# objects}}. Removed {removed, number}. Not removed {notRemoved, number}. Skipped recent {skippedYoung, number}."
   },
 
   "AdminDashboardPage": {

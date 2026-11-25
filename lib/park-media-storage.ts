@@ -6,6 +6,20 @@ import { PARK_MEDIA_BUCKET } from "@/lib/park-media";
 const LIST_PAGE = 100;
 const REMOVE_CHUNK = 100;
 
+/** Objects older than this may be treated as orphan candidates (upload→commit race). */
+export const PARK_MEDIA_ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
+
+export type ParkMediaListedObject = {
+  path: string;
+  createdAt: string | null;
+};
+
+export type ParkMediaListResult = {
+  objects: ParkMediaListedObject[];
+  /** False when a list page failed — caller must not treat the set as complete. */
+  complete: boolean;
+};
+
 function folderFromPrefix(prefix: string): string {
   return prefix.replace(/\/+$/, "");
 }
@@ -13,14 +27,14 @@ function folderFromPrefix(prefix: string): string {
 /**
  * Recursively list object paths under a bucket folder prefix
  * (e.g. `{campgroundId}/` or `{campgroundId}/sites/{siteId}/`).
- * Best-effort: logs and returns what was collected if a page fails.
  */
-export async function listParkMediaObjectPaths(
+export async function listParkMediaObjects(
   supabase: SupabaseClient,
   prefix: string,
-): Promise<string[]> {
+): Promise<ParkMediaListResult> {
   const root = folderFromPrefix(prefix);
-  const paths: string[] = [];
+  const objects: ParkMediaListedObject[] = [];
+  let complete = true;
 
   async function walk(folder: string): Promise<void> {
     let offset = 0;
@@ -39,6 +53,7 @@ export async function listParkMediaObjectPaths(
           folder || "(root)",
           error.message,
         );
+        complete = false;
         return;
       }
       if (!data || data.length === 0) break;
@@ -51,7 +66,11 @@ export async function listParkMediaObjectPaths(
         if (isFolder) {
           await walk(child);
         } else {
-          paths.push(child);
+          objects.push({
+            path: child,
+            createdAt:
+              typeof item.created_at === "string" ? item.created_at : null,
+          });
         }
       }
 
@@ -61,7 +80,16 @@ export async function listParkMediaObjectPaths(
   }
 
   await walk(root);
-  return paths;
+  return { objects, complete };
+}
+
+/** @deprecated Prefer {@link listParkMediaObjects}; kept for simple path-only callers. */
+export async function listParkMediaObjectPaths(
+  supabase: SupabaseClient,
+  prefix: string,
+): Promise<string[]> {
+  const { objects } = await listParkMediaObjects(supabase, prefix);
+  return objects.map((o) => o.path);
 }
 
 /**
@@ -78,14 +106,22 @@ export async function removeParkMediaByPrefix(
     return;
   }
 
-  let paths: string[];
+  let list: ParkMediaListResult;
   try {
-    paths = await listParkMediaObjectPaths(supabase, trimmed);
+    list = await listParkMediaObjects(supabase, trimmed);
   } catch (err) {
     console.warn("[park-media] storage prefix list threw", err);
     return;
   }
 
+  if (!list.complete) {
+    console.warn(
+      "[park-media] storage prefix list incomplete; removing collected paths only",
+      trimmed,
+    );
+  }
+
+  const paths = list.objects.map((o) => o.path);
   if (paths.length === 0) return;
 
   for (let i = 0; i < paths.length; i += REMOVE_CHUNK) {
@@ -110,14 +146,14 @@ export async function removeParkMediaByPrefix(
 
 /**
  * Best-effort remove of specific object paths (orphan sweep).
- * Returns how many remove calls reported success vs failure.
+ * Paths already gone (not returned by `remove`) count as removed, not failed.
  */
 export async function removeParkMediaObjectPaths(
   supabase: SupabaseClient,
   paths: readonly string[],
-): Promise<{ removed: number; failed: number }> {
+): Promise<{ removed: number; notRemoved: number }> {
   let removed = 0;
-  let failed = 0;
+  let notRemoved = 0;
   const safe = paths.filter((p) => p && !p.includes(".."));
 
   for (let i = 0; i < safe.length; i += REMOVE_CHUNK) {
@@ -132,19 +168,29 @@ export async function removeParkMediaObjectPaths(
           error.message,
           `(chunk ${i / REMOVE_CHUNK + 1})`,
         );
-        failed += chunk.length;
+        notRemoved += chunk.length;
         continue;
       }
-      const deleted = Array.isArray(data) ? data.length : chunk.length;
-      removed += deleted;
-      if (deleted < chunk.length) {
-        failed += chunk.length - deleted;
-      }
+      // API returns only objects it deleted; missing paths are already gone.
+      removed += chunk.length;
+      void data;
     } catch (err) {
       console.warn("[park-media] orphan sweep remove threw", err);
-      failed += chunk.length;
+      notRemoved += chunk.length;
     }
   }
 
-  return { removed, failed };
+  return { removed, notRemoved };
+}
+
+/** True when the object is old enough to be an orphan candidate. */
+export function isOlderThanParkMediaGrace(
+  createdAt: string | null | undefined,
+  nowMs = Date.now(),
+  graceMs = PARK_MEDIA_ORPHAN_GRACE_MS,
+): boolean {
+  if (!createdAt) return false;
+  const t = Date.parse(createdAt);
+  if (Number.isNaN(t)) return false;
+  return t < nowMs - graceMs;
 }

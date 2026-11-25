@@ -24,6 +24,7 @@ import {
   normalizeStoredRigLengthFeet,
   siteTypeRequiresMaxRigLength,
 } from "@/lib/site-rig-length";
+import { getSupabaseAdmin } from "@/lib/supabase/admin_server";
 import {
   handleDbNoData,
   handleDbResponse,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/supabase/db-utils";
 import { requirePlatformAdmin } from "@/lib/supabase/require-platform-admin";
 import { createClient } from "@/lib/supabase/server";
+import { after } from "next/server";
 import { getLocale } from "next-intl/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -323,15 +325,15 @@ export async function deleteSiteAction(
       });
     }
 
-    // Row gone — Storage cleanup must not fail the action.
-    try {
-      await removeParkMediaByPrefix(
-        supabase,
-        sitePhotoPathPrefix(campgroundId, siteId),
-      );
-    } catch (err) {
-      console.warn("[park-media] site delete storage cleanup threw", err);
-    }
+    const mediaPrefix = sitePhotoPathPrefix(campgroundId, siteId);
+    // Best-effort Storage cleanup after the response (manual sweep recovers misses).
+    after(async () => {
+      try {
+        await removeParkMediaByPrefix(getSupabaseAdmin(), mediaPrefix);
+      } catch (err) {
+        console.warn("[park-media] site delete storage cleanup threw", err);
+      }
+    });
 
     revalidateLocalizedPath(routes.platformAdmin.campgroundSites(campgroundId));
     revalidateLocalizedPath(routes.platformAdmin.campgroundView(campgroundId));

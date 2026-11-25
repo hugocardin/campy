@@ -88,7 +88,7 @@ export function CampgroundActions({ campground }: CampgroundActionsProps) {
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-3">
         <DeleteButtonWithConfirmation
-          disabled={isPending}
+          disabled={isPending || campground.active}
           title={t_campgrounds("actions.deleteCampgroundTitle")}
           description={t_campgrounds("actions.deleteCampgroundDescription", {
             name: campground.name,

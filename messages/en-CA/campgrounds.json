@@ -57,7 +57,7 @@
     "activate": "Activate",
     "deactivate": "Deactivate",
     "deleteCampgroundTitle": "Delete campground?",
-    "deleteCampgroundDescription": "Permanently delete \"{name}\", its sites, and park media from storage. Prefer deactivate when you may reuse the park. Parks with bookings cannot be deleted."
+    "deleteCampgroundDescription": "Permanently delete \"{name}\", its sites, and park media from storage. Deactivate the park first. Parks with bookings cannot be deleted."
   },
 
   "AdminCampgroundsPage": {

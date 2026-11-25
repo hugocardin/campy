@@ -150,20 +150,39 @@ describe("park-media helpers", () => {
     const cover = parkMediaPublicUrl("cg/cover/a.jpg", PROJECT);
     const photo = parkMediaPublicUrl("cg/sites/s/b.jpg", PROJECT);
     const refs = referencedParkMediaObjectPaths(
-      [cover, null, "https://evil/x.jpg"],
-      [[photo, "https://evil/y.jpg"], null],
+      [cover, null],
+      [[photo], null],
       PROJECT,
     );
-    assert.equal(refs.has("cg/cover/a.jpg"), true);
-    assert.equal(refs.has("cg/sites/s/b.jpg"), true);
-    assert.equal(refs.size, 2);
+    assert.equal(refs.paths.has("cg/cover/a.jpg"), true);
+    assert.equal(refs.paths.has("cg/sites/s/b.jpg"), true);
+    assert.equal(refs.paths.size, 2);
+    assert.equal(refs.unparsedCount, 0);
+    assert.equal(refs.urlCount, 2);
 
     assert.deepEqual(
       parkMediaOrphanObjectPaths(
         ["cg/cover/a.jpg", "cg/cover/orphan.jpg", "cg/sites/s/b.jpg", "../x"],
-        refs,
+        refs.paths,
       ),
       ["cg/cover/orphan.jpg"],
     );
+  });
+
+  it("counts unparsed media URLs for fail-closed sweeps", () => {
+    const cover = parkMediaPublicUrl("cg/cover/a.jpg", PROJECT);
+    const refs = referencedParkMediaObjectPaths(
+      [cover, "https://evil/x.jpg"],
+      [["https://evil/y.jpg"]],
+      PROJECT,
+    );
+    assert.equal(refs.paths.size, 1);
+    assert.equal(refs.unparsedCount, 2);
+    assert.equal(refs.urlCount, 3);
+
+    const emptyEnv = referencedParkMediaObjectPaths([cover], [], "");
+    assert.equal(emptyEnv.paths.size, 0);
+    assert.equal(emptyEnv.unparsedCount, 1);
+    assert.equal(emptyEnv.urlCount, 1);
   });
 });

@@ -5,11 +5,12 @@
 
   "parkMediaSweep": {
     "title": "Nettoyage des médias park-media",
-    "description": "Supprimer les objets Storage park-media qui ne sont référencés par aucune couverture de camping ni photo d'emplacement. Sans danger à relancer; ne supprime pas les médias en usage.",
+    "description": "Supprimer les objets Storage park-media non référencés de plus de 24 heures. Annule sans supprimer si le listage ou les URL semblent incomplets. Les téléversements récents sont ignorés.",
     "run": "Balayer les orphelins",
     "running": "Balayage…",
-    "confirm": "Analyser park-media et supprimer les objets non référencés? Les couvertures et photos d'emplacement en usage sont conservées.",
-    "result": "{scanned, number} objets analysés. {removed, number} supprimés. {failed, number} échecs."
+    "confirmTitle": "Balayer les orphelins?",
+    "confirm": "Supprimer les objets park-media non référencés par une couverture ou une photo d'emplacement et âgés de plus de 24 heures? Les médias en usage sont conservés. Le balayage s'annule si les vérifications semblent incomplètes.",
+    "result": "{scanned, plural, one {# objet analysé} many {# objets analysés} other {# objets analysés}}. {removed, number} supprimés. {notRemoved, number} non retirés. {skippedYoung, number} récents ignorés."
   },
 
   "AdminDashboardPage": {
