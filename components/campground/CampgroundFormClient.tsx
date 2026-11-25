@@ -292,6 +292,12 @@ export default function CampgroundFormClient({
   const knownCommissionTypes = commissionTypes.filter((type) =>
     Boolean(parseCommissionTypeName(type.name)),
   );
+  /** Current id not in the closed percent/fixed set (e.g. future lookup row). */
+  const orphanCommissionTypeId =
+    form.commission_type_id &&
+    !knownCommissionTypes.some((t) => String(t.id) === form.commission_type_id)
+      ? form.commission_type_id
+      : null;
 
   const handleCommissionTypeChange = (value: string) => {
     const nextId = value === COMMISSION_TYPE_NONE ? "" : value;
@@ -595,6 +601,11 @@ export default function CampgroundFormClient({
                     <SelectItem value={COMMISSION_TYPE_NONE}>
                       {t_campgrounds("form.commissionTypeNone")}
                     </SelectItem>
+                    {orphanCommissionTypeId ? (
+                      <SelectItem value={orphanCommissionTypeId}>
+                        {t_campgrounds("commissionTypes.unknown")}
+                      </SelectItem>
+                    ) : null}
                     {[...knownCommissionTypes]
                       .sort((a, b) => a.id - b.id)
                       .map((type) => (
@@ -608,7 +619,9 @@ export default function CampgroundFormClient({
                   id="commission-type-hint"
                   className="mt-1 text-xs text-muted-foreground"
                 >
-                  {t_campgrounds("form.commissionTypeHint")}
+                  {orphanCommissionTypeId
+                    ? t_campgrounds("form.commissionTypeUnknownHint")
+                    : t_campgrounds("form.commissionTypeHint")}
                 </p>
               </div>
 

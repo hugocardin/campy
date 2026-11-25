@@ -39,6 +39,7 @@
     "commissionTypePlaceholder": "Select a commission type",
     "commissionTypeNone": "None",
     "commissionTypeHint": "Optional. Platform fee terms for this park (data entry only).",
+    "commissionTypeUnknownHint": "This park uses an unsupported commission type. Choose Percent, Fixed amount, or None before saving.",
     "commissionValueLabel": "Commission value",
     "commissionValuePercentLabel": "Commission percent",
     "commissionValueFixedLabel": "Commission amount",

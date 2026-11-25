@@ -39,6 +39,7 @@
     "commissionTypePlaceholder": "Sélectionnez un type de commission",
     "commissionTypeNone": "Aucun",
     "commissionTypeHint": "Facultatif. Conditions de frais de plateforme pour ce camping (saisie seulement).",
+    "commissionTypeUnknownHint": "Ce camping utilise un type de commission non pris en charge. Choisissez Pourcentage, Montant fixe ou Aucun avant d’enregistrer.",
     "commissionValueLabel": "Valeur de la commission",
     "commissionValuePercentLabel": "Pourcentage de commission",
     "commissionValueFixedLabel": "Montant de commission",

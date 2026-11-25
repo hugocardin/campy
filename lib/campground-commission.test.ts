@@ -24,13 +24,32 @@ describe("parseCommissionTypeName", () => {
 });
 
 describe("normalizeDecimalInput", () => {
-  it("accepts comma decimals", () => {
+  it("accepts comma decimals with 1–2 fraction digits", () => {
     assert.equal(normalizeDecimalInput("5,00"), "5.00");
     assert.equal(normalizeDecimalInput("12,5"), "12.5");
   });
 
+  it("does not treat grouping commas as decimals", () => {
+    assert.equal(normalizeDecimalInput("1,000"), "1,000");
+    assert.equal(normalizeDecimalInput("2,500"), "2,500");
+  });
+
   it("leaves dot decimals alone", () => {
     assert.equal(normalizeDecimalInput("5.00"), "5.00");
+  });
+});
+
+describe("normalizeCommissionInput grouping commas", () => {
+  it("rejects 1,000 as invalid (not one)", () => {
+    const result = normalizeCommissionInput({
+      commission_type_id: 2,
+      commission_value: "1,000",
+      typeName: "fixed",
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.reason, "value_invalid");
+    }
   });
 });
 

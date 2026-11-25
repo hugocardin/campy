@@ -64,7 +64,12 @@ function hasAtMostFractionDigits(value: number, maxDigits: number): boolean {
   return Math.abs(value * factor - Math.round(value * factor)) < 1e-8;
 }
 
-/** Normalize decimal separators (`,` → `.`) for locale-typed form values. */
+/**
+ * Normalize decimal separators for locale-typed form values.
+ * Only `,` with 1–2 fractional digits is treated as a decimal (e.g. `12,5`).
+ * Grouping commas (`1,000`) are left alone so they fail as invalid rather than
+ * silently becoming `1.000` → 1.
+ */
 export function normalizeDecimalInput(
   raw: number | string | null | undefined,
 ): string | undefined {
@@ -75,8 +80,8 @@ export function normalizeDecimalInput(
   }
   const trimmed = raw.trim();
   if (trimmed === "") return undefined;
-  // Allow a single comma as decimal separator (fr-CA style).
-  if (/^\d+,\d+$/.test(trimmed)) {
+  // fr-CA style decimal comma only — not a thousands separator.
+  if (/^\d+,\d{1,2}$/.test(trimmed)) {
     return trimmed.replace(",", ".");
   }
   return trimmed;
