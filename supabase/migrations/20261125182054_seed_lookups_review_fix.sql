@@ -1,6 +1,7 @@
 -- Review follow-up for 20261125181703 (PR #63): assert seed pairs, never-rewind
 -- setval, and booking_statuses lookup RLS. Safe when the original seed already
 -- ran live without these guards (live version 20261125181703).
+-- SELECT-only grant harden (REVOKE ALL + GRANT SELECT) is 20261125182425.
 
 BEGIN;
 

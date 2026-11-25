@@ -2,8 +2,9 @@
 
 Migrations:
 
-- `20261125181703_seed_commission_types_booking_statuses.sql` (matches live version)
+- `20261125181703_seed_commission_types_booking_statuses.sql` (exact live-applied seed body)
 - `20261125182054_seed_lookups_review_fix.sql` (assert / setval / lookup RLS)
+- `20261125182425_booking_statuses_select_only_grants.sql` (REVOKE ALL + GRANT SELECT)
 
 ## Before apply (service role)
 
@@ -49,10 +50,17 @@ WHERE schemaname = 'public' AND tablename = 'booking_statuses';
 -- booking_statuses_select_all, SELECT, {anon,authenticated}
 
 SELECT has_table_privilege('anon', 'public.booking_statuses', 'INSERT') AS anon_ins,
-       has_table_privilege('authenticated', 'public.booking_statuses', 'UPDATE') AS auth_upd;
--- both false
+       has_table_privilege('authenticated', 'public.booking_statuses', 'UPDATE') AS auth_upd,
+       has_table_privilege('anon', 'public.booking_statuses', 'REFERENCES') AS anon_refs;
+-- all false; SELECT remains true
 
--- Re-apply review_fix must succeed (assert passes; RLS/policy idempotent).
+SELECT array_agg(privilege_type ORDER BY privilege_type)
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public' AND table_name = 'booking_statuses'
+  AND grantee = 'anon';
+-- {SELECT} only
+
+-- Re-apply review_fix / select_only_grants must succeed (idempotent).
 ```
 
 App contract: `lib/booking-status.ts` `BOOKING_STATUS_NAMES` (resolve by name).
