@@ -251,5 +251,39 @@ describe("runOrphanParkMediaSweepLoop", () => {
     assert.equal(result.removed, 1);
     assert.equal(result.stoppedEarly, "unparsed_media_urls");
     assert.equal(result.hasMore, true);
+    assert.equal(result.hitDeadline, false);
+  });
+
+  it("deadline stops before a new page without setting stoppedEarly", async () => {
+    let pages = 0;
+    let t = 0;
+    const result = await runOrphanParkMediaSweepLoop({
+      warn: silent,
+      maxPages: 10,
+      deadlineMs: 100,
+      now: () => t,
+      listPage: async () => {
+        pages += 1;
+        t = 150; // next page will see deadline exceeded
+        return {
+          kind: "ok",
+          page: okPage({
+            scanned: 100,
+            hasMore: true,
+            nextAfter: `d/${pages}`,
+            paths: [`d/${pages}/a`],
+          }),
+        };
+      },
+      removePaths: async () => ({ removed: 1, notRemoved: 0 }),
+    });
+
+    assert.equal(result.kind, "success");
+    if (result.kind !== "success") return;
+    assert.equal(pages, 1);
+    assert.equal(result.removed, 1);
+    assert.equal(result.stoppedEarly, null);
+    assert.equal(result.hitDeadline, true);
+    assert.equal(result.hasMore, true);
   });
 });

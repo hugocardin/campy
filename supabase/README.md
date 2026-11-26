@@ -4,7 +4,7 @@ Schema and RLS currently live primarily in the hosted Supabase project. This fol
 
 **Guest search geocoder (#24):** Photon (Komoot) — see `probes/search-v2-place-unaccent.md`. Optional `PHOTON_API_URL`; no API key.
 
-**Park media (Phase C):** public Storage bucket `park-media` + `campgrounds.cover_photo` + `sites.photos` — see `probes/park-media-storage.md` and migration `20261125025950_park_media_storage.sql`.
+**Park media (Phase C):** public Storage bucket `park-media` + `campgrounds.cover_photo` + `sites.photos` — see `probes/park-media-storage.md` and migration `20261125025950_park_media_storage.sql`. Orphan cleanup: admin sweep + periodic cron on `/api/cron/park-media-orphan-sweep` (enable steps + `CRON_SECRET` in that probe).
 
 ## Layout
 

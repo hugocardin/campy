@@ -1,0 +1,68 @@
+# Manual / backup invoke of park-media orphan sweep (#57).
+#
+# Primary schedule is Vercel Cron (`vercel.json` → GET the route with CRON_SECRET).
+# This workflow is workflow_dispatch only so both schedulers cannot fire at once.
+# Note: if a schedule is ever re-added, GitHub disables unused scheduled workflows
+# after ~60 days of repo inactivity, and `schedule` only runs from the default branch.
+name: Park-media orphan cron
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: park-media-orphan-cron
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    name: Sweep orphan park-media
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require secrets
+        env:
+          CAMPY_APP_URL: ${{ secrets.CAMPY_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "${CAMPY_APP_URL}" ] || [ -z "${CRON_SECRET}" ]; then
+            echo "Skipping: set GitHub Actions secrets CAMPY_APP_URL and CRON_SECRET to enable."
+            echo "See supabase/probes/park-media-storage.md (Periodic cron)."
+            exit 0
+          fi
+          echo "SECRETS_OK=1" >> "$GITHUB_ENV"
+
+      - name: Invoke cron route
+        if: env.SECRETS_OK == '1'
+        env:
+          CAMPY_APP_URL: ${{ secrets.CAMPY_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          base="${CAMPY_APP_URL%/}"
+          url="${base}/api/cron/park-media-orphan-sweep"
+          echo "POST ${url}"
+          body="$(curl -sS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -w "\n%{http_code}" \
+            --max-time 90 \
+            "${url}")"
+          status="$(printf '%s' "${body}" | tail -n 1)"
+          payload="$(printf '%s' "${body}" | sed '$d')"
+          echo "HTTP ${status}"
+          echo "${payload}"
+          case "${status}" in
+            200) ;;
+            *)
+              echo "Cron sweep failed with HTTP ${status}"
+              exit 1
+              ;;
+          esac
+          # Defense in depth: fail if payload marks a degraded mid-sweep stop.
+          if printf '%s' "${payload}" | grep -Eq '"stoppedEarly"[[:space:]]*:[[:space:]]*"[^"]+"'; then
+            echo "Cron sweep reported stoppedEarly — treating as failure"
+            exit 1
+          fi

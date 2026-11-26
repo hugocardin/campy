@@ -2,11 +2,17 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PARK_MEDIA_BUCKET } from "@/lib/park-media";
+import { removePathsInChunks } from "@/lib/park-media-remove-paths";
 
 const LIST_PAGE = 100;
 const REMOVE_CHUNK = 100;
 
-/** Objects older than this may be treated as orphan candidates (upload→commit race). */
+/**
+ * Objects older than this may be treated as orphan candidates.
+ * Assumes browser upload → Server Action commit finishes well within this
+ * window (seconds/minutes in normal use). Same grace for admin + unattended
+ * cron; do not lengthen without product sign-off.
+ */
 export const PARK_MEDIA_ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export type ParkMediaListedObject = {
@@ -139,38 +145,44 @@ export async function removeParkMediaByPrefix(
 
 /**
  * Best-effort remove of specific object paths (orphan sweep).
- * Paths already gone (not returned by `remove`) count as removed, not failed.
+ * Paths already gone (not returned by `remove`) still count toward `removed`.
+ * `removedPaths` prefers names Storage reports in `data` (audit sample).
  */
 export async function removeParkMediaObjectPaths(
   supabase: SupabaseClient,
   paths: readonly string[],
-): Promise<{ removed: number; notRemoved: number }> {
-  let removed = 0;
-  let notRemoved = 0;
-  const safe = paths.filter((p) => p && !p.includes(".."));
-
-  for (let i = 0; i < safe.length; i += REMOVE_CHUNK) {
-    const chunk = safe.slice(i, i + REMOVE_CHUNK);
-    try {
-      const { error } = await supabase.storage
-        .from(PARK_MEDIA_BUCKET)
-        .remove(chunk);
-      if (error) {
-        console.warn(
-          "[park-media] orphan sweep remove failed",
-          error.message,
-          `(chunk ${i / REMOVE_CHUNK + 1})`,
-        );
-        notRemoved += chunk.length;
-        continue;
+): Promise<{
+  removed: number;
+  notRemoved: number;
+  removedPaths: string[];
+}> {
+  let chunkIndex = 0;
+  return removePathsInChunks(
+    paths,
+    async (chunk) => {
+      chunkIndex += 1;
+      try {
+        const { data, error } = await supabase.storage
+          .from(PARK_MEDIA_BUCKET)
+          .remove([...chunk]);
+        if (error) {
+          console.warn(
+            "[park-media] orphan sweep remove failed",
+            error.message,
+            `(chunk ${chunkIndex})`,
+          );
+          return { ok: false };
+        }
+        // Exact names Storage reports as deleted (may be empty if already gone).
+        const removedPaths = (data ?? [])
+          .map((obj) => (typeof obj.name === "string" ? obj.name : ""))
+          .filter(Boolean);
+        return { ok: true, removedPaths };
+      } catch (err) {
+        console.warn("[park-media] orphan sweep remove threw", err);
+        return { ok: false };
       }
-      // Missing paths in the response are already gone — count as removed.
-      removed += chunk.length;
-    } catch (err) {
-      console.warn("[park-media] orphan sweep remove threw", err);
-      notRemoved += chunk.length;
-    }
-  }
-
-  return { removed, notRemoved };
+    },
+    REMOVE_CHUNK,
+  );
 }

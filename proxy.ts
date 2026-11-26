@@ -104,6 +104,7 @@ export default async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpe?g|gif|svg|ico|webp|css|js|mjs|map|txt|xml|woff2?|ttf|eot)$).*)",
+    // Skip `/api` and `/api/...` only (not `/apiary` etc.); cron/webhooks auth themselves.
+    "/((?!api(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpe?g|gif|svg|ico|webp|css|js|mjs|map|txt|xml|woff2?|ttf|eot)$).*)",
   ],
 };
