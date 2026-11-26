@@ -2,7 +2,7 @@
 -- Future editable columns: add a *new* forward migration that calls
 --   private.grant_profiles_authenticated_update_allowlist(ARRAY[...full list...])
 -- Do not edit this already-applied migration's array (or copy the old DO $$
--- grant blocks from 20261031035111 / 20261116135025).
+-- grant blocks from 20261031035111 / 20261116135119).
 --
 -- Idempotent: safe to re-run. Creates `private` schema if missing.
 
@@ -122,7 +122,7 @@ REVOKE ALL ON FUNCTION private.grant_profiles_authenticated_update_allowlist(tex
 COMMENT ON FUNCTION private.grant_profiles_authenticated_update_allowlist(text[]) IS
   'Fail-closed: GRANT UPDATE (expected_editable ∩ live) on public.profiles TO authenticated. Unexpected live cols RAISE. Call from forward migrations when adding guest-editable profile columns.';
 
--- Current allow-list (includes preferred_rig_unit from 20261116135025).
+-- Current allow-list (includes preferred_rig_unit from 20261116135119).
 SELECT private.grant_profiles_authenticated_update_allowlist(
   ARRAY[
     'full_name',

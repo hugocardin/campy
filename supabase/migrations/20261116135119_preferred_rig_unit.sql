@@ -8,7 +8,7 @@
 -- The DO $$ grant block below is the one-shot apply for this column.
 -- Canonical helper for later columns:
 --   private.grant_profiles_authenticated_update_allowlist(text[])
---   (see 20261116140131_profiles_update_allowlist_helper.sql).
+--   (see 20261116140211_profiles_update_allowlist_helper.sql).
 -- Do not edit already-applied 20261031035111 for new editable cols.
 
 BEGIN;

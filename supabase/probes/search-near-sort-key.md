@@ -2,8 +2,8 @@
 
 Migrations:
 
-- `20261116162000_search_near_sort_key`
-- `20261116162530_search_near_sort_name_asc` (#48 review: explicit `name` ASC)
+- `20261116161614_search_near_sort_key`
+- `20261116162158_search_near_sort_name_asc` (#48 review: explicit `name` ASC)
 
 ## Design
 

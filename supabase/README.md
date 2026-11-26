@@ -15,6 +15,14 @@ Schema and RLS currently live primarily in the hosted Supabase project. This fol
 
 There is no full CLI project yet (`config.toml` optional). Prefer **one** apply path per migration to avoid history drift.
 
+### Naming rule (avoid version drift)
+
+When applying via MCP `apply_migration`, Dashboard SQL Editor, or any path that stamps its own version into `supabase_migrations.schema_migrations`: **apply first**, then name the local file from the version `list_migrations` / `schema_migrations` returns. Never invent the `YYYYMMDDHHMMSS` timestamp by hand — that is what produced the rename syncs in #64 / #65 / #68. File bodies in `migrations/` are git-canonical; live `statements` may differ for pre-#68 files (post-apply comments / consolidated follow-ups) — known and accepted.
+
+### Transactions
+
+Prefer wrapping each script in one `BEGIN`…`COMMIT` so a partial apply rolls back. Some apply paths already wrap the script; when they do, an explicit transaction in the file is aspirational / documentation, not a second nested boundary.
+
 ## Apply path (pick one)
 
 ### A. Supabase Dashboard SQL Editor (current default)
@@ -36,8 +44,9 @@ There is no full CLI project yet (`config.toml` optional). Prefer **one** apply 
    For profiles / user_roles, see the snapshot queries in `probes/profiles-user-roles-rls.md`.
 
 3. Paste the full contents of the next unapplied file under `migrations/` (apply in filename order).
-4. Run it. The script is one `BEGIN`…`COMMIT` transaction (partial apply rolls back). Watch `NOTICE` lines for every dropped policy name.
-5. If you later adopt the Supabase CLI, mark each SQL-Editor-applied version so `db push` does not re-run it:
+4. Run it. Prefer one `BEGIN`…`COMMIT` in the script (see Transactions above). Watch `NOTICE` lines for every dropped policy name.
+5. Rename the local file to the version recorded in `schema_migrations` (see Naming rule).
+6. If you later adopt the Supabase CLI, mark each SQL-Editor-applied version so `db push` does not re-run it:
 
    ```bash
    npx supabase init   # once, if you want config.toml + CLI workflow
@@ -57,6 +66,33 @@ npx supabase db push
 ```
 
 Do **not** mix “SQL Editor apply” and “`db push`” for the same version unless you `migration repair` as above.
+
+### Local / preview repair after version sync (#68)
+
+Hosted Campy already uses the live versions below. If a local `supabase start` DB, preview branch, or teammate DB applied a file under an old repo timestamp, repair after pulling the rename. Use `--local` for `supabase start` (shown below); for a preview branch use `--db-url <preview url>` instead of `--local`. Without a target flag, `migration repair` hits the linked hosted project.
+
+```bash
+# protect_site_type_codes (#66 → live)
+npx supabase migration repair --local --status reverted 20261125183000
+npx supabase migration repair --local --status applied 20261125182821
+
+# remaining history sync (old repo timestamp → live)
+npx supabase migration repair --local --status reverted 20261116062701 && npx supabase migration repair --local --status applied 20261116062709
+npx supabase migration repair --local --status reverted 20261116064012 && npx supabase migration repair --local --status applied 20261116063554
+npx supabase migration repair --local --status reverted 20261116064530 && npx supabase migration repair --local --status applied 20261116064207
+npx supabase migration repair --local --status reverted 20261116135025 && npx supabase migration repair --local --status applied 20261116135119
+npx supabase migration repair --local --status reverted 20261116140131 && npx supabase migration repair --local --status applied 20261116140211
+npx supabase migration repair --local --status reverted 20261116154127 && npx supabase migration repair --local --status applied 20261116154552
+npx supabase migration repair --local --status reverted 20261116155256 && npx supabase migration repair --local --status applied 20261116155510
+npx supabase migration repair --local --status reverted 20261116155730 && npx supabase migration repair --local --status applied 20261116155733
+npx supabase migration repair --local --status reverted 20261116160012 && npx supabase migration repair --local --status applied 20261116155939
+npx supabase migration repair --local --status reverted 20261116160145 && npx supabase migration repair --local --status applied 20261116160126
+npx supabase migration repair --local --status reverted 20261116162000 && npx supabase migration repair --local --status applied 20261116161614
+npx supabase migration repair --local --status reverted 20261116162530 && npx supabase migration repair --local --status applied 20261116162158
+npx supabase migration repair --local --status reverted 20261125032045 && npx supabase migration repair --local --status applied 20261125031840
+npx supabase migration repair --local --status reverted 20261125033810 && npx supabase migration repair --local --status applied 20261125033936
+npx supabase migration repair --local --status reverted 20261125044000 && npx supabase migration repair --local --status applied 20261125034720
+```
 
 ## Admin catalog RLS (`20261031030842_admin_catalog_rls.sql`)
 
@@ -91,7 +127,7 @@ After applying, walk through `probes/admin-catalog-rls.md`.
 
 | Relation | SELECT | Client writes | Role assignment |
 | --- | --- | --- | --- |
-| `profiles` | own row (`authenticated`) | `GRANT UPDATE` = **allow-list ∩ live** (`full_name`, `default_rig_length`, `preferred_rig_unit`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds`); unexpected live cols → **RAISE**. Canonical helper: `private.grant_profiles_authenticated_update_allowlist(text[])` (`20261116140131_*`). `default_rig_length` is **feet** (COMMENT in `20261116062701_*`; metres convert at the app edge like `sites.max_rig_length`). `preferred_rig_unit` is `ft`/`m`/NULL (COMMENT + CHECK in `20261116135025_*`; NULL → locale fallback). CHECKs + `trg_profiles_set_updated_at` in `20261116064012_*` (name 1–120 trimmed / NULL; rig `(0, 200]` / NULL; `updated_at` on every UPDATE) | **`set_user_role(user_id, role_code)`** RPC (`SECURITY DEFINER`, `platform_admin` only). Own-only SELECT would make cross-user `PATCH` match 0 rows. |
+| `profiles` | own row (`authenticated`) | `GRANT UPDATE` = **allow-list ∩ live** (`full_name`, `default_rig_length`, `preferred_rig_unit`, `preferred_site_type_id`, `notification_preferences`, `bookmarked_campgrounds`); unexpected live cols → **RAISE**. Canonical helper: `private.grant_profiles_authenticated_update_allowlist(text[])` (`20261116140211_*`). `default_rig_length` is **feet** (COMMENT in `20261116062709_*`; metres convert at the app edge like `sites.max_rig_length`). `preferred_rig_unit` is `ft`/`m`/NULL (COMMENT + CHECK in `20261116135119_*`; NULL → locale fallback). CHECKs + `trg_profiles_set_updated_at` in `20261116063554_*` (name 1–120 trimmed / NULL; rig `(0, 200]` / NULL; `updated_at` on every UPDATE; tightened in `20261116064207_*`) | **`set_user_role(user_id, role_code)`** RPC (`SECURITY DEFINER`, `platform_admin` only). Own-only SELECT would make cross-user `PATCH` match 0 rows. |
 | `user_roles` | `authenticated` only (not `anon`) | none — `REVOKE ALL` then no write grants | n/a |
 
 **Defense in depth:** `BEFORE UPDATE` trigger `trg_restrict_profile_role_id_change` locks `id` / `email` / `role_id`. Trusted writers (`auth.role()` / jwt claims = `service_role`, or `session_user` ∈ (`postgres`,`supabase_admin`)) — **not** `supabase_auth_admin` generally. Email sync from GoTrue is allowed only when `session_user = supabase_auth_admin` and `profiles.email` matches normalized `auth.users.email`. Role changes: `is_platform_admin()` or trusted writer; last-admin via advisory xact lock then `COUNT` (no `FOR UPDATE`).

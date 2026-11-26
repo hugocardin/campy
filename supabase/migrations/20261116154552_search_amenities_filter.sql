@@ -4,8 +4,8 @@
 --
 -- Note (PR #47): this file was edited after the first live apply (seed INSERT
 -- removed; search_path added). Live follow-ups:
---   20261116155256_search_amenities_review_fix
---   20261116155730_search_amenities_review_followup
+--   20261116155510_search_amenities_review_fix
+--   20261116155733_search_amenities_review_followup
 
 CREATE OR REPLACE FUNCTION public.amenity_code_canonical_key(code text)
 RETURNS text
