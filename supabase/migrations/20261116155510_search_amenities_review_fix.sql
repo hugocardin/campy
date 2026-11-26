@@ -649,7 +649,7 @@ GRANT EXECUTE ON FUNCTION public.search_campgrounds_near(
   text, text[], smallint[], boolean, boolean, boolean, text, numeric, text, text[], numeric, text[], integer
 ) TO authenticated, anon, service_role;
 
--- Undo demo amenity links inserted by 20261116154127 (keep seed.sql for local).
+-- Undo demo amenity links inserted by 20261116154552 (keep seed.sql for local).
 DELETE FROM public.campground_amenities AS ca
 USING public.campgrounds AS c, public.amenities AS a
 WHERE ca.campground_id = c.id

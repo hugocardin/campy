@@ -1,6 +1,6 @@
 -- Admin catalog: expose commission_types.name beside commission_type_id
 -- so platform-admin reads don't need a second lookup round-trip.
--- Applied on Campy as version 20261125044000.
+-- Applied on Campy as version 20261125034720.
 
 BEGIN;
 

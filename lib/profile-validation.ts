@@ -2,12 +2,12 @@
  * Guest profile field rules (Phase B).
  * Keep {@link FULL_NAME_MAX_LENGTH} in sync with
  * `profiles_full_name_len_chk` in
- * `supabase/migrations/20261116064012_profiles_edit_constraints_updated_at.sql`
- * (tightened in `20261116064530_profiles_full_name_check_tighten.sql`).
+ * `supabase/migrations/20261116063554_profiles_edit_constraints_updated_at.sql`
+ * (tightened in `20261116064207_profiles_full_name_check_tighten.sql`).
  * Keep rig max in sync with {@link RIG_LENGTH_MAX_FT} /
  * `profiles_default_rig_length_chk` in that same migration.
  * `preferred_rig_unit` CHECK (`ft`/`m`/NULL) lives in
- * `supabase/migrations/20261116135025_preferred_rig_unit.sql`.
+ * `supabase/migrations/20261116135119_preferred_rig_unit.sql`.
  */
 export const FULL_NAME_MAX_LENGTH = 120;
 

@@ -14,7 +14,7 @@ Migrations:
 | Fine site types | Multi-select `require_site_types text[]` against `site_types.code` (`TENT` / `RV` / `RV_AND_TENT` / `LODGING`). Coarse `stay_kind` kept; AND when both set. App drops incompatible types when stay changes. |
 | Price filter | `max_price` on a **matching** site (`price_per_night_base <= max`). Same-site AND with other site filters. |
 | Price sort / cards | `campground_matching_site_min_price` → RPC column `min_price_per_night`. Sort keys `price` / `price-desc`. |
-| Near RPC | Same filters + `min_price_per_night`. `sort_key` landed in `20261116162000_search_near_sort_key` (#24 §4) — see `search-near-sort-key.md`. |
+| Near RPC | Same filters + `min_price_per_night`. `sort_key` landed in `20261116161614_search_near_sort_key` (#24 §4) — see `search-near-sort-key.md`. |
 
 URL: `types=tent,rv`, `maxPrice=75`, `sort=price|price-desc`.
 

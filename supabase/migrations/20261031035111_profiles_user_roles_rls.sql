@@ -25,8 +25,8 @@
 -- so the applier must classify them (fail closed; not a deny-list grant).
 --
 -- Applied migration — leave this allow-list immutable. Later editable columns
--- (e.g. preferred_rig_unit in 20261116135025 / grant helper in
--- 20261116140131_profiles_update_allowlist_helper) extend grants in forward
+-- (e.g. preferred_rig_unit in 20261116135119 / grant helper in
+-- 20261116140211_profiles_update_allowlist_helper) extend grants in forward
 -- migrations; re-applying *this* script after those land will RAISE until the
 -- new cols are classified via the helper / a dedicated forward migration.
 --
