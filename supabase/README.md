@@ -17,7 +17,7 @@ There is no full CLI project yet (`config.toml` optional). Prefer **one** apply 
 
 ### Naming rule (avoid version drift)
 
-When applying via MCP `apply_migration`, Dashboard SQL Editor, or any path that stamps its own version into `supabase_migrations.schema_migrations`: **apply first**, then name the local file from the version `list_migrations` / `schema_migrations` returns. Never invent the `YYYYMMDDHHMMSS` timestamp by hand — that is what produced the rename syncs in #64 / #65 / #68.
+When applying via MCP `apply_migration`, Dashboard SQL Editor, or any path that stamps its own version into `supabase_migrations.schema_migrations`: **apply first**, then name the local file from the version `list_migrations` / `schema_migrations` returns. Never invent the `YYYYMMDDHHMMSS` timestamp by hand — that is what produced the rename syncs in #64 / #65 / #68. File bodies in `migrations/` are git-canonical; live `statements` may differ for pre-#68 files (post-apply comments / consolidated follow-ups) — known and accepted.
 
 ### Transactions
 
@@ -69,29 +69,29 @@ Do **not** mix “SQL Editor apply” and “`db push`” for the same version u
 
 ### Local / preview repair after version sync (#68)
 
-Hosted Campy already uses the live versions below. If a local `supabase start` DB, preview branch, or teammate DB applied a file under an old repo timestamp, repair after pulling the rename:
+Hosted Campy already uses the live versions below. If a local `supabase start` DB, preview branch, or teammate DB applied a file under an old repo timestamp, repair after pulling the rename. Use `--local` for `supabase start` (shown below); for a preview branch use `--db-url <preview url>` instead of `--local`. Without a target flag, `migration repair` hits the linked hosted project.
 
 ```bash
 # protect_site_type_codes (#66 → live)
-supabase migration repair --status reverted 20261125183000
-supabase migration repair --status applied 20261125182821
+npx supabase migration repair --local --status reverted 20261125183000
+npx supabase migration repair --local --status applied 20261125182821
 
 # remaining history sync (old repo timestamp → live)
-supabase migration repair --status reverted 20261116062701 && supabase migration repair --status applied 20261116062709
-supabase migration repair --status reverted 20261116064012 && supabase migration repair --status applied 20261116063554
-supabase migration repair --status reverted 20261116064530 && supabase migration repair --status applied 20261116064207
-supabase migration repair --status reverted 20261116135025 && supabase migration repair --status applied 20261116135119
-supabase migration repair --status reverted 20261116140131 && supabase migration repair --status applied 20261116140211
-supabase migration repair --status reverted 20261116154127 && supabase migration repair --status applied 20261116154552
-supabase migration repair --status reverted 20261116155256 && supabase migration repair --status applied 20261116155510
-supabase migration repair --status reverted 20261116155730 && supabase migration repair --status applied 20261116155733
-supabase migration repair --status reverted 20261116160012 && supabase migration repair --status applied 20261116155939
-supabase migration repair --status reverted 20261116160145 && supabase migration repair --status applied 20261116160126
-supabase migration repair --status reverted 20261116162000 && supabase migration repair --status applied 20261116161614
-supabase migration repair --status reverted 20261116162530 && supabase migration repair --status applied 20261116162158
-supabase migration repair --status reverted 20261125032045 && supabase migration repair --status applied 20261125031840
-supabase migration repair --status reverted 20261125033810 && supabase migration repair --status applied 20261125033936
-supabase migration repair --status reverted 20261125044000 && supabase migration repair --status applied 20261125034720
+npx supabase migration repair --local --status reverted 20261116062701 && npx supabase migration repair --local --status applied 20261116062709
+npx supabase migration repair --local --status reverted 20261116064012 && npx supabase migration repair --local --status applied 20261116063554
+npx supabase migration repair --local --status reverted 20261116064530 && npx supabase migration repair --local --status applied 20261116064207
+npx supabase migration repair --local --status reverted 20261116135025 && npx supabase migration repair --local --status applied 20261116135119
+npx supabase migration repair --local --status reverted 20261116140131 && npx supabase migration repair --local --status applied 20261116140211
+npx supabase migration repair --local --status reverted 20261116154127 && npx supabase migration repair --local --status applied 20261116154552
+npx supabase migration repair --local --status reverted 20261116155256 && npx supabase migration repair --local --status applied 20261116155510
+npx supabase migration repair --local --status reverted 20261116155730 && npx supabase migration repair --local --status applied 20261116155733
+npx supabase migration repair --local --status reverted 20261116160012 && npx supabase migration repair --local --status applied 20261116155939
+npx supabase migration repair --local --status reverted 20261116160145 && npx supabase migration repair --local --status applied 20261116160126
+npx supabase migration repair --local --status reverted 20261116162000 && npx supabase migration repair --local --status applied 20261116161614
+npx supabase migration repair --local --status reverted 20261116162530 && npx supabase migration repair --local --status applied 20261116162158
+npx supabase migration repair --local --status reverted 20261125032045 && npx supabase migration repair --local --status applied 20261125031840
+npx supabase migration repair --local --status reverted 20261125033810 && npx supabase migration repair --local --status applied 20261125033936
+npx supabase migration repair --local --status reverted 20261125044000 && npx supabase migration repair --local --status applied 20261125034720
 ```
 
 ## Admin catalog RLS (`20261031030842_admin_catalog_rls.sql`)
