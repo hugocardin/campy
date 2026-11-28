@@ -49,6 +49,7 @@ import {
 } from "@/lib/campground-search-query";
 import { createDebouncedNavigation } from "@/lib/debounced-navigation";
 import type { DrivewayType } from "@/lib/driveway-type";
+import { stripLocalePrefix } from "@/lib/locale-path";
 import {
   ELECTRICITY_AMP_NONE,
   type ElectricityAmpFilterOption,
@@ -426,13 +427,19 @@ export default function CampgroundListControls({
    *
    * Writes the held target with `history.replaceState` (sync) so a concurrent
    * Link/`router.push` is not raced by `startTransition(router.replace)`.
-   * While mounted, `flushPending` then clears the timer (navigate no-ops when
-   * params already match). On unload/unmount, skip flush (avoid setState) and
-   * `cancel` the timer after the URL is committed.
+   * Uses `window.location.pathname` (locale prefix intact). Skips replaceState
+   * once Next has already committed another route (unmount after leave).
+   * While mounted, `flushPending` clears the timer (navigate no-ops when params
+   * already match). On unload/unmount, `cancel` after the URL is committed.
    */
   function flushPendingFiltersForLeave(options?: { syncOnly?: boolean }) {
     const pending = filterNav.peekPending();
     if (pending == null) return;
+    // Next may already have committed the destination URL before passive cleanup.
+    if (stripLocalePrefix(window.location.pathname) !== pathnameRef.current) {
+      filterNav.cancel();
+      return;
+    }
     const next: CampgroundQueryState = {
       ...pending,
       q: pending.place ? "" : searchRef.current,
@@ -441,7 +448,7 @@ export default function CampgroundListControls({
     const params = buildCampgroundSearchParams(next);
     if (!campgroundSearchParamsEqual(params, lastReplacedParamsRef.current)) {
       const query = params.toString();
-      const path = pathnameRef.current;
+      const path = window.location.pathname;
       const url = query ? `${path}?${query}` : path;
       window.history.replaceState(window.history.state ?? null, "", url);
       lastReplacedParamsRef.current = new URLSearchParams(params.toString());
@@ -451,6 +458,34 @@ export default function CampgroundListControls({
       return;
     }
     filterNav.flushPending();
+  }
+
+  /** True when this click is a same-tab in-app navigation away from this page. */
+  function shouldFlushFiltersBeforeAnchorClick(
+    event: MouseEvent,
+    anchor: Element,
+  ): boolean {
+    if (!(anchor instanceof HTMLAnchorElement)) return false;
+    if (event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return false;
+    }
+    if (anchor.hasAttribute("download")) return false;
+    const target = anchor.getAttribute("target");
+    if (target != null && target !== "" && target !== "_self") return false;
+    const href = anchor.getAttribute("href");
+    if (href == null || href === "" || href.startsWith("#")) return false;
+    let url: URL;
+    try {
+      url = new URL(href, window.location.href);
+    } catch {
+      return false;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    if (url.origin !== window.location.origin) return false;
+    // Stay on this page (hash/query-only): let the normal debounce/`router.replace` run.
+    if (stripLocalePrefix(url.pathname) === pathnameRef.current) return false;
+    return true;
   }
 
   // Wire navigate outside render (react-hooks/refs).
@@ -616,8 +651,7 @@ export default function CampgroundListControls({
       if (!(target instanceof Element)) return;
       const anchor = target.closest("a[href]");
       if (!anchor) return;
-      const href = anchor.getAttribute("href");
-      if (href == null || href === "" || href.startsWith("#")) return;
+      if (!shouldFlushFiltersBeforeAnchorClick(event, anchor)) return;
       flushPendingFiltersForLeave();
     }
 
