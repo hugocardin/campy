@@ -586,6 +586,11 @@ export default function CampgroundListControls({
     clearTimeoutRef(debounceTimeoutRef);
   }
 
+  /** Pending debounced target if any, else the live params ref. */
+  function currentQueryBase(): CampgroundQueryState {
+    return filterNav.peekPending() ?? latestParamsRef.current;
+  }
+
   /** Clear geo + remap distance sort when finishing a leave-place navigation. */
   function leavePlaceUrlPatch(
     latest: CampgroundQueryState,
@@ -743,10 +748,10 @@ export default function CampgroundListControls({
     searchRef.current = label;
     setSearch(label);
     setGeoError(null);
-    const radiusKm =
-      latestParamsRef.current.radiusKm ?? preferredRadius;
+    const latest = currentQueryBase();
+    const radiusKm = latest.radiusKm ?? preferredRadius;
     replaceQuery(
-      withLatestCampgroundFilters(latestParamsRef.current, {
+      withLatestCampgroundFilters(latest, {
         q: "",
         sort: "distance",
         place: label,
@@ -787,7 +792,7 @@ export default function CampgroundListControls({
     );
     updateRigUnit(nextUnit);
     updateRigDraft(converted);
-    const latest = latestParamsRef.current;
+    const latest = currentQueryBase();
     const leavePatch = leavePlacePending
       ? leavePlaceUrlPatch(latest)
       : undefined;
@@ -818,7 +823,7 @@ export default function CampgroundListControls({
     clearSearchDebounce();
     // Prefer a pending debounced target so a second checkbox click during the
     // quiet period builds on leave-place / prior toggles, not URL-rebuilt state.
-    const latest = filterNav.peekPending() ?? latestParamsRef.current;
+    const latest = currentQueryBase();
     const patchSetsGeo = "lat" in patch || "lng" in patch;
     // Finish leave-place in the same navigation unless the patch sets its own geo
     // (e.g. near-me). Never keep old place radius after the user left the label.
@@ -868,7 +873,7 @@ export default function CampgroundListControls({
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
       setLeavePlacePending(false);
-      const latest = filterNav.peekPending() ?? latestParamsRef.current;
+      const latest = currentQueryBase();
       const rigLength = takePendingRigLength();
       const maxPrice = takePendingMaxPrice();
       // Sync effect may have restored URL geo + distance sort into the ref;
@@ -1182,8 +1187,7 @@ export default function CampgroundListControls({
                   checked={selectedSiteTypes.has(code)}
                   disabled={discreteControlsDisabled}
                   onCheckedChange={(checked) => {
-                    const latest =
-                      filterNav.peekPending() ?? latestParamsRef.current;
+                    const latest = currentQueryBase();
                     replaceWithFilters(
                       {
                         q: search,
@@ -1222,8 +1226,7 @@ export default function CampgroundListControls({
                   checked={selectedAmps.has(value)}
                   disabled={discreteControlsDisabled}
                   onCheckedChange={(checked) => {
-                    const latest =
-                      filterNav.peekPending() ?? latestParamsRef.current;
+                    const latest = currentQueryBase();
                     replaceWithFilters(
                       {
                         q: search,
@@ -1265,9 +1268,7 @@ export default function CampgroundListControls({
                     replaceWithFilters(
                       {
                         q: search,
-                        sort:
-                          (filterNav.peekPending() ?? latestParamsRef.current)
-                            .sort,
+                        sort: currentQueryBase().sort,
                         [key]: checked === true,
                       },
                       { debounce: true },
@@ -1346,8 +1347,7 @@ export default function CampgroundListControls({
                   clearTimeoutRef(rigDebounceRef);
                   rigDebounceRef.current = window.setTimeout(() => {
                     rigDebounceRef.current = null;
-                    const latest =
-                      filterNav.peekPending() ?? latestParamsRef.current;
+                    const latest = currentQueryBase();
                     replaceQuery(
                       withLatestCampgroundFilters(latest, {
                         q: liveSearchQ(latest.place),
@@ -1395,8 +1395,7 @@ export default function CampgroundListControls({
                   clearTimeoutRef(maxPriceDebounceRef);
                   maxPriceDebounceRef.current = window.setTimeout(() => {
                     maxPriceDebounceRef.current = null;
-                    const latest =
-                      filterNav.peekPending() ?? latestParamsRef.current;
+                    const latest = currentQueryBase();
                     replaceQuery(
                       withLatestCampgroundFilters(latest, {
                         q: liveSearchQ(latest.place),
@@ -1470,8 +1469,7 @@ export default function CampgroundListControls({
               replaceWithFilters(
                 {
                   q: search,
-                  sort:
-                    (filterNav.peekPending() ?? latestParamsRef.current).sort,
+                  sort: currentQueryBase().sort,
                   dumpStation: checked === true,
                 },
                 { debounce: true },
@@ -1514,8 +1512,7 @@ export default function CampgroundListControls({
                     checked={selectedAmenityKeys.has(key)}
                     disabled={discreteControlsDisabled}
                     onCheckedChange={(checked) => {
-                      const latest =
-                        filterNav.peekPending() ?? latestParamsRef.current;
+                      const latest = currentQueryBase();
                       replaceWithFilters(
                         {
                           q: search,
