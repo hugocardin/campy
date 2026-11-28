@@ -25,6 +25,7 @@ import { SiteCreateUpdateInput } from "@/entities/site_create_update_input";
 import type { DrivewayType } from "@/lib/driveway-type";
 import { DRIVEWAY_TYPES } from "@/lib/driveway-type";
 import {
+  ELECTRICITY_AMP_MESSAGE_KEYS,
   ELECTRICITY_AMP_VALUES,
   type ElectricityAmp,
   normalizeElectricityAmps,
@@ -51,13 +52,6 @@ import {
   isParsePricingRulesReason,
   pricingRulesErrorMessageKey,
 } from "@/lib/site-pricing-rules";
-
-const AMP_LABEL_KEYS = {
-  15: "amp15",
-  20: "amp20",
-  30: "amp30",
-  50: "amp50",
-} as const satisfies Record<ElectricityAmp, string>;
 
 const DRIVEWAY_NONE = "__none__";
 
@@ -590,7 +584,9 @@ export default function SiteFormClient({
                         htmlFor={id}
                         className="font-normal cursor-pointer"
                       >
-                        {t_sites(`electricityAmps.${AMP_LABEL_KEYS[amp]}`)}
+                        {t_sites(
+                          `electricityAmps.${ELECTRICITY_AMP_MESSAGE_KEYS[amp]}`,
+                        )}
                       </Label>
                     </div>
                   );

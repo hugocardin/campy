@@ -10,13 +10,15 @@ Migrations:
 - `20261116022503_dump_driveway_rig_search_rpcs` / `20261116022628_*` (`min_rig_length`; `stay_kind`; near + temporary boolean compat, dropped in `20261116034908`)
 - follow-up hardens CHECK→trigger + shared site-filter helper
 - `20261116034908_drop_require_electricity_search_overloads` (issue #30 — drop boolean compat wrappers; `require_amps` only)
+- `20261128184001_merge_electricity_amps_15_20` (15+20 → combined 15/20A tier stored as `15`)
+- `20261128184549_amps_15_20_review_fix` (re-remap leftovers, validate CHECK, remap `require_amps` 20→15 in normalize)
 
 ## Filters
 
 | Filter URL | Storage / match |
 | --- | --- |
-| `amps=none,15,30` | `sites.electricity_amps` overlap (`0` = none / empty array) |
-| `electricity=1` (legacy) | App maps to amps `15,20,30,50` (“any amp”) when `amps` absent |
+| `amps=none,15,30` | `sites.electricity_amps` overlap (`0` = none / empty array); `15` = 15/20A tier; legacy `20` remaps to `15` |
+| `electricity=1` (legacy) | App maps to amps `15,30,50` (“any amp”) when `amps` absent |
 | `water=1` | same site → `site_amenities` `WATER` |
 | `sewer=1` | same site → `site_amenities` `SEWER` |
 | `driveway=pull_through\|back_in` | same site → `sites.driveway_type` |

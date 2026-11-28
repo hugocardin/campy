@@ -7,7 +7,10 @@ import { Amenity } from "@/entities/amenity";
 import { CampgroundAdmin } from "@/entities/campground-admin";
 import { Site } from "@/entities/sites";
 import FormattedRigLength from "@/components/rig-length/FormattedRigLength";
-import { formatElectricityAmps } from "@/lib/electricity-amps";
+import {
+  ELECTRICITY_AMP_MESSAGE_KEYS,
+  formatElectricityAmpsWithLabels,
+} from "@/lib/electricity-amps";
 import { isLodgingSiteType } from "@/lib/site-rig-length";
 import {
   formatPricingRulesForEditor,
@@ -151,9 +154,15 @@ export default function SiteViewClient({
                 </h3>
                 <p>
                   {(() => {
-                    const amps = formatElectricityAmps(site.electricity_amps);
+                    const amps = formatElectricityAmpsWithLabels(
+                      site.electricity_amps,
+                      (amp) =>
+                        t_sites(
+                          `electricityAmps.${ELECTRICITY_AMP_MESSAGE_KEYS[amp]}`,
+                        ),
+                    );
                     return amps != null
-                      ? t_sites("electricityAmps.list", { amps })
+                      ? amps
                       : t_sites("electricityAmps.none");
                   })()}
                 </p>

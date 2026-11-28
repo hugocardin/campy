@@ -235,6 +235,10 @@ describe("hookup URL filters", () => {
     );
   });
 
+  it("remaps legacy amps=20 URL token to the 15/20A tier", () => {
+    assert.deepEqual(parseCampgroundAmps({ amps: "20,30" }), [15, 30]);
+  });
+
   it("serializes amps for the URL", () => {
     assert.equal(formatCampgroundAmpsParam([]), undefined);
     assert.equal(formatCampgroundAmpsParam(["none", 50, 15]), "none,15,50");

@@ -277,7 +277,8 @@ export function parseHookupFlag(value: string | undefined): boolean {
 }
 
 /**
- * Parse `amps` URL param: comma-separated `none` / `15` / `20` / `30` / `50`.
+ * Parse `amps` URL param: comma-separated `none` / `15` / `30` / `50`.
+ * Legacy `20` remaps to `15` (combined 15/20A tier).
  * Legacy `electricity=1` (when `amps` absent) → all amp values ("any amp").
  */
 export function parseCampgroundAmps(params: {
@@ -289,7 +290,7 @@ export function parseCampgroundAmps(params: {
       params.amps.split(",").map((part) => part.trim().toLowerCase()),
     );
   }
-  // Legacy yes/no electricity URL → any amp (overlap with 15|20|30|50).
+  // Legacy yes/no electricity URL → any amp (overlap with 15|30|50).
   if (parseHookupFlag(params.electricity)) {
     return [...ELECTRICITY_AMP_VALUES];
   }

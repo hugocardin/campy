@@ -5,7 +5,9 @@
 --     20261115191024_search_campgrounds_hookup_filters)
 --   * DUMP_STATION amenity + sites.driveway_type
 --     (20261116022329_dump_driveway_rig_search + RPC follow-ups)
---   * sites.electricity_amps (20261116014604 + harden 20261116015837)
+--   * sites.electricity_amps (20261116014604 + harden + 20261128184001 merge)
+--     Allowed: 15 (15/20A tier), 30, 50
+--     AL-12 uses {30,50} on purpose so local/demo can show a multi-outlet site
 --   * ELECTRICITY amenity retired (amps column only)
 --   * The named campgrounds and sites below (Campy demo catalog). On a fresh
 --     `supabase db reset` with no park/site seed, this INSERT matches nothing.
@@ -18,8 +20,11 @@ SET electricity_amps = v.amps,
     updated_at = now()
 FROM (
   VALUES
+    -- 15/20A + 50A pedestal
     ('Alice Lake Provincial Park', 'AL-1', ARRAY[15, 50]::smallint[]),
-    ('Alice Lake Provincial Park', 'AL-12', ARRAY[30]::smallint[]),
+    -- 30A + 50A pedestal (demo multi-outlet; not part of the 15/20 merge itself)
+    ('Alice Lake Provincial Park', 'AL-12', ARRAY[30, 50]::smallint[]),
+    -- 50A-only pedestal
     ('Green Point Campground – Pacific Rim', 'GP-21', ARRAY[50]::smallint[])
 ) AS v(park, site, amps)
 JOIN public.campgrounds AS c ON c.name = v.park
