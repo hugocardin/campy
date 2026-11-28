@@ -4,15 +4,31 @@
  * can keep applying local UI without a later sync effect clobbering what will
  * be pushed.
  */
+export type DebouncedNavigateReason = "debounce" | "flushPending" | "flushNow";
+
+export type DebouncedNavigateMeta = {
+  reason: DebouncedNavigateReason;
+};
+
+export type DebouncedNavigateFn<T> = (
+  state: T,
+  meta: DebouncedNavigateMeta,
+) => void;
+
 export type DebouncedNavigation<T> = {
   /** Queue `state` and (re)start the quiet-period timer. */
   schedule(state: T): void;
   /** Cancel any pending timer and navigate with `state` immediately. */
   flushNow(state: T): void;
+  /**
+   * If a navigation is pending, flush it now (same as `flushNow` with the
+   * held target). Returns true when a flush ran.
+   */
+  flushPending(): boolean;
   /** Drop a pending navigation without calling `navigate`. */
   cancel(): void;
   /** Replace the navigate callback (e.g. from a layout effect). */
-  setNavigate(navigate: (state: T) => void): void;
+  setNavigate(navigate: DebouncedNavigateFn<T>): void;
   /** Pending target, if a timer is armed. */
   peekPending(): T | null;
   /** True while a debounced navigation is scheduled. */
@@ -24,7 +40,7 @@ type TimerHandle = ReturnType<typeof setTimeout>;
 export function createDebouncedNavigation<T>(options: {
   debounceMs: number;
   /** Optional initial navigate; prefer `setNavigate` from an effect when wiring React. */
-  navigate?: (state: T) => void;
+  navigate?: DebouncedNavigateFn<T>;
   /** Fired when a debounce becomes pending or clears (schedule / flush / cancel / fire). */
   onPendingChange?: (pending: boolean) => void;
   setTimeoutFn?: typeof setTimeout;
@@ -34,7 +50,7 @@ export function createDebouncedNavigation<T>(options: {
   const clearTimeoutFn = options.clearTimeoutFn ?? clearTimeout;
   let timer: TimerHandle | null = null;
   let pending: T | null = null;
-  let navigate =
+  let navigate: DebouncedNavigateFn<T> =
     options.navigate ??
     (() => {
       if (process.env.NODE_ENV !== "production") {
@@ -65,14 +81,23 @@ export function createDebouncedNavigation<T>(options: {
         const target = pending;
         pending = null;
         setPendingFlag(false);
-        if (target != null) navigate(target);
+        if (target != null) navigate(target, { reason: "debounce" });
       }, options.debounceMs);
     },
     flushNow(state) {
       clearTimer();
       pending = null;
       setPendingFlag(false);
-      navigate(state);
+      navigate(state, { reason: "flushNow" });
+    },
+    flushPending() {
+      if (pending == null) return false;
+      const target = pending;
+      clearTimer();
+      pending = null;
+      setPendingFlag(false);
+      navigate(target, { reason: "flushPending" });
+      return true;
     },
     cancel() {
       const wasPending = timer != null || pending != null;

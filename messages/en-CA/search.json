@@ -71,6 +71,8 @@
     "amenitiesLabel": "Park amenities",
     "amenitiesHint": "Shows parks that have every selected amenity. Water, sewer, and dump station stay in their own filters.",
     "clearFilters": "Clear",
+    "filtersUpdating": "Updating results…",
+    "filtersApplyNow": "Apply now",
     "nearMe": "Near me",
     "nearMeLocating": "Locating…",
     "radiusLabel": "Search radius",

@@ -49,6 +49,7 @@ import {
 } from "@/lib/campground-search-query";
 import { createDebouncedNavigation } from "@/lib/debounced-navigation";
 import type { DrivewayType } from "@/lib/driveway-type";
+import { stripLocalePrefix } from "@/lib/locale-path";
 import {
   ELECTRICITY_AMP_NONE,
   type ElectricityAmpFilterOption,
@@ -140,10 +141,12 @@ const DRIVEWAY_ANY = "__any__";
 const SEARCH_INPUT_DEBOUNCE_MS = 300;
 /**
  * Quiet period before starting a search navigation for discrete filter
- * clicks (checkboxes, selects). Long enough to multi-select without a
- * reload per click; short enough to feel responsive.
+ * checkboxes (site types, amps, hookups, dump-station, amenities). Chosen at
+ * 2.5s so a typical multi-select pass can finish without a reload per click;
+ * single-choice selects stay immediate (see replaceQuery). While pending,
+ * controls show an aria-live status plus Apply now (`flushPending`).
  */
-const FILTER_NAV_DEBOUNCE_MS = 600;
+const FILTER_NAV_DEBOUNCE_MS = 2500;
 
 const AMP_FILTERS: {
   value: ElectricityAmpFilterOption;
@@ -266,7 +269,11 @@ export default function CampgroundListControls({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  /** List URL/search reloads only — not campground-detail navigation. */
+  const [isListPending, startListTransition] = useTransition();
+  const [, startDetailTransition] = useTransition();
+  const filterStatusRef = useRef<HTMLParagraphElement>(null);
+  const filterApplyNowRef = useRef<HTMLButtonElement>(null);
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
@@ -375,6 +382,13 @@ export default function CampgroundListControls({
   const [leavePlacePending, setLeavePlacePending] = useState(false);
   /** Quiet-period hint while multi-select filter nav is debounced (results still stale). */
   const [filterNavPending, setFilterNavPending] = useState(false);
+  /**
+   * True while a filter-debounce list replace is in flight. Set from navigate
+   * `reason` (`debounce` / `flushPending`); cleared when `isListPending` ends
+   * (render sync below) so a later unrelated list transition cannot inherit it.
+   */
+  const [filterListFlush, setFilterListFlush] = useState(false);
+  const [prevIsListPending, setPrevIsListPending] = useState(isListPending);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
@@ -414,14 +428,83 @@ export default function CampgroundListControls({
   );
   // Live search text for navigate-time merge (avoid freezing q while holding).
   const searchRef = useRef(search);
+  const pathnameRef = useRef(pathname);
   /** Place-centered search: keep q empty so RPC does not also ILIKE the label. */
   function liveSearchQ(place: string | undefined): string {
     return place ? "" : searchRef.current;
   }
 
+  /**
+   * Commit a pending filter debounce before leaving the page.
+   *
+   * Writes the held target with `history.replaceState` (sync) so a concurrent
+   * Link/`router.push` is not raced by `startTransition(router.replace)`.
+   * Uses `window.location.pathname` (locale prefix intact). Skips replaceState
+   * once Next has already committed another route (unmount after leave).
+   * While mounted, `flushPending` clears the timer (navigate no-ops when params
+   * already match). On unload/unmount, `cancel` after the URL is committed.
+   */
+  function flushPendingFiltersForLeave(options?: { syncOnly?: boolean }) {
+    const pending = filterNav.peekPending();
+    if (pending == null) return;
+    // Next may already have committed the destination URL before passive cleanup.
+    if (stripLocalePrefix(window.location.pathname) !== pathnameRef.current) {
+      filterNav.cancel();
+      return;
+    }
+    const next: CampgroundQueryState = {
+      ...pending,
+      q: pending.place ? "" : searchRef.current,
+    };
+    latestParamsRef.current = next;
+    const params = buildCampgroundSearchParams(next);
+    if (!campgroundSearchParamsEqual(params, lastReplacedParamsRef.current)) {
+      const query = params.toString();
+      const path = window.location.pathname;
+      const url = query ? `${path}?${query}` : path;
+      window.history.replaceState(window.history.state ?? null, "", url);
+      lastReplacedParamsRef.current = new URLSearchParams(params.toString());
+    }
+    if (options?.syncOnly) {
+      filterNav.cancel();
+      return;
+    }
+    filterNav.flushPending();
+  }
+
+  /** True when this click is a same-tab in-app navigation away from this page. */
+  function shouldFlushFiltersBeforeAnchorClick(
+    event: MouseEvent,
+    anchor: Element,
+  ): boolean {
+    if (!(anchor instanceof HTMLAnchorElement)) return false;
+    if (event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return false;
+    }
+    if (anchor.hasAttribute("download")) return false;
+    const target = anchor.getAttribute("target");
+    if (target != null && target !== "" && target !== "_self") return false;
+    const href = anchor.getAttribute("href");
+    if (href == null || href === "" || href.startsWith("#")) return false;
+    let url: URL;
+    try {
+      url = new URL(href, window.location.href);
+    } catch {
+      return false;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    if (url.origin !== window.location.origin) return false;
+    // Stay on this page (hash/query-only): let the normal debounce/`router.replace` run.
+    if (stripLocalePrefix(url.pathname) === pathnameRef.current) return false;
+    return true;
+  }
+
   // Wire navigate outside render (react-hooks/refs).
   useLayoutEffect(() => {
-    filterNav.setNavigate((state) => {
+    filterNav.setNavigate((state, { reason }) => {
+      const fromFilterDebounce =
+        reason === "debounce" || reason === "flushPending";
       // Hold URL-derived fields from `state`, but always take live free-text q
       // so typing during a quiet/in-flight window is not dropped.
       const next: CampgroundQueryState = {
@@ -434,17 +517,37 @@ export default function CampgroundListControls({
       setLastPushedQ(next.q.trim());
       const params = buildCampgroundSearchParams(next);
       // Skip when equal to the last push (or external URL we adopted) — not the
-      // possibly-stale in-flight `searchParams` during isPending.
+      // possibly-stale in-flight `searchParams` during isListPending.
       if (campgroundSearchParamsEqual(params, lastReplacedParamsRef.current)) {
+        if (fromFilterDebounce) setFilterListFlush(false);
         return;
       }
       lastReplacedParamsRef.current = new URLSearchParams(params.toString());
       const query = params.toString();
-      startTransition(() => {
+      // Keep Apply now through this list reload only for filter debounce flushes
+      // (timer / Apply now), not search-text or Clear flushNow.
+      setFilterListFlush(fromFilterDebounce);
+      // Timer path: move focus off Apply now before paint hides it later.
+      if (
+        fromFilterDebounce &&
+        document.activeElement === filterApplyNowRef.current
+      ) {
+        filterStatusRef.current?.focus({ preventScroll: true });
+      }
+      startListTransition(() => {
         router.replace(query ? `${pathname}?${query}` : pathname);
       });
     });
-  }, [filterNav, pathname, router, startTransition]);
+  }, [filterNav, pathname, router, startListTransition]);
+
+  // Clear filter-flush flag when the list transition ends (not an effect —
+  // avoids react-hooks/set-state-in-effect while keeping the flag honest).
+  if (isListPending !== prevIsListPending) {
+    setPrevIsListPending(isListPending);
+    if (!isListPending && filterListFlush) {
+      setFilterListFlush(false);
+    }
+  }
 
   // Sync search input from URL only for external changes (back/forward / Clear).
   if (displayFromUrl !== prevDisplayFromUrl) {
@@ -504,7 +607,7 @@ export default function CampgroundListControls({
     const liveQ = activePlace ? "" : search;
     // Hold URL-derived fields until the URL catches up — but keep free-text q live
     // so a checkbox click cannot drop mid-typing search text.
-    if (filterNavPending || isPending) {
+    if (filterNavPending || isListPending) {
       latestParamsRef.current = { ...latestParamsRef.current, q: liveQ };
       return;
     }
@@ -538,7 +641,7 @@ export default function CampgroundListControls({
     rigUnit,
     rigLengthUrlState,
     filterNavPending,
-    isPending,
+    isListPending,
   ]);
 
   // Cancel pending debounced pushes after external URL sync (back/forward).
@@ -558,6 +661,10 @@ export default function CampgroundListControls({
   }, [search]);
 
   useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
+  useEffect(() => {
     rigDraftRef.current = rigDraft;
   }, [rigDraft]);
 
@@ -571,15 +678,38 @@ export default function CampgroundListControls({
 
   useEffect(() => {
     cancelledRef.current = false;
+
+    /** In-app leave via links: flush before Next.js commits the new route. */
+    function onDocumentClickCapture(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (!anchor) return;
+      if (!shouldFlushFiltersBeforeAnchorClick(event, anchor)) return;
+      flushPendingFiltersForLeave();
+    }
+
+    /** Refresh / tab close / mobile pagehide: keep pending filters in the URL. */
+    function onPageHide() {
+      flushPendingFiltersForLeave({ syncOnly: true });
+    }
+
+    document.addEventListener("click", onDocumentClickCapture, true);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
+      document.removeEventListener("click", onDocumentClickCapture, true);
+      window.removeEventListener("pagehide", onPageHide);
       cancelledRef.current = true;
       geoRequestIdRef.current += 1;
-      // Leaving the page: drop pending drafts/navigations (intentional).
+      // Typing drafts still drop; pending discrete filters commit to history so
+      // Back/refresh keep the selection the user already made.
       clearTimeoutRef(debounceTimeoutRef);
       clearTimeoutRef(rigDebounceRef);
       clearTimeoutRef(maxPriceDebounceRef);
-      filterNav.cancel();
+      flushPendingFiltersForLeave({ syncOnly: true });
     };
+    // flushPendingFiltersForLeave reads refs + stable filterNav.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/leave only
   }, [filterNav]);
 
   function clearSearchDebounce() {
@@ -671,9 +801,9 @@ export default function CampgroundListControls({
 
   /**
    * Apply filter/search state locally and push the URL (search). Pass
-   * `{ debounce: true }` for multi-select checkbox groups so rapid toggles
-   * coalesce; the scheduled target is held by `filterNav` so URL-sync effects
-   * cannot clobber sort/province/geo before the quiet period ends.
+   * `{ debounce: true }` for filter checkboxes so rapid toggles coalesce; the
+   * scheduled target is held by `filterNav` so URL-sync effects cannot clobber
+   * sort/province/geo before the quiet period ends.
    */
   function replaceQuery(
     next: CampgroundQueryState,
@@ -766,9 +896,9 @@ export default function CampgroundListControls({
     campground: Extract<SearchSuggestion, { kind: "campground" }>,
   ) {
     clearSearchDebounce();
-    filterNav.cancel();
+    flushPendingFiltersForLeave();
     setLeavePlacePending(false);
-    startTransition(() => {
+    startDetailTransition(() => {
       router.push(
         routes.campgroundDetail(campground.id, {
           rigUnit: rigUnitRef.current,
@@ -812,7 +942,7 @@ export default function CampgroundListControls({
 
   /**
    * Apply a filter patch; flush pending rig / max-price drafts so they are not
-   * dropped. Pass `{ debounce: true }` for multi-select checkboxes only —
+   * dropped. Pass `{ debounce: true }` for filter checkboxes only —
    * single-choice selects stay immediate (URL-controlled displays must not
    * snap back during a quiet period).
    */
@@ -960,11 +1090,16 @@ export default function CampgroundListControls({
       geo ||
       anySiteFilterActive(localFilters),
   );
-  // Disable discrete controls during isPending so a late URL echo cannot race a
+  // Disable discrete controls during isListPending so a late URL echo cannot race a
   // mid-click localFilters update (render-time sync adopts URL when keys diverge).
   // Keep them enabled while only filterNavPending so multi-select can continue.
-  // Search input stays enabled during isPending so typing is not blurred/lost.
-  const discreteControlsDisabled = geoBusy || isPending;
+  // Search input stays enabled during isListPending so typing is not blurred/lost.
+  const discreteControlsDisabled = geoBusy || isListPending;
+  // Status through quiet period + any list reload (search typing included).
+  const showFilterUpdateStatus = filterNavPending || isListPending;
+  // Apply now only for filter-debounce quiet/flush — not search-text reloads.
+  const showFilterApplyNow =
+    filterNavPending || (filterListFlush && isListPending);
   const selectedAmps = new Set(localFilters.amps);
   const selectedSiteTypes = new Set(localFilters.siteTypes);
   const selectedAmenityKeys = new Set(
@@ -987,6 +1122,15 @@ export default function CampgroundListControls({
     return true;
   });
 
+  // Timer/transition end can hide Apply now while focused — move before paint
+  // (passive useEffect runs too late; Chromium already dropped focus to body).
+  useLayoutEffect(() => {
+    if (showFilterApplyNow) return;
+    if (document.activeElement === filterApplyNowRef.current) {
+      filterStatusRef.current?.focus({ preventScroll: true });
+    }
+  }, [showFilterApplyNow]);
+
   return (
     // Password managers (e.g. Proton Pass) inject attrs like `data-protonpass-form`
     // onto this shell before hydration. suppressHydrationWarning only silences THIS
@@ -994,10 +1138,41 @@ export default function CampgroundListControls({
     // (URL + server props), or remove the flag and re-check the console.
     <div
       className={`space-y-4 ${
-        isPending || geoBusy || filterNavPending ? "opacity-80" : ""
+        isListPending || geoBusy || filterNavPending ? "opacity-80" : ""
       }`}
       suppressHydrationWarning
     >
+      {/* Always mounted: reserves height (no checkbox jump) and keeps the live
+          region in the DOM so AT announces text changes. */}
+      <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        <p
+          ref={filterStatusRef}
+          tabIndex={-1}
+          role="status"
+          aria-live="polite"
+          className="outline-none"
+        >
+          {showFilterUpdateStatus ? t("filtersUpdating") : ""}
+        </p>
+        <Button
+          ref={filterApplyNowRef}
+          type="button"
+          variant="ghost"
+          size="sm"
+          tabIndex={showFilterApplyNow ? 0 : -1}
+          aria-hidden={!showFilterApplyNow}
+          className={`h-auto px-0 text-foreground underline-offset-4 hover:bg-transparent hover:underline ${
+            showFilterApplyNow ? "" : "invisible pointer-events-none"
+          }`}
+          onClick={() => {
+            // Move focus off the button before it becomes inert after flush.
+            filterStatusRef.current?.focus({ preventScroll: true });
+            filterNav.flushPending();
+          }}
+        >
+          {t("filtersApplyNow")}
+        </Button>
+      </div>
       <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
         <SearchSuggestInput
           value={search}

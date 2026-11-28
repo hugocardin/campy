@@ -71,6 +71,8 @@
     "amenitiesLabel": "Commodités du camping",
     "amenitiesHint": "Affiche les campings qui offrent toutes les commodités sélectionnées. Eau, égouts et station de vidange restent dans leurs propres filtres.",
     "clearFilters": "Effacer",
+    "filtersUpdating": "Mise à jour des résultats…",
+    "filtersApplyNow": "Appliquer",
     "nearMe": "Près de moi",
     "nearMeLocating": "Localisation…",
     "radiusLabel": "Rayon de recherche",

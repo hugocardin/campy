@@ -77,6 +77,30 @@ describe("createDebouncedNavigation", () => {
     assert.deepEqual(navigated, ["now"]);
   });
 
+  it("flushPending navigates the held target and is a no-op when idle", () => {
+    const { setTimeoutFn, clearTimeoutFn, advance, timers } = createFakeTimers();
+    const navigated: string[] = [];
+    const nav = createDebouncedNavigation<string>({
+      debounceMs: 600,
+      navigate: (s) => navigated.push(s),
+      setTimeoutFn,
+      clearTimeoutFn,
+    });
+
+    assert.equal(nav.flushPending(), false);
+    assert.deepEqual(navigated, []);
+
+    nav.schedule("held");
+    assert.equal(nav.flushPending(), true);
+    assert.deepEqual(navigated, ["held"]);
+    assert.equal(nav.isPending(), false);
+    assert.equal(nav.peekPending(), null);
+    assert.equal(timers.size, 0);
+
+    advance(600);
+    assert.deepEqual(navigated, ["held"]);
+  });
+
   it("cancel drops the pending navigation without calling navigate", () => {
     const { setTimeoutFn, clearTimeoutFn, advance } = createFakeTimers();
     const navigated: string[] = [];
@@ -115,5 +139,27 @@ describe("createDebouncedNavigation", () => {
     advance(600);
     assert.deepEqual(first, []);
     assert.deepEqual(second, ["later"]);
+  });
+
+  it("passes reason debounce | flushPending | flushNow to navigate", () => {
+    const { setTimeoutFn, clearTimeoutFn, advance } = createFakeTimers();
+    const reasons: string[] = [];
+    const nav = createDebouncedNavigation<string>({
+      debounceMs: 600,
+      navigate: (_s, meta) => reasons.push(meta.reason),
+      setTimeoutFn,
+      clearTimeoutFn,
+    });
+
+    nav.schedule("a");
+    advance(600);
+    assert.deepEqual(reasons, ["debounce"]);
+
+    nav.schedule("b");
+    assert.equal(nav.flushPending(), true);
+    assert.deepEqual(reasons, ["debounce", "flushPending"]);
+
+    nav.flushNow("c");
+    assert.deepEqual(reasons, ["debounce", "flushPending", "flushNow"]);
   });
 });
