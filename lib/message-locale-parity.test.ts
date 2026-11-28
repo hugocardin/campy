@@ -28,13 +28,11 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set([
   "campgrounds.form.longitudeLabel",
   "campgrounds.form.commissionValueUnset",
   "sites.form.descriptionLabel",
-  // Amp labels are the same in both locales (IEC-style "15 A")
+  // Amp labels are the same in both locales (IEC-style "15/20 A")
   "search.controls.filterAmp15",
-  "search.controls.filterAmp20",
   "search.controls.filterAmp30",
   "search.controls.filterAmp50",
   "sites.electricityAmps.amp15",
-  "sites.electricityAmps.amp20",
   "sites.electricityAmps.amp30",
   "sites.electricityAmps.amp50",
   // SI metre abbreviation is identical in en-CA / fr-CA

@@ -61,8 +61,7 @@
 
     "siteFiltersHint": "Shows parks with at least one site that matches selected site types, any selected amp (or None), every selected water/sewer hookup, driveway, rig length, and max price (when set).",
     "filterAmpNone": "None",
-    "filterAmp15": "15 A",
-    "filterAmp20": "20 A",
+    "filterAmp15": "15/20 A",
     "filterAmp30": "30 A",
     "filterAmp50": "50 A",
     "filterWater": "Water",

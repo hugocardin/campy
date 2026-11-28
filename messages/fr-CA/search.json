@@ -61,8 +61,7 @@
 
     "siteFiltersHint": "Affiche les campings ayant au moins un emplacement qui correspond aux types choisis, à l’un des ampérages (ou Aucun), à tous les branchements eau/égouts, à l’allée, à la longueur de véhicule et au prix max (si indiqués).",
     "filterAmpNone": "Aucun",
-    "filterAmp15": "15 A",
-    "filterAmp20": "20 A",
+    "filterAmp15": "15/20 A",
     "filterAmp30": "30 A",
     "filterAmp50": "50 A",
     "filterWater": "Eau",

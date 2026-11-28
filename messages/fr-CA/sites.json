@@ -47,13 +47,12 @@
 
   "electricityAmps": {
     "none": "Aucun",
-    "amp15": "15 A",
-    "amp20": "20 A",
+    "amp15": "15/20 A",
     "amp30": "30 A",
     "amp50": "50 A",
-    "list": "{amps}\u00a0A",
     "summaryLabel": "Électricité"
   },
+
 
   "errors": {
     "nameRequired": "Le nom est requis",
@@ -63,7 +62,7 @@
     "maxRigLengthRequired": "La longueur max. du véhicule est obligatoire pour les emplacements VR",
     "invalidPricePerNight": "Prix par nuit invalide",
     "invalidMinStayNights": "Nombre minimal de nuits invalide",
-    "invalidElectricityAmps": "Choisissez uniquement parmi 15, 20, 30 ou 50 ampères",
+    "invalidElectricityAmps": "Choisissez uniquement parmi 15/20, 30 ou 50 ampères",
     "invalidDrivewayType": "Choisissez traversante, marche arrière, ou laissez vide",
     "pricingRulesInvalidJson": "Les règles de prix doivent être un JSON valide",
     "pricingRulesNotObject": "Les règles de prix doivent être un objet JSON (pas un tableau ni une valeur seule)",

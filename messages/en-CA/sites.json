@@ -47,13 +47,12 @@
 
   "electricityAmps": {
     "none": "None",
-    "amp15": "15 A",
-    "amp20": "20 A",
+    "amp15": "15/20 A",
     "amp30": "30 A",
     "amp50": "50 A",
-    "list": "{amps} A",
     "summaryLabel": "Electricity"
   },
+
 
   "errors": {
     "nameRequired": "Name is required",
@@ -63,7 +62,7 @@
     "maxRigLengthRequired": "Max rig length is required for RV sites",
     "invalidPricePerNight": "Invalid price per night",
     "invalidMinStayNights": "Invalid min stay nights",
-    "invalidElectricityAmps": "Choose only from 15, 20, 30, or 50 amps",
+    "invalidElectricityAmps": "Choose only from 15/20, 30, or 50 amps",
     "invalidDrivewayType": "Choose pull-through, back-in, or leave unset",
     "pricingRulesInvalidJson": "Pricing rules must be valid JSON",
     "pricingRulesNotObject": "Pricing rules must be a JSON object (not an array or bare value)",

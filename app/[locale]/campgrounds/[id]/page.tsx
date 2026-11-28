@@ -16,7 +16,9 @@ import { getSitesOfCampground } from "@/data/campgrounds/get-campground-sites";
 import { Amenity } from "@/entities/amenity";
 import { DbErrorCode } from "@/lib/errors";
 import {
-  formatElectricityAmps,
+  ELECTRICITY_AMP_MESSAGE_KEYS,
+  formatElectricityAmpsWithLabels,
+  type ElectricityAmp,
   unionElectricityAmps,
 } from "@/lib/electricity-amps";
 import { formatCampgroundPricePerNight } from "@/lib/campground-price";
@@ -154,10 +156,13 @@ export default async function CampgroundDetailsPage({
     amenities != null
       ? groupAmenitiesForLocale(amenities, tAmenities, locale)
       : [];
-  const campgroundAmpsNumbers =
+  const electricityAmpLabel = (amp: ElectricityAmp) =>
+    tSites(`electricityAmps.${ELECTRICITY_AMP_MESSAGE_KEYS[amp]}`);
+  const campgroundAmpsList =
     sites != null
-      ? formatElectricityAmps(
+      ? formatElectricityAmpsWithLabels(
           unionElectricityAmps(sites.map((site) => site.electricity_amps)),
+          electricityAmpLabel,
         )
       : null;
 
@@ -278,10 +283,8 @@ export default async function CampgroundDetailsPage({
                         {tSites("electricityAmps.summaryLabel")}
                       </h3>
                       <p>
-                        {campgroundAmpsNumbers != null
-                          ? tSites("electricityAmps.list", {
-                              amps: campgroundAmpsNumbers,
-                            })
+                        {campgroundAmpsList != null
+                          ? campgroundAmpsList
                           : tSites("electricityAmps.none")}
                       </p>
                     </div>
@@ -402,11 +405,12 @@ export default async function CampgroundDetailsPage({
                           </TableCell>
                           <TableCell>
                             {(() => {
-                              const amps = formatElectricityAmps(
+                              const amps = formatElectricityAmpsWithLabels(
                                 site.electricity_amps,
+                                electricityAmpLabel,
                               );
                               return amps != null
-                                ? tSites("electricityAmps.list", { amps })
+                                ? amps
                                 : tSites("electricityAmps.none");
                             })()}
                           </TableCell>

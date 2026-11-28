@@ -124,13 +124,11 @@ const AMP_FILTERS: {
   labelKey:
     | "filterAmpNone"
     | "filterAmp15"
-    | "filterAmp20"
     | "filterAmp30"
     | "filterAmp50";
 }[] = [
   { value: ELECTRICITY_AMP_NONE, labelKey: "filterAmpNone" },
   { value: 15, labelKey: "filterAmp15" },
-  { value: 20, labelKey: "filterAmp20" },
   { value: 30, labelKey: "filterAmp30" },
   { value: 50, labelKey: "filterAmp50" },
 ];
