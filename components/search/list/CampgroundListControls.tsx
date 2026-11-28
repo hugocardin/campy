@@ -143,7 +143,8 @@ const SEARCH_INPUT_DEBOUNCE_MS = 300;
  * Quiet period before starting a search navigation for discrete filter
  * checkboxes (site types, amps, hookups, dump-station, amenities). Chosen at
  * 2.5s so a typical multi-select pass can finish without a reload per click;
- * single-choice selects stay immediate (see replaceQuery).
+ * single-choice selects stay immediate (see replaceQuery). While pending,
+ * controls show an aria-live status plus Apply now (`flushPending`).
  */
 const FILTER_NAV_DEBOUNCE_MS = 2500;
 
@@ -1094,6 +1095,24 @@ export default function CampgroundListControls({
       }`}
       suppressHydrationWarning
     >
+      {filterNavPending ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+          <p role="status" aria-live="polite">
+            {t("filtersUpdating")}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-auto px-0 text-foreground underline-offset-4 hover:bg-transparent hover:underline"
+            onClick={() => {
+              filterNav.flushPending();
+            }}
+          >
+            {t("filtersApplyNow")}
+          </Button>
+        </div>
+      ) : null}
       <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
         <SearchSuggestInput
           value={search}
