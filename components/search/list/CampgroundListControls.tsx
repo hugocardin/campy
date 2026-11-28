@@ -140,8 +140,9 @@ const DRIVEWAY_ANY = "__any__";
 const SEARCH_INPUT_DEBOUNCE_MS = 300;
 /**
  * Quiet period before starting a search navigation for discrete filter
- * clicks (multi-select checkboxes). Long enough to finish a multi-select
- * pass without a reload per click; short enough to feel intentional.
+ * checkboxes (site types, amps, hookups, dump-station, amenities). Chosen at
+ * 2.5s so a typical multi-select pass can finish without a reload per click;
+ * single-choice selects stay immediate (see replaceQuery).
  */
 const FILTER_NAV_DEBOUNCE_MS = 2500;
 
