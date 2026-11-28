@@ -34,7 +34,15 @@ export function createDebouncedNavigation<T>(options: {
   const clearTimeoutFn = options.clearTimeoutFn ?? clearTimeout;
   let timer: TimerHandle | null = null;
   let pending: T | null = null;
-  let navigate = options.navigate ?? (() => {});
+  let navigate =
+    options.navigate ??
+    (() => {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "createDebouncedNavigation: navigate called before setNavigate",
+        );
+      }
+    });
 
   function setPendingFlag(next: boolean) {
     options.onPendingChange?.(next);

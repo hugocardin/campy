@@ -402,21 +402,36 @@ export default function CampgroundListControls({
   );
   /** Bumped on external URL sync so an effect can cancel pending debounced pushes. */
   const [externalUrlEpoch, setExternalUrlEpoch] = useState(0);
+  /** Last query we actually pushed (or adopted from external URL) — for no-op skips. */
+  const lastReplacedParamsRef = useRef(
+    new URLSearchParams(searchParams.toString()),
+  );
+  // Live search text for navigate-time merge (avoid freezing q while holding).
+  const searchRef = useRef(search);
 
   // Wire navigate outside render (react-hooks/refs).
   useLayoutEffect(() => {
     filterNav.setNavigate((state) => {
-      latestParamsRef.current = state;
-      const params = buildCampgroundSearchParams(state);
-      // Toggle-back within the quiet period: same filters as the live URL —
-      // skip router.replace (no isPending lock / server round trip).
-      if (campgroundSearchParamsEqual(params, searchParams)) return;
+      // Hold URL-derived fields from `state`, but always take live free-text q
+      // so typing during a quiet/in-flight window is not dropped.
+      const next: CampgroundQueryState = {
+        ...state,
+        q: state.place ? "" : searchRef.current,
+      };
+      latestParamsRef.current = next;
+      const params = buildCampgroundSearchParams(next);
+      // Skip when equal to the last push (or external URL we adopted) — not the
+      // possibly-stale in-flight `searchParams` during isPending.
+      if (campgroundSearchParamsEqual(params, lastReplacedParamsRef.current)) {
+        return;
+      }
+      lastReplacedParamsRef.current = new URLSearchParams(params.toString());
       const query = params.toString();
       startTransition(() => {
         router.replace(query ? `${pathname}?${query}` : pathname);
       });
     });
-  }, [filterNav, pathname, router, searchParams, startTransition]);
+  }, [filterNav, pathname, router, startTransition]);
 
   // Sync search input from URL only for external changes (back/forward / Clear).
   if (displayFromUrl !== prevDisplayFromUrl) {
@@ -467,15 +482,19 @@ export default function CampgroundListControls({
   }
 
   useEffect(() => {
-    // Hold the scheduled / in-flight target until the URL catches up — rebuilding
-    // from URL sort/province/geo mid-flight would restore stale place geo.
-    if (filterNavPending || isPending) return;
+    const liveQ = activePlace ? "" : search;
+    // Hold URL-derived fields until the URL catches up — but keep free-text q live
+    // so a checkbox click cannot drop mid-typing search text.
+    if (filterNavPending || isPending) {
+      latestParamsRef.current = { ...latestParamsRef.current, q: liveQ };
+      return;
+    }
     // Build from local state only — do not re-seed from URL here (avoids a race
     // where a pending clear is overwritten before router.replace lands).
     latestParamsRef.current = queryStateFromFilters(
       {
         // Place-centered search: keep q empty so RPC does not also ILIKE the label.
-        q: activePlace ? "" : search,
+        q: liveQ,
         sort: sortParam,
         province: provinceParam,
         lat: geo?.lat,
@@ -504,14 +523,21 @@ export default function CampgroundListControls({
   ]);
 
   // Cancel pending debounced pushes after external URL sync (back/forward).
-  useEffect(() => {
+  // Layout effect: run before paint / timers so a stale schedule cannot rewrite
+  // the history entry the user just navigated to.
+  useLayoutEffect(() => {
     if (externalUrlEpoch === 0) return;
     clearTimeoutRef(debounceTimeoutRef);
     filterNav.cancel();
-  }, [externalUrlEpoch, filterNav]);
+    lastReplacedParamsRef.current = new URLSearchParams(searchParams.toString());
+  }, [externalUrlEpoch, filterNav, searchParams]);
 
   // Sync refs after render-time setState (external URL sync). Event handlers
   // use updateRigDraft / updateRigUnit so the ref is current before the next paint.
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
+
   useEffect(() => {
     rigDraftRef.current = rigDraft;
   }, [rigDraft]);
@@ -670,6 +696,7 @@ export default function CampgroundListControls({
   }
 
   function onSearchInputChange(nextValue: string) {
+    searchRef.current = nextValue;
     setSearch(nextValue);
     // Leaving place mode: clear local place flag only. The sync effect rebuilds
     // latestParamsRef from the still-geo URL, so geo/sort are fixed in the
@@ -689,6 +716,7 @@ export default function CampgroundListControls({
     const label = place.subtitle
       ? `${place.label}, ${place.subtitle}`
       : place.label;
+    searchRef.current = label;
     setSearch(label);
     setGeoError(null);
     const radiusKm =
@@ -743,7 +771,7 @@ export default function CampgroundListControls({
     replaceQuery(
       withLatestCampgroundFilters(latest, {
         ...leavePatch,
-        q: latest.q,
+        q: activePlace ? "" : search,
         sort: leavePatch?.sort ?? latest.sort,
         rigLength: feet,
         rigUnit: nextUnit,
@@ -775,11 +803,13 @@ export default function CampgroundListControls({
     if (leavePlacePending) setLeavePlacePending(false);
     const rigLength = takePendingRigLength();
     const maxPrice = takePendingMaxPrice();
+    const liveQ = activePlace ? "" : search;
     replaceQuery(
       withLatestCampgroundFilters(latest, {
         ...leavePatch,
         ...patch,
-        q: patch.q ?? latest.q,
+        // Prefer explicit patch.q, else live search text (not a frozen pending q).
+        q: patch.q ?? liveQ,
         sort: patch.sort ?? leavePatch?.sort ?? latest.sort,
         // Flush only when camping stays allowed; lodging clears via withLatest.
         ...("rigLength" in patch ? {} : { rigLength }),
@@ -843,6 +873,7 @@ export default function CampgroundListControls({
           return;
         }
         setGeoBusy(false);
+        searchRef.current = "";
         setSearch("");
         replaceWithFilters({
           q: "",
@@ -1067,6 +1098,7 @@ export default function CampgroundListControls({
               clearTimeoutRef(rigDebounceRef);
               clearTimeoutRef(maxPriceDebounceRef);
               cancelGeolocation();
+              searchRef.current = "";
               setSearch("");
               setActivePlace(undefined);
               // Explicit clear when a profile default would otherwise reapply.
@@ -1287,7 +1319,7 @@ export default function CampgroundListControls({
                       filterNav.peekPending() ?? latestParamsRef.current;
                     replaceQuery(
                       withLatestCampgroundFilters(latest, {
-                        q: latest.q,
+                        q: searchRef.current,
                         sort: latest.sort,
                         rigLength: resolveRigDraft(),
                         rigUnit: rigUnitRef.current,
@@ -1336,7 +1368,7 @@ export default function CampgroundListControls({
                       filterNav.peekPending() ?? latestParamsRef.current;
                     replaceQuery(
                       withLatestCampgroundFilters(latest, {
-                        q: latest.q,
+                        q: searchRef.current,
                         sort: latest.sort,
                         maxPrice: resolveMaxPriceDraft(),
                         priceCurrency:
