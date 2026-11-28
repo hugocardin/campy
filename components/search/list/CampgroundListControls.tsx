@@ -835,8 +835,12 @@ export default function CampgroundListControls({
   });
 
   return (
+    // Password managers (e.g. Proton Pass) inject attrs like
+    // `data-protonpass-form` onto this filter shell before hydrate.
+    // No app SSR/client mismatch here — suppress only this node's attrs.
     <div
       className={`space-y-4 ${isPending || geoBusy ? "opacity-80" : ""}`}
+      suppressHydrationWarning
     >
       <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
         <SearchSuggestInput
@@ -1174,6 +1178,7 @@ export default function CampgroundListControls({
                 inputClassName="w-28"
                 value={rigDraft}
                 disabled={geoBusy}
+                autoComplete="off"
                 onChange={(value) => {
                   updateRigDraft(value);
                   if (rigDebounceRef.current != null) {
@@ -1215,6 +1220,7 @@ export default function CampgroundListControls({
                 max={GUEST_MAX_PRICE_CAP}
                 step="any"
                 inputMode="decimal"
+                autoComplete="off"
                 className="w-28"
                 placeholder={t("maxPricePlaceholder")}
                 value={maxPriceDraft}

@@ -202,6 +202,9 @@ export default function SearchSuggestInput({
         role="combobox"
         disabled={disabled}
         autoComplete="off"
+        data-1p-ignore=""
+        data-lpignore="true"
+        data-form-type="other"
       />
       {showList ? (
         <ul
