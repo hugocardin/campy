@@ -17,6 +17,7 @@ import { Amenity } from "@/entities/amenity";
 import { DbErrorCode } from "@/lib/errors";
 import {
   ELECTRICITY_AMP_MESSAGE_KEYS,
+  ELECTRICITY_AMP_SUMMARY_JOINER,
   formatElectricityAmpsWithLabels,
   type ElectricityAmp,
   unionElectricityAmps,
@@ -163,6 +164,7 @@ export default async function CampgroundDetailsPage({
       ? formatElectricityAmpsWithLabels(
           unionElectricityAmps(sites.map((site) => site.electricity_amps)),
           electricityAmpLabel,
+          ELECTRICITY_AMP_SUMMARY_JOINER,
         )
       : null;
 

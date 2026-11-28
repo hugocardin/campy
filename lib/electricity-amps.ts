@@ -2,17 +2,28 @@
  * Fixed site electricity amp options (never free text).
  * Guest search "None" is a filter token only — sites store `{}` for no power.
  *
- * 15 is the combined 15/20A low-tier outlet (UI label "15/20 A").
- * Legacy stored/URL value 20 remaps to 15.
+ * `ELECTRICITY_AMP_15_20` (stored as 15) is the combined 15/20A low-tier outlet
+ * — never plain "15A". Keeping the numeric `15` avoids rewriting most existing
+ * rows that already stored 15 for that plug class.
  *
  * Keep in sync with SQL `public.electricity_amp_values()`
- * (`supabase/migrations/20261128183815_merge_electricity_amps_15_20.sql`).
+ * (`supabase/migrations/20261128184001_merge_electricity_amps_15_20.sql`
+ * + `20261128184549_amps_15_20_review_fix.sql`).
  */
-export const ELECTRICITY_AMP_VALUES = [15, 30, 50] as const;
+export const ELECTRICITY_AMP_15_20 = 15 as const;
+
+export const ELECTRICITY_AMP_VALUES = [
+  ELECTRICITY_AMP_15_20,
+  30,
+  50,
+] as const;
 
 export type ElectricityAmp = (typeof ELECTRICITY_AMP_VALUES)[number];
 
-/** Legacy separate 20A value; remapped to the combined 15/20A tier (15). */
+/**
+ * Legacy separate 20A value; remapped to {@link ELECTRICITY_AMP_15_20}.
+ * @deprecated Temporary compat for stale URLs / clients; remove once deploy settles.
+ */
 export const ELECTRICITY_AMP_LEGACY_20 = 20;
 
 /** Guest filter token for sites with no electricity (`{}`). */
@@ -27,10 +38,16 @@ export const ELECTRICITY_AMP_NONE_RPC = 0;
 
 /** i18n message keys under `sites.electricityAmps.*`. */
 export const ELECTRICITY_AMP_MESSAGE_KEYS = {
-  15: "amp15",
+  [ELECTRICITY_AMP_15_20]: "amp15",
   30: "amp30",
   50: "amp50",
 } as const satisfies Record<ElectricityAmp, string>;
+
+/** Default joiner for plugs on one pedestal (exact outlet list). */
+export const ELECTRICITY_AMP_OUTLET_JOINER = " + ";
+
+/** Joiner for park-level union (amps available somewhere, not one pedestal). */
+export const ELECTRICITY_AMP_SUMMARY_JOINER = ", ";
 
 const AMP_SET = new Set<number>(ELECTRICITY_AMP_VALUES);
 
@@ -38,25 +55,30 @@ export function isElectricityAmp(value: number): value is ElectricityAmp {
   return AMP_SET.has(value);
 }
 
+/** Map legacy 20 → combined 15/20A tier; other integers unchanged. */
+export function remapLegacyAmp(value: number): number {
+  return value === ELECTRICITY_AMP_LEGACY_20 ? ELECTRICITY_AMP_15_20 : value;
+}
+
 /**
  * Parse a single amp. Strings must be plain decimal digits (`/^\d+$/`).
  * Numbers must be integers in the allowed set.
- * Legacy `20` remaps to `15` (combined 15/20A tier).
+ * Legacy `20` remaps to {@link ELECTRICITY_AMP_15_20}.
  */
 export function parseElectricityAmp(value: unknown): ElectricityAmp | undefined {
   if (typeof value === "number") {
     if (!Number.isInteger(value)) return undefined;
-    if (value === ELECTRICITY_AMP_LEGACY_20) return 15;
-    if (!isElectricityAmp(value)) return undefined;
-    return value;
+    const remapped = remapLegacyAmp(value);
+    if (!isElectricityAmp(remapped)) return undefined;
+    return remapped;
   }
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   if (!/^\d+$/.test(trimmed)) return undefined;
   const n = Number(trimmed);
-  if (n === ELECTRICITY_AMP_LEGACY_20) return 15;
-  if (!isElectricityAmp(n)) return undefined;
-  return n;
+  const remapped = remapLegacyAmp(n);
+  if (!isElectricityAmp(remapped)) return undefined;
+  return remapped;
 }
 
 /** Dedupe + keep fixed list order. Drops invalid values. */
@@ -73,8 +95,9 @@ export function normalizeElectricityAmps(
 
 /**
  * Strict parse for admin writes: reject non-arrays and any invalid/duplicate
- * entries (do not silently drop). Empty array = no electricity.
- * Legacy 20 is accepted and stored as 15; [15, 20] is a duplicate → invalid.
+ * entries (do not silently drop junk). Empty array = no electricity.
+ * Legacy 20 is a temporary compat shim → stored as 15; [15, 20] is a
+ * duplicate → invalid.
  */
 export function parseElectricityAmpsInput(
   value: unknown,
@@ -126,28 +149,20 @@ export function normalizeElectricityAmpFilters(
 }
 
 /**
- * Join localized outlet labels (already include the unit), e.g. "15/20 A + 30 A".
- * Empty → null. Prefer this over numeric formatting so guests see exact plugs.
+ * Join localized outlet labels (already include the unit).
+ * Default joiner is `" + "` for one pedestal's exact plugs
+ * (e.g. "15/20 A + 30 A"). Use {@link ELECTRICITY_AMP_SUMMARY_JOINER} for
+ * park-level unions so it does not read as one pedestal.
+ * Empty → null.
  */
 export function formatElectricityAmpsWithLabels(
   amps: readonly ElectricityAmp[] | null | undefined,
   labelFor: (amp: ElectricityAmp) => string,
+  joiner: string = ELECTRICITY_AMP_OUTLET_JOINER,
 ): string | null {
   const normalized = normalizeElectricityAmps(amps ?? []);
   if (normalized.length === 0) return null;
-  return normalized.map(labelFor).join(" + ");
-}
-
-/**
- * Amp numbers for display without unit (e.g. "15 + 50"). Empty → null.
- * Prefer `formatElectricityAmpsWithLabels` when i18n labels are available.
- */
-export function formatElectricityAmps(
-  amps: readonly ElectricityAmp[] | null | undefined,
-): string | null {
-  const normalized = normalizeElectricityAmps(amps ?? []);
-  if (normalized.length === 0) return null;
-  return normalized.join(" + ");
+  return normalized.map(labelFor).join(joiner);
 }
 
 /** Union of amp options across sites (campground-level summary). */
