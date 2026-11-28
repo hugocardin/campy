@@ -41,6 +41,7 @@ import {
 import {
   CampgroundQueryState,
   buildCampgroundSearchParams,
+  campgroundSearchParamsEqual,
   clearedCampgroundQueryState,
   siteFiltersFromQueryState,
   siteFiltersKey,
@@ -84,6 +85,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -391,28 +393,30 @@ export default function CampgroundListControls({
       urlRigLengthState,
     ),
   );
-  const navigateSearchRef = useRef<(state: CampgroundQueryState) => void>(
-    () => {},
-  );
-  const filterNavRef = useRef<ReturnType<
-    typeof createDebouncedNavigation<CampgroundQueryState>
-  > | null>(null);
-  if (filterNavRef.current == null) {
-    filterNavRef.current = createDebouncedNavigation<CampgroundQueryState>({
+  // Stable controller (lazy useState — navigate wired in layout effect below).
+  const [filterNav] = useState(() =>
+    createDebouncedNavigation<CampgroundQueryState>({
       debounceMs: FILTER_NAV_DEBOUNCE_MS,
-      navigate: (state) => navigateSearchRef.current(state),
       onPendingChange: setFilterNavPending,
+    }),
+  );
+  /** Bumped on external URL sync so an effect can cancel pending debounced pushes. */
+  const [externalUrlEpoch, setExternalUrlEpoch] = useState(0);
+
+  // Wire navigate outside render (react-hooks/refs).
+  useLayoutEffect(() => {
+    filterNav.setNavigate((state) => {
+      latestParamsRef.current = state;
+      const params = buildCampgroundSearchParams(state);
+      // Toggle-back within the quiet period: same filters as the live URL —
+      // skip router.replace (no isPending lock / server round trip).
+      if (campgroundSearchParamsEqual(params, searchParams)) return;
+      const query = params.toString();
+      startTransition(() => {
+        router.replace(query ? `${pathname}?${query}` : pathname);
+      });
     });
-  }
-  const filterNav = filterNavRef.current;
-  navigateSearchRef.current = (state) => {
-    latestParamsRef.current = state;
-    const params = buildCampgroundSearchParams(state);
-    const query = params.toString();
-    startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname);
-    });
-  };
+  }, [filterNav, pathname, router, searchParams, startTransition]);
 
   // Sync search input from URL only for external changes (back/forward / Clear).
   if (displayFromUrl !== prevDisplayFromUrl) {
@@ -420,9 +424,7 @@ export default function CampgroundListControls({
     const externalQ = qParam !== lastPushedQ;
     const externalPlace = placeLabel !== prevPlaceLabel;
     if (externalQ || externalPlace) {
-      // Back/forward owns the URL — drop a pending debounced search push.
-      clearTimeoutRef(debounceTimeoutRef);
-      filterNav.cancel();
+      setExternalUrlEpoch((n) => n + 1);
       setLastPushedQ(qParam);
       setPrevPlaceLabel(placeLabel);
       setActivePlace(placeLabel);
@@ -444,10 +446,7 @@ export default function CampgroundListControls({
     const isExternal =
       urlFiltersKey !== lastPushedFiltersKey || urlRigUnit !== lastPushedRigUnit;
     if (isExternal) {
-      // External URL (back/forward / shared link) — cancel a pending filter push
-      // so we do not rewrite history after the user left.
-      clearTimeoutRef(debounceTimeoutRef);
-      filterNav.cancel();
+      setExternalUrlEpoch((n) => n + 1);
       setLastPushedFiltersKey(urlFiltersKey);
       setLastPushedRigUnit(urlRigUnit);
       // setState only during render (react-hooks/refs); effects sync refs below.
@@ -468,10 +467,9 @@ export default function CampgroundListControls({
   }
 
   useEffect(() => {
-    // While a debounced filter navigation is pending, keep the scheduled target
-    // in latestParamsRef — rebuilding from URL sort/province/geo would clobber
-    // values that have not been pushed yet (and restore leave-place geo).
-    if (filterNav.isPending()) return;
+    // Hold the scheduled / in-flight target until the URL catches up — rebuilding
+    // from URL sort/province/geo mid-flight would restore stale place geo.
+    if (filterNavPending || isPending) return;
     // Build from local state only — do not re-seed from URL here (avoids a race
     // where a pending clear is overwritten before router.replace lands).
     latestParamsRef.current = queryStateFromFilters(
@@ -501,9 +499,16 @@ export default function CampgroundListControls({
     localFilters,
     rigUnit,
     rigLengthUrlState,
-    filterNav,
     filterNavPending,
+    isPending,
   ]);
+
+  // Cancel pending debounced pushes after external URL sync (back/forward).
+  useEffect(() => {
+    if (externalUrlEpoch === 0) return;
+    clearTimeoutRef(debounceTimeoutRef);
+    filterNav.cancel();
+  }, [externalUrlEpoch, filterNav]);
 
   // Sync refs after render-time setState (external URL sync). Event handlers
   // use updateRigDraft / updateRigUnit so the ref is current before the next paint.

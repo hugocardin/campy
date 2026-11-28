@@ -99,4 +99,21 @@ describe("createDebouncedNavigation", () => {
     advance(600);
     assert.deepEqual(navigated, []);
   });
+
+  it("setNavigate replaces the navigate callback for later flushes", () => {
+    const { setTimeoutFn, clearTimeoutFn, advance } = createFakeTimers();
+    const first: string[] = [];
+    const second: string[] = [];
+    const nav = createDebouncedNavigation<string>({
+      debounceMs: 600,
+      navigate: (s) => first.push(s),
+      setTimeoutFn,
+      clearTimeoutFn,
+    });
+    nav.setNavigate((s) => second.push(s));
+    nav.schedule("later");
+    advance(600);
+    assert.deepEqual(first, []);
+    assert.deepEqual(second, ["later"]);
+  });
 });
