@@ -197,6 +197,21 @@ export function siteFiltersKey(filters: CampgroundSiteFilters): string {
   ].join("|");
 }
 
+/**
+ * Compare two search-param bags by key/value (order-independent). Guest search
+ * uses at most one value per key.
+ */
+export function campgroundSearchParamsEqual(
+  a: URLSearchParams,
+  b: URLSearchParams,
+): boolean {
+  const keys = new Set([...a.keys(), ...b.keys()]);
+  for (const key of keys) {
+    if (a.get(key) !== b.get(key)) return false;
+  }
+  return true;
+}
+
 /** Build guest search URLSearchParams from query state (omit defaults / falsy). */
 export function buildCampgroundSearchParams(
   next: CampgroundQueryState,

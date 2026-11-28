@@ -41,11 +41,13 @@ import {
 import {
   CampgroundQueryState,
   buildCampgroundSearchParams,
+  campgroundSearchParamsEqual,
   clearedCampgroundQueryState,
   siteFiltersFromQueryState,
   siteFiltersKey,
   withLatestCampgroundFilters,
 } from "@/lib/campground-search-query";
+import { createDebouncedNavigation } from "@/lib/debounced-navigation";
 import type { DrivewayType } from "@/lib/driveway-type";
 import {
   ELECTRICITY_AMP_NONE,
@@ -81,7 +83,21 @@ import { usePathname, useRouter } from "@/i18n/navigation";
 import { LocateFixed } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useTransition,
+  type MutableRefObject,
+} from "react";
+
+function clearTimeoutRef(ref: MutableRefObject<number | null>) {
+  if (ref.current != null) {
+    window.clearTimeout(ref.current);
+    ref.current = null;
+  }
+}
 
 export type GuestAmenityOption = {
   code: string;
@@ -119,6 +135,15 @@ type Props = {
 const ALL_PROVINCES = "__all__";
 const STAY_ANY = "__any__";
 const DRIVEWAY_ANY = "__any__";
+
+/** Debounce for free-text search / leave-place URL push. */
+const SEARCH_INPUT_DEBOUNCE_MS = 300;
+/**
+ * Quiet period before starting a search navigation for discrete filter
+ * clicks (checkboxes, selects). Long enough to multi-select without a
+ * reload per click; short enough to feel responsive.
+ */
+const FILTER_NAV_DEBOUNCE_MS = 600;
 
 const AMP_FILTERS: {
   value: ElectricityAmpFilterOption;
@@ -348,6 +373,8 @@ export default function CampgroundListControls({
   const maxPriceDebounceRef = useRef<number | null>(null);
   /** True after editing away from a place label until the leave navigation lands. */
   const [leavePlacePending, setLeavePlacePending] = useState(false);
+  /** Quiet-period hint while multi-select filter nav is debounced (results still stale). */
+  const [filterNavPending, setFilterNavPending] = useState(false);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
@@ -366,6 +393,58 @@ export default function CampgroundListControls({
       urlRigLengthState,
     ),
   );
+  // Stable controller (lazy useState — navigate wired in layout effect below).
+  const [filterNav] = useState(() =>
+    createDebouncedNavigation<CampgroundQueryState>({
+      debounceMs: FILTER_NAV_DEBOUNCE_MS,
+      onPendingChange: setFilterNavPending,
+    }),
+  );
+  /**
+   * External URL adoption signal. Epoch-only: do not put `searchParams` in the
+   * cancel effect deps (that re-cancelled on every own push after the first Back).
+   */
+  const [externalUrlSignal, setExternalUrlSignal] = useState<{
+    epoch: number;
+    query: string;
+  }>({ epoch: 0, query: "" });
+  /** Last query we actually pushed (or adopted from external URL) — for no-op skips. */
+  const lastReplacedParamsRef = useRef(
+    new URLSearchParams(searchParams.toString()),
+  );
+  // Live search text for navigate-time merge (avoid freezing q while holding).
+  const searchRef = useRef(search);
+  /** Place-centered search: keep q empty so RPC does not also ILIKE the label. */
+  function liveSearchQ(place: string | undefined): string {
+    return place ? "" : searchRef.current;
+  }
+
+  // Wire navigate outside render (react-hooks/refs).
+  useLayoutEffect(() => {
+    filterNav.setNavigate((state) => {
+      // Hold URL-derived fields from `state`, but always take live free-text q
+      // so typing during a quiet/in-flight window is not dropped.
+      const next: CampgroundQueryState = {
+        ...state,
+        // Place-centered: empty q (same rule as liveSearchQ).
+        q: state.place ? "" : searchRef.current,
+      };
+      latestParamsRef.current = next;
+      // Match lastPushedQ to what we actually push (not the pre-merge scheduled q).
+      setLastPushedQ(next.q.trim());
+      const params = buildCampgroundSearchParams(next);
+      // Skip when equal to the last push (or external URL we adopted) — not the
+      // possibly-stale in-flight `searchParams` during isPending.
+      if (campgroundSearchParamsEqual(params, lastReplacedParamsRef.current)) {
+        return;
+      }
+      lastReplacedParamsRef.current = new URLSearchParams(params.toString());
+      const query = params.toString();
+      startTransition(() => {
+        router.replace(query ? `${pathname}?${query}` : pathname);
+      });
+    });
+  }, [filterNav, pathname, router, startTransition]);
 
   // Sync search input from URL only for external changes (back/forward / Clear).
   if (displayFromUrl !== prevDisplayFromUrl) {
@@ -373,6 +452,10 @@ export default function CampgroundListControls({
     const externalQ = qParam !== lastPushedQ;
     const externalPlace = placeLabel !== prevPlaceLabel;
     if (externalQ || externalPlace) {
+      setExternalUrlSignal((prev) => ({
+        epoch: prev.epoch + 1,
+        query: searchParams.toString(),
+      }));
       setLastPushedQ(qParam);
       setPrevPlaceLabel(placeLabel);
       setActivePlace(placeLabel);
@@ -394,6 +477,10 @@ export default function CampgroundListControls({
     const isExternal =
       urlFiltersKey !== lastPushedFiltersKey || urlRigUnit !== lastPushedRigUnit;
     if (isExternal) {
+      setExternalUrlSignal((prev) => ({
+        epoch: prev.epoch + 1,
+        query: searchParams.toString(),
+      }));
       setLastPushedFiltersKey(urlFiltersKey);
       setLastPushedRigUnit(urlRigUnit);
       // setState only during render (react-hooks/refs); effects sync refs below.
@@ -414,12 +501,19 @@ export default function CampgroundListControls({
   }
 
   useEffect(() => {
+    const liveQ = activePlace ? "" : search;
+    // Hold URL-derived fields until the URL catches up — but keep free-text q live
+    // so a checkbox click cannot drop mid-typing search text.
+    if (filterNavPending || isPending) {
+      latestParamsRef.current = { ...latestParamsRef.current, q: liveQ };
+      return;
+    }
     // Build from local state only — do not re-seed from URL here (avoids a race
     // where a pending clear is overwritten before router.replace lands).
     latestParamsRef.current = queryStateFromFilters(
       {
         // Place-centered search: keep q empty so RPC does not also ILIKE the label.
-        q: activePlace ? "" : search,
+        q: liveQ,
         sort: sortParam,
         province: provinceParam,
         lat: geo?.lat,
@@ -443,10 +537,26 @@ export default function CampgroundListControls({
     localFilters,
     rigUnit,
     rigLengthUrlState,
+    filterNavPending,
+    isPending,
   ]);
+
+  // Cancel pending debounced pushes after external URL sync (back/forward).
+  // Layout effect keyed only on the epoch signal — not live searchParams — so our
+  // own pushes landing do not cancel a filter/search debounce armed mid-flight.
+  useLayoutEffect(() => {
+    if (externalUrlSignal.epoch === 0) return;
+    clearTimeoutRef(debounceTimeoutRef);
+    filterNav.cancel();
+    lastReplacedParamsRef.current = new URLSearchParams(externalUrlSignal.query);
+  }, [externalUrlSignal, filterNav]);
 
   // Sync refs after render-time setState (external URL sync). Event handlers
   // use updateRigDraft / updateRigUnit so the ref is current before the next paint.
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
+
   useEffect(() => {
     rigDraftRef.current = rigDraft;
   }, [rigDraft]);
@@ -464,14 +574,21 @@ export default function CampgroundListControls({
     return () => {
       cancelledRef.current = true;
       geoRequestIdRef.current += 1;
+      // Leaving the page: drop pending drafts/navigations (intentional).
+      clearTimeoutRef(debounceTimeoutRef);
+      clearTimeoutRef(rigDebounceRef);
+      clearTimeoutRef(maxPriceDebounceRef);
+      filterNav.cancel();
     };
-  }, []);
+  }, [filterNav]);
 
   function clearSearchDebounce() {
-    if (debounceTimeoutRef.current != null) {
-      window.clearTimeout(debounceTimeoutRef.current);
-      debounceTimeoutRef.current = null;
-    }
+    clearTimeoutRef(debounceTimeoutRef);
+  }
+
+  /** Pending debounced target if any, else the live params ref. */
+  function currentQueryBase(): CampgroundQueryState {
+    return filterNav.peekPending() ?? latestParamsRef.current;
   }
 
   /** Clear geo + remap distance sort when finishing a leave-place navigation. */
@@ -521,8 +638,7 @@ export default function CampgroundListControls({
    */
   function takePendingRigLength(): number | null | undefined {
     if (rigDebounceRef.current != null) {
-      window.clearTimeout(rigDebounceRef.current);
-      rigDebounceRef.current = null;
+      clearTimeoutRef(rigDebounceRef);
       return resolveRigDraft();
     }
     return latestParamsRef.current.rigLength;
@@ -542,8 +658,7 @@ export default function CampgroundListControls({
 
   function takePendingMaxPrice(): number | undefined {
     if (maxPriceDebounceRef.current != null) {
-      window.clearTimeout(maxPriceDebounceRef.current);
-      maxPriceDebounceRef.current = null;
+      clearTimeoutRef(maxPriceDebounceRef);
       return resolveMaxPriceDraft();
     }
     return latestParamsRef.current.maxPrice;
@@ -554,48 +669,63 @@ export default function CampgroundListControls({
     setGeoBusy(false);
   }
 
-  function replaceQuery(next: CampgroundQueryState) {
-    const trimmedQ = next.q.trim();
+  /**
+   * Apply filter/search state locally and push the URL (search). Pass
+   * `{ debounce: true }` for multi-select checkbox groups so rapid toggles
+   * coalesce; the scheduled target is held by `filterNav` so URL-sync effects
+   * cannot clobber sort/province/geo before the quiet period ends.
+   */
+  function replaceQuery(
+    next: CampgroundQueryState,
+    options?: { debounce?: boolean },
+  ) {
+    // Normalize place-mode q before tracking / scheduling (matches navigate).
+    const normalized: CampgroundQueryState = {
+      ...next,
+      q: next.place ? "" : next.q,
+    };
+    const trimmedQ = normalized.q.trim();
     setLastPushedQ(trimmedQ);
-    setActivePlace(next.place);
-    setPrevPlaceLabel(next.place);
-    const nextUnit: RigLengthUnit = next.rigUnit === "m" ? "m" : "ft";
+    setActivePlace(normalized.place);
+    setPrevPlaceLabel(normalized.place);
+    const nextUnit: RigLengthUnit = normalized.rigUnit === "m" ? "m" : "ft";
     const campingAttrsOk = campingSiteAttrsAllowed(
-      next.stayKind,
-      next.siteTypes,
+      normalized.stayKind,
+      normalized.siteTypes,
     );
     // URL state (omit / null / number) vs resolved feet for localFilters /
     // lastPushed key — must match what URL sync will resolve after replace,
     // or our own echo is treated as external and clobbers mid-type drafts.
     const resolvedFeet = feetFromRigLengthUrlState(
-      next.rigLength,
+      normalized.rigLength,
       defaultRigLength,
       campingAttrsOk,
     );
     const filtersForKey = {
-      ...siteFiltersFromQueryState(next),
+      ...siteFiltersFromQueryState(normalized),
       rigLength: resolvedFeet,
     };
     const nextKey = siteFiltersKey(filtersForKey);
     setLastPushedFiltersKey(nextKey);
     setLastPushedRigUnit(nextUnit);
     setLocalFilters(filtersForKey);
-    setRigLengthUrlState(next.rigLength);
+    setRigLengthUrlState(normalized.rigLength);
     updateRigUnit(nextUnit);
     // Do not overwrite mid-typing drafts here — external URL sync does that.
     if (!campingAttrsOk) {
       updateRigDraft("");
     }
-    latestParamsRef.current = next;
+    latestParamsRef.current = normalized;
 
-    const params = buildCampgroundSearchParams(next);
-    const query = params.toString();
-    startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname);
-    });
+    if (options?.debounce) {
+      filterNav.schedule(normalized);
+      return;
+    }
+    filterNav.flushNow(normalized);
   }
 
   function onSearchInputChange(nextValue: string) {
+    searchRef.current = nextValue;
     setSearch(nextValue);
     // Leaving place mode: clear local place flag only. The sync effect rebuilds
     // latestParamsRef from the still-geo URL, so geo/sort are fixed in the
@@ -610,16 +740,18 @@ export default function CampgroundListControls({
     place: Extract<SearchSuggestion, { kind: "place" }>,
   ) {
     clearSearchDebounce();
+    filterNav.cancel();
     setLeavePlacePending(false);
     const label = place.subtitle
       ? `${place.label}, ${place.subtitle}`
       : place.label;
+    searchRef.current = label;
     setSearch(label);
     setGeoError(null);
-    const radiusKm =
-      latestParamsRef.current.radiusKm ?? preferredRadius;
+    const latest = currentQueryBase();
+    const radiusKm = latest.radiusKm ?? preferredRadius;
     replaceQuery(
-      withLatestCampgroundFilters(latestParamsRef.current, {
+      withLatestCampgroundFilters(latest, {
         q: "",
         sort: "distance",
         place: label,
@@ -634,6 +766,7 @@ export default function CampgroundListControls({
     campground: Extract<SearchSuggestion, { kind: "campground" }>,
   ) {
     clearSearchDebounce();
+    filterNav.cancel();
     setLeavePlacePending(false);
     startTransition(() => {
       router.push(
@@ -659,15 +792,17 @@ export default function CampgroundListControls({
     );
     updateRigUnit(nextUnit);
     updateRigDraft(converted);
-    const latest = latestParamsRef.current;
+    const latest = currentQueryBase();
     const leavePatch = leavePlacePending
       ? leavePlaceUrlPatch(latest)
       : undefined;
     if (leavePlacePending) setLeavePlacePending(false);
+    // leavePlaceUrlPatch sets place: undefined — must not fall back via ??.
+    const placeAfter = leavePatch ? leavePatch.place : latest.place;
     replaceQuery(
       withLatestCampgroundFilters(latest, {
         ...leavePatch,
-        q: latest.q,
+        q: liveSearchQ(placeAfter),
         sort: leavePatch?.sort ?? latest.sort,
         rigLength: feet,
         rigUnit: nextUnit,
@@ -675,12 +810,20 @@ export default function CampgroundListControls({
     );
   }
 
-  /** Apply a filter patch; flush pending rig / max-price drafts so they are not dropped. */
+  /**
+   * Apply a filter patch; flush pending rig / max-price drafts so they are not
+   * dropped. Pass `{ debounce: true }` for multi-select checkboxes only —
+   * single-choice selects stay immediate (URL-controlled displays must not
+   * snap back during a quiet period).
+   */
   function replaceWithFilters(
     patch: Parameters<typeof withLatestCampgroundFilters>[1],
+    options?: { debounce?: boolean },
   ) {
     clearSearchDebounce();
-    const latest = latestParamsRef.current;
+    // Prefer a pending debounced target so a second checkbox click during the
+    // quiet period builds on leave-place / prior toggles, not URL-rebuilt state.
+    const latest = currentQueryBase();
     const patchSetsGeo = "lat" in patch || "lng" in patch;
     // Finish leave-place in the same navigation unless the patch sets its own geo
     // (e.g. near-me). Never keep old place radius after the user left the label.
@@ -691,16 +834,24 @@ export default function CampgroundListControls({
     if (leavePlacePending) setLeavePlacePending(false);
     const rigLength = takePendingRigLength();
     const maxPrice = takePendingMaxPrice();
+    const placeAfter =
+      leavePatch && "place" in leavePatch
+        ? leavePatch.place
+        : "place" in patch
+          ? patch.place
+          : latest.place;
     replaceQuery(
       withLatestCampgroundFilters(latest, {
         ...leavePatch,
         ...patch,
-        q: patch.q ?? latest.q,
+        // Prefer explicit patch.q, else live search text (not a frozen pending q).
+        q: patch.q ?? liveSearchQ(placeAfter),
         sort: patch.sort ?? leavePatch?.sort ?? latest.sort,
         // Flush only when camping stays allowed; lodging clears via withLatest.
         ...("rigLength" in patch ? {} : { rigLength }),
         ...("maxPrice" in patch ? {} : { maxPrice }),
       }),
+      options?.debounce ? { debounce: true } : undefined,
     );
   }
 
@@ -722,7 +873,7 @@ export default function CampgroundListControls({
     debounceTimeoutRef.current = window.setTimeout(() => {
       debounceTimeoutRef.current = null;
       setLeavePlacePending(false);
-      const latest = latestParamsRef.current;
+      const latest = currentQueryBase();
       const rigLength = takePendingRigLength();
       const maxPrice = takePendingMaxPrice();
       // Sync effect may have restored URL geo + distance sort into the ref;
@@ -738,7 +889,7 @@ export default function CampgroundListControls({
           : undefined,
         maxPrice,
       });
-    }, 300);
+    }, SEARCH_INPUT_DEBOUNCE_MS);
 
     return clearSearchDebounce;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search` / leavePlacePending
@@ -758,6 +909,7 @@ export default function CampgroundListControls({
           return;
         }
         setGeoBusy(false);
+        searchRef.current = "";
         setSearch("");
         replaceWithFilters({
           q: "",
@@ -808,8 +960,10 @@ export default function CampgroundListControls({
       geo ||
       anySiteFilterActive(localFilters),
   );
-  // Discrete controls only — keep the search input enabled during isPending so
-  // typing is not blurred/lost while router.replace transitions.
+  // Disable discrete controls during isPending so a late URL echo cannot race a
+  // mid-click localFilters update (render-time sync adopts URL when keys diverge).
+  // Keep them enabled while only filterNavPending so multi-select can continue.
+  // Search input stays enabled during isPending so typing is not blurred/lost.
   const discreteControlsDisabled = geoBusy || isPending;
   const selectedAmps = new Set(localFilters.amps);
   const selectedSiteTypes = new Set(localFilters.siteTypes);
@@ -839,7 +993,9 @@ export default function CampgroundListControls({
     // node's attributes. Keep its className/attrs derived from SSR-safe state only
     // (URL + server props), or remove the flag and re-check the console.
     <div
-      className={`space-y-4 ${isPending || geoBusy ? "opacity-80" : ""}`}
+      className={`space-y-4 ${
+        isPending || geoBusy || filterNavPending ? "opacity-80" : ""
+      }`}
       suppressHydrationWarning
     >
       <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
@@ -973,16 +1129,12 @@ export default function CampgroundListControls({
             disabled={discreteControlsDisabled}
             onClick={() => {
               clearSearchDebounce();
+              filterNav.cancel();
               setLeavePlacePending(false);
-              if (rigDebounceRef.current != null) {
-                window.clearTimeout(rigDebounceRef.current);
-                rigDebounceRef.current = null;
-              }
-              if (maxPriceDebounceRef.current != null) {
-                window.clearTimeout(maxPriceDebounceRef.current);
-                maxPriceDebounceRef.current = null;
-              }
+              clearTimeoutRef(rigDebounceRef);
+              clearTimeoutRef(maxPriceDebounceRef);
               cancelGeolocation();
+              searchRef.current = "";
               setSearch("");
               setActivePlace(undefined);
               // Explicit clear when a profile default would otherwise reapply.
@@ -1035,15 +1187,19 @@ export default function CampgroundListControls({
                   checked={selectedSiteTypes.has(code)}
                   disabled={discreteControlsDisabled}
                   onCheckedChange={(checked) => {
-                    replaceWithFilters({
-                      q: search,
-                      sort: latestParamsRef.current.sort,
-                      siteTypes: toggleSiteTypeFilter(
-                        latestParamsRef.current.siteTypes,
-                        code,
-                        checked === true,
-                      ),
-                    });
+                    const latest = currentQueryBase();
+                    replaceWithFilters(
+                      {
+                        q: search,
+                        sort: latest.sort,
+                        siteTypes: toggleSiteTypeFilter(
+                          latest.siteTypes,
+                          code,
+                          checked === true,
+                        ),
+                      },
+                      { debounce: true },
+                    );
                   }}
                 />
                 <Label htmlFor={id} className="font-normal cursor-pointer">
@@ -1070,15 +1226,19 @@ export default function CampgroundListControls({
                   checked={selectedAmps.has(value)}
                   disabled={discreteControlsDisabled}
                   onCheckedChange={(checked) => {
-                    replaceWithFilters({
-                      q: search,
-                      sort: latestParamsRef.current.sort,
-                      amps: toggleAmpFilter(
-                        latestParamsRef.current.amps,
-                        value,
-                        checked === true,
-                      ),
-                    });
+                    const latest = currentQueryBase();
+                    replaceWithFilters(
+                      {
+                        q: search,
+                        sort: latest.sort,
+                        amps: toggleAmpFilter(
+                          latest.amps,
+                          value,
+                          checked === true,
+                        ),
+                      },
+                      { debounce: true },
+                    );
                   }}
                 />
                 <Label htmlFor={id} className="font-normal cursor-pointer">
@@ -1105,11 +1265,14 @@ export default function CampgroundListControls({
                   checked={localFilters[key]}
                   disabled={discreteControlsDisabled}
                   onCheckedChange={(checked) => {
-                    replaceWithFilters({
-                      q: search,
-                      sort: latestParamsRef.current.sort,
-                      [key]: checked === true,
-                    });
+                    replaceWithFilters(
+                      {
+                        q: search,
+                        sort: currentQueryBase().sort,
+                        [key]: checked === true,
+                      },
+                      { debounce: true },
+                    );
                   }}
                 />
                 <Label htmlFor={id} className="font-normal cursor-pointer">
@@ -1181,20 +1344,19 @@ export default function CampgroundListControls({
                 autoComplete="off"
                 onChange={(value) => {
                   updateRigDraft(value);
-                  if (rigDebounceRef.current != null) {
-                    window.clearTimeout(rigDebounceRef.current);
-                  }
+                  clearTimeoutRef(rigDebounceRef);
                   rigDebounceRef.current = window.setTimeout(() => {
                     rigDebounceRef.current = null;
+                    const latest = currentQueryBase();
                     replaceQuery(
-                      withLatestCampgroundFilters(latestParamsRef.current, {
-                        q: latestParamsRef.current.q,
-                        sort: latestParamsRef.current.sort,
+                      withLatestCampgroundFilters(latest, {
+                        q: liveSearchQ(latest.place),
+                        sort: latest.sort,
                         rigLength: resolveRigDraft(),
                         rigUnit: rigUnitRef.current,
                       }),
                     );
-                  }, 300);
+                  }, SEARCH_INPUT_DEBOUNCE_MS);
                 }}
                 unit={rigUnit}
                 onUnitChange={onRigUnitChange}
@@ -1230,22 +1392,20 @@ export default function CampgroundListControls({
                 onChange={(e) => {
                   const value = e.target.value;
                   updateMaxPriceDraft(value);
-                  if (maxPriceDebounceRef.current != null) {
-                    window.clearTimeout(maxPriceDebounceRef.current);
-                  }
+                  clearTimeoutRef(maxPriceDebounceRef);
                   maxPriceDebounceRef.current = window.setTimeout(() => {
                     maxPriceDebounceRef.current = null;
+                    const latest = currentQueryBase();
                     replaceQuery(
-                      withLatestCampgroundFilters(latestParamsRef.current, {
-                        q: latestParamsRef.current.q,
-                        sort: latestParamsRef.current.sort,
+                      withLatestCampgroundFilters(latest, {
+                        q: liveSearchQ(latest.place),
+                        sort: latest.sort,
                         maxPrice: resolveMaxPriceDraft(),
                         priceCurrency:
-                          latestParamsRef.current.priceCurrency ??
-                          GUEST_PRICE_CURRENCY,
+                          latest.priceCurrency ?? GUEST_PRICE_CURRENCY,
                       }),
                     );
-                  }, 300);
+                  }, SEARCH_INPUT_DEBOUNCE_MS);
                 }}
               />
               <Select
@@ -1306,11 +1466,14 @@ export default function CampgroundListControls({
             checked={localFilters.dumpStation}
             disabled={discreteControlsDisabled}
             onCheckedChange={(checked) => {
-              replaceWithFilters({
-                q: search,
-                sort: latestParamsRef.current.sort,
-                dumpStation: checked === true,
-              });
+              replaceWithFilters(
+                {
+                  q: search,
+                  sort: currentQueryBase().sort,
+                  dumpStation: checked === true,
+                },
+                { debounce: true },
+              );
             }}
           />
           <Label htmlFor="dump-station" className="font-normal cursor-pointer">
@@ -1349,15 +1512,19 @@ export default function CampgroundListControls({
                     checked={selectedAmenityKeys.has(key)}
                     disabled={discreteControlsDisabled}
                     onCheckedChange={(checked) => {
-                      replaceWithFilters({
-                        q: search,
-                        sort: latestParamsRef.current.sort,
-                        amenityCodes: toggleAmenityFilter(
-                          latestParamsRef.current.amenityCodes,
-                          opt.code,
-                          checked === true,
-                        ),
-                      });
+                      const latest = currentQueryBase();
+                      replaceWithFilters(
+                        {
+                          q: search,
+                          sort: latest.sort,
+                          amenityCodes: toggleAmenityFilter(
+                            latest.amenityCodes,
+                            opt.code,
+                            checked === true,
+                          ),
+                        },
+                        { debounce: true },
+                      );
                     }}
                   />
                   <Label htmlFor={id} className="font-normal cursor-pointer">

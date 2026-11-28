@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   buildCampgroundSearchParams,
   campgroundSearchKey,
+  campgroundSearchParamsEqual,
   clearedCampgroundQueryState,
   hookupsKey,
   siteFiltersKey,
@@ -261,6 +262,16 @@ describe("buildCampgroundSearchParams / clear", () => {
       place: "Québec, Canada",
     });
     assert.equal(withoutGeo.get("place"), null);
+  });
+
+  it("campgroundSearchParamsEqual ignores key order", () => {
+    const a = new URLSearchParams("b=2&a=1");
+    const b = new URLSearchParams("a=1&b=2");
+    assert.equal(campgroundSearchParamsEqual(a, b), true);
+    assert.equal(
+      campgroundSearchParamsEqual(a, new URLSearchParams("a=1&b=3")),
+      false,
+    );
   });
 
   it("campgroundSearchKey ignores sort and place label", () => {
