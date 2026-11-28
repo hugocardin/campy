@@ -8,6 +8,7 @@ import {
   type SearchSuggestion,
 } from "@/lib/geocoding/types";
 import { formatCampgroundLocation } from "@/lib/format-campground-location";
+import { PASSWORD_MANAGER_IGNORE_PROPS } from "@/lib/password-manager-ignore";
 import { Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
@@ -202,6 +203,7 @@ export default function SearchSuggestInput({
         role="combobox"
         disabled={disabled}
         autoComplete="off"
+        {...PASSWORD_MANAGER_IGNORE_PROPS}
       />
       {showList ? (
         <ul

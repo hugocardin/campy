@@ -63,6 +63,7 @@ import {
   campingSiteAttrsAllowed,
   normalizeGuestSiteTypes,
 } from "@/lib/guest-site-types";
+import { PASSWORD_MANAGER_IGNORE_PROPS } from "@/lib/password-manager-ignore";
 import { routes } from "@/lib/routes";
 import {
   convertRigDraftOnUnitChange,
@@ -835,8 +836,13 @@ export default function CampgroundListControls({
   });
 
   return (
+    // Password managers (e.g. Proton Pass) inject attrs like `data-protonpass-form`
+    // onto this shell before hydration. suppressHydrationWarning only silences THIS
+    // node's attributes. Keep its className/attrs derived from SSR-safe state only
+    // (URL + server props), or remove the flag and re-check the console.
     <div
       className={`space-y-4 ${isPending || geoBusy ? "opacity-80" : ""}`}
+      suppressHydrationWarning
     >
       <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
         <SearchSuggestInput
@@ -1174,6 +1180,7 @@ export default function CampgroundListControls({
                 inputClassName="w-28"
                 value={rigDraft}
                 disabled={geoBusy}
+                autoComplete="off"
                 onChange={(value) => {
                   updateRigDraft(value);
                   if (rigDebounceRef.current != null) {
@@ -1215,6 +1222,8 @@ export default function CampgroundListControls({
                 max={GUEST_MAX_PRICE_CAP}
                 step="any"
                 inputMode="decimal"
+                autoComplete="off"
+                {...PASSWORD_MANAGER_IGNORE_PROPS}
                 className="w-28"
                 placeholder={t("maxPricePlaceholder")}
                 value={maxPriceDraft}
