@@ -382,9 +382,12 @@ export default function CampgroundListControls({
   const [leavePlacePending, setLeavePlacePending] = useState(false);
   /** Quiet-period hint while multi-select filter nav is debounced (results still stale). */
   const [filterNavPending, setFilterNavPending] = useState(false);
-  /** True after a filter-debounce flush until the list `router.replace` finishes. */
-  const [filterFlushInFlight, setFilterFlushInFlight] = useState(false);
-  const filterDebounceArmedRef = useRef(false);
+  /**
+   * Set when a filter-debounce flush starts a list replace. Combined with
+   * `isListPending` so Apply now stays through that reload only (not search typing).
+   * Driven by navigate `reason` (debounce / flushPending), not a cancel race.
+   */
+  const [filterListFlush, setFilterListFlush] = useState(false);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
@@ -407,18 +410,7 @@ export default function CampgroundListControls({
   const [filterNav] = useState(() =>
     createDebouncedNavigation<CampgroundQueryState>({
       debounceMs: FILTER_NAV_DEBOUNCE_MS,
-      onPendingChange: (pending) => {
-        setFilterNavPending(pending);
-        if (pending) {
-          filterDebounceArmedRef.current = true;
-        } else {
-          // Cancel ends without navigate; clear on the next microtask so a
-          // synchronous flush/timer navigate can still consume the arm.
-          queueMicrotask(() => {
-            filterDebounceArmedRef.current = false;
-          });
-        }
-      },
+      onPendingChange: setFilterNavPending,
     }),
   );
   /**
@@ -509,9 +501,9 @@ export default function CampgroundListControls({
 
   // Wire navigate outside render (react-hooks/refs).
   useLayoutEffect(() => {
-    filterNav.setNavigate((state) => {
-      const fromFilterDebounce = filterDebounceArmedRef.current;
-      filterDebounceArmedRef.current = false;
+    filterNav.setNavigate((state, { reason }) => {
+      const fromFilterDebounce =
+        reason === "debounce" || reason === "flushPending";
       // Hold URL-derived fields from `state`, but always take live free-text q
       // so typing during a quiet/in-flight window is not dropped.
       const next: CampgroundQueryState = {
@@ -526,20 +518,26 @@ export default function CampgroundListControls({
       // Skip when equal to the last push (or external URL we adopted) — not the
       // possibly-stale in-flight `searchParams` during isListPending.
       if (campgroundSearchParamsEqual(params, lastReplacedParamsRef.current)) {
+        if (fromFilterDebounce) setFilterListFlush(false);
         return;
       }
       lastReplacedParamsRef.current = new URLSearchParams(params.toString());
       const query = params.toString();
-      if (fromFilterDebounce) setFilterFlushInFlight(true);
+      // Keep Apply now through this list reload only for filter debounce flushes
+      // (timer / Apply now), not search-text or Clear flushNow.
+      setFilterListFlush(fromFilterDebounce);
+      // Timer path: move focus off Apply now before paint hides it later.
+      if (
+        fromFilterDebounce &&
+        document.activeElement === filterApplyNowRef.current
+      ) {
+        filterStatusRef.current?.focus({ preventScroll: true });
+      }
       startListTransition(() => {
         router.replace(query ? `${pathname}?${query}` : pathname);
       });
     });
   }, [filterNav, pathname, router, startListTransition]);
-
-  useEffect(() => {
-    if (!isListPending) setFilterFlushInFlight(false);
-  }, [isListPending]);
 
   // Sync search input from URL only for external changes (back/forward / Clear).
   if (displayFromUrl !== prevDisplayFromUrl) {
@@ -1090,7 +1088,8 @@ export default function CampgroundListControls({
   // Status through quiet period + any list reload (search typing included).
   const showFilterUpdateStatus = filterNavPending || isListPending;
   // Apply now only for filter-debounce quiet/flush — not search-text reloads.
-  const showFilterApplyNow = filterNavPending || filterFlushInFlight;
+  const showFilterApplyNow =
+    filterNavPending || (filterListFlush && isListPending);
   const selectedAmps = new Set(localFilters.amps);
   const selectedSiteTypes = new Set(localFilters.siteTypes);
   const selectedAmenityKeys = new Set(
@@ -1113,8 +1112,9 @@ export default function CampgroundListControls({
     return true;
   });
 
-  // Timer flush can hide Apply now while it still has focus — move to status.
-  useEffect(() => {
+  // Timer/transition end can hide Apply now while focused — move before paint
+  // (passive useEffect runs too late; Chromium already dropped focus to body).
+  useLayoutEffect(() => {
     if (showFilterApplyNow) return;
     if (document.activeElement === filterApplyNowRef.current) {
       filterStatusRef.current?.focus({ preventScroll: true });

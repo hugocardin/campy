@@ -140,4 +140,26 @@ describe("createDebouncedNavigation", () => {
     assert.deepEqual(first, []);
     assert.deepEqual(second, ["later"]);
   });
+
+  it("passes reason debounce | flushPending | flushNow to navigate", () => {
+    const { setTimeoutFn, clearTimeoutFn, advance } = createFakeTimers();
+    const reasons: string[] = [];
+    const nav = createDebouncedNavigation<string>({
+      debounceMs: 600,
+      navigate: (_s, meta) => reasons.push(meta.reason),
+      setTimeoutFn,
+      clearTimeoutFn,
+    });
+
+    nav.schedule("a");
+    advance(600);
+    assert.deepEqual(reasons, ["debounce"]);
+
+    nav.schedule("b");
+    assert.equal(nav.flushPending(), true);
+    assert.deepEqual(reasons, ["debounce", "flushPending"]);
+
+    nav.flushNow("c");
+    assert.deepEqual(reasons, ["debounce", "flushPending", "flushNow"]);
+  });
 });
