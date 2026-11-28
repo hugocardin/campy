@@ -10,6 +10,11 @@ export type DebouncedNavigateMeta = {
   reason: DebouncedNavigateReason;
 };
 
+export type DebouncedNavigateFn<T> = (
+  state: T,
+  meta: DebouncedNavigateMeta,
+) => void;
+
 export type DebouncedNavigation<T> = {
   /** Queue `state` and (re)start the quiet-period timer. */
   schedule(state: T): void;
@@ -23,7 +28,7 @@ export type DebouncedNavigation<T> = {
   /** Drop a pending navigation without calling `navigate`. */
   cancel(): void;
   /** Replace the navigate callback (e.g. from a layout effect). */
-  setNavigate(navigate: (state: T, meta: DebouncedNavigateMeta) => void): void;
+  setNavigate(navigate: DebouncedNavigateFn<T>): void;
   /** Pending target, if a timer is armed. */
   peekPending(): T | null;
   /** True while a debounced navigation is scheduled. */
@@ -35,7 +40,7 @@ type TimerHandle = ReturnType<typeof setTimeout>;
 export function createDebouncedNavigation<T>(options: {
   debounceMs: number;
   /** Optional initial navigate; prefer `setNavigate` from an effect when wiring React. */
-  navigate?: (state: T, meta: DebouncedNavigateMeta) => void;
+  navigate?: DebouncedNavigateFn<T>;
   /** Fired when a debounce becomes pending or clears (schedule / flush / cancel / fire). */
   onPendingChange?: (pending: boolean) => void;
   setTimeoutFn?: typeof setTimeout;
@@ -45,10 +50,9 @@ export function createDebouncedNavigation<T>(options: {
   const clearTimeoutFn = options.clearTimeoutFn ?? clearTimeout;
   let timer: TimerHandle | null = null;
   let pending: T | null = null;
-  let navigate =
+  let navigate: DebouncedNavigateFn<T> =
     options.navigate ??
-    ((..._args: [T, DebouncedNavigateMeta]) => {
-      void _args;
+    (() => {
       if (process.env.NODE_ENV !== "production") {
         console.warn(
           "createDebouncedNavigation: navigate called before setNavigate",

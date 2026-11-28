@@ -383,11 +383,12 @@ export default function CampgroundListControls({
   /** Quiet-period hint while multi-select filter nav is debounced (results still stale). */
   const [filterNavPending, setFilterNavPending] = useState(false);
   /**
-   * Set when a filter-debounce flush starts a list replace. Combined with
-   * `isListPending` so Apply now stays through that reload only (not search typing).
-   * Driven by navigate `reason` (debounce / flushPending), not a cancel race.
+   * True while a filter-debounce list replace is in flight. Set from navigate
+   * `reason` (`debounce` / `flushPending`); cleared when `isListPending` ends
+   * (render sync below) so a later unrelated list transition cannot inherit it.
    */
   const [filterListFlush, setFilterListFlush] = useState(false);
+  const [prevIsListPending, setPrevIsListPending] = useState(isListPending);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
@@ -538,6 +539,15 @@ export default function CampgroundListControls({
       });
     });
   }, [filterNav, pathname, router, startListTransition]);
+
+  // Clear filter-flush flag when the list transition ends (not an effect —
+  // avoids react-hooks/set-state-in-effect while keeping the flag honest).
+  if (isListPending !== prevIsListPending) {
+    setPrevIsListPending(isListPending);
+    if (!isListPending && filterListFlush) {
+      setFilterListFlush(false);
+    }
+  }
 
   // Sync search input from URL only for external changes (back/forward / Clear).
   if (displayFromUrl !== prevDisplayFromUrl) {
