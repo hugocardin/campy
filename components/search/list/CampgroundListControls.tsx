@@ -415,9 +415,43 @@ export default function CampgroundListControls({
   );
   // Live search text for navigate-time merge (avoid freezing q while holding).
   const searchRef = useRef(search);
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   /** Place-centered search: keep q empty so RPC does not also ILIKE the label. */
   function liveSearchQ(place: string | undefined): string {
     return place ? "" : searchRef.current;
+  }
+
+  /**
+   * Commit a pending filter debounce before leaving the page.
+   *
+   * Writes the held target with `history.replaceState` (sync) so a concurrent
+   * Link/`router.push` is not raced by `startTransition(router.replace)`.
+   * While mounted, `flushPending` then clears the timer (navigate no-ops when
+   * params already match). On unload/unmount, skip flush (avoid setState) and
+   * `cancel` the timer after the URL is committed.
+   */
+  function flushPendingFiltersForLeave(options?: { syncOnly?: boolean }) {
+    const pending = filterNav.peekPending();
+    if (pending == null) return;
+    const next: CampgroundQueryState = {
+      ...pending,
+      q: pending.place ? "" : searchRef.current,
+    };
+    latestParamsRef.current = next;
+    const params = buildCampgroundSearchParams(next);
+    if (!campgroundSearchParamsEqual(params, lastReplacedParamsRef.current)) {
+      const query = params.toString();
+      const path = pathnameRef.current;
+      const url = query ? `${path}?${query}` : path;
+      window.history.replaceState(window.history.state ?? null, "", url);
+      lastReplacedParamsRef.current = new URLSearchParams(params.toString());
+    }
+    if (options?.syncOnly) {
+      filterNav.cancel();
+      return;
+    }
+    filterNav.flushPending();
   }
 
   // Wire navigate outside render (react-hooks/refs).
@@ -572,15 +606,39 @@ export default function CampgroundListControls({
 
   useEffect(() => {
     cancelledRef.current = false;
+
+    /** In-app leave via links: flush before Next.js commits the new route. */
+    function onDocumentClickCapture(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href");
+      if (href == null || href === "" || href.startsWith("#")) return;
+      flushPendingFiltersForLeave();
+    }
+
+    /** Refresh / tab close / mobile pagehide: keep pending filters in the URL. */
+    function onPageHide() {
+      flushPendingFiltersForLeave({ syncOnly: true });
+    }
+
+    document.addEventListener("click", onDocumentClickCapture, true);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
+      document.removeEventListener("click", onDocumentClickCapture, true);
+      window.removeEventListener("pagehide", onPageHide);
       cancelledRef.current = true;
       geoRequestIdRef.current += 1;
-      // Leaving the page: drop pending drafts/navigations (intentional).
+      // Typing drafts still drop; pending discrete filters commit to history so
+      // Back/refresh keep the selection the user already made.
       clearTimeoutRef(debounceTimeoutRef);
       clearTimeoutRef(rigDebounceRef);
       clearTimeoutRef(maxPriceDebounceRef);
-      filterNav.cancel();
+      flushPendingFiltersForLeave({ syncOnly: true });
     };
+    // flushPendingFiltersForLeave reads refs + stable filterNav.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/leave only
   }, [filterNav]);
 
   function clearSearchDebounce() {
@@ -767,7 +825,7 @@ export default function CampgroundListControls({
     campground: Extract<SearchSuggestion, { kind: "campground" }>,
   ) {
     clearSearchDebounce();
-    filterNav.cancel();
+    flushPendingFiltersForLeave();
     setLeavePlacePending(false);
     startTransition(() => {
       router.push(

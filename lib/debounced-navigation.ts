@@ -9,6 +9,11 @@ export type DebouncedNavigation<T> = {
   schedule(state: T): void;
   /** Cancel any pending timer and navigate with `state` immediately. */
   flushNow(state: T): void;
+  /**
+   * If a navigation is pending, flush it now (same as `flushNow` with the
+   * held target). Returns true when a flush ran.
+   */
+  flushPending(): boolean;
   /** Drop a pending navigation without calling `navigate`. */
   cancel(): void;
   /** Replace the navigate callback (e.g. from a layout effect). */
@@ -73,6 +78,15 @@ export function createDebouncedNavigation<T>(options: {
       pending = null;
       setPendingFlag(false);
       navigate(state);
+    },
+    flushPending() {
+      if (pending == null) return false;
+      const target = pending;
+      clearTimer();
+      pending = null;
+      setPendingFlag(false);
+      navigate(target);
+      return true;
     },
     cancel() {
       const wasPending = timer != null || pending != null;
