@@ -672,9 +672,9 @@ export default function CampgroundListControls({
 
   /**
    * Apply filter/search state locally and push the URL (search). Pass
-   * `{ debounce: true }` for multi-select checkbox groups so rapid toggles
-   * coalesce; the scheduled target is held by `filterNav` so URL-sync effects
-   * cannot clobber sort/province/geo before the quiet period ends.
+   * `{ debounce: true }` for filter checkboxes so rapid toggles coalesce; the
+   * scheduled target is held by `filterNav` so URL-sync effects cannot clobber
+   * sort/province/geo before the quiet period ends.
    */
   function replaceQuery(
     next: CampgroundQueryState,
@@ -813,7 +813,7 @@ export default function CampgroundListControls({
 
   /**
    * Apply a filter patch; flush pending rig / max-price drafts so they are not
-   * dropped. Pass `{ debounce: true }` for multi-select checkboxes only —
+   * dropped. Pass `{ debounce: true }` for filter checkboxes only —
    * single-choice selects stay immediate (URL-controlled displays must not
    * snap back during a quiet period).
    */
