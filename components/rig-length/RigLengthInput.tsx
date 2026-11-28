@@ -2,6 +2,7 @@
 
 import RigLengthUnitToggle from "@/components/rig-length/RigLengthUnitToggle";
 import { Input } from "@/components/ui/input";
+import { PASSWORD_MANAGER_IGNORE_PROPS } from "@/lib/password-manager-ignore";
 import type { RigLengthUnit } from "@/lib/site-rig-length";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
@@ -70,6 +71,7 @@ export default function RigLengthInput({
           value={value}
           disabled={disabled}
           autoComplete={autoComplete}
+          {...PASSWORD_MANAGER_IGNORE_PROPS}
           aria-required={required || undefined}
           aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
