@@ -22,7 +22,8 @@ export type ElectricityAmp = (typeof ELECTRICITY_AMP_VALUES)[number];
 
 /**
  * Legacy separate 20A value; remapped to {@link ELECTRICITY_AMP_15_20}.
- * @deprecated Temporary compat for stale URLs / clients; remove once deploy settles.
+ * @deprecated Temporary compat for stale URLs / clients. Remove together with the
+ * SQL `normalize_campground_site_filter_params` 20→15 remap — see #73.
  */
 export const ELECTRICITY_AMP_LEGACY_20 = 20;
 
