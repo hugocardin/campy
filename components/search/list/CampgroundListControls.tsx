@@ -792,7 +792,8 @@ export default function CampgroundListControls({
       ? leavePlaceUrlPatch(latest)
       : undefined;
     if (leavePlacePending) setLeavePlacePending(false);
-    const placeAfter = leavePatch?.place ?? latest.place;
+    // leavePlaceUrlPatch sets place: undefined — must not fall back via ??.
+    const placeAfter = leavePatch ? leavePatch.place : latest.place;
     replaceQuery(
       withLatestCampgroundFilters(latest, {
         ...leavePatch,
