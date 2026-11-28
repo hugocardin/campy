@@ -416,7 +416,6 @@ export default function CampgroundListControls({
   // Live search text for navigate-time merge (avoid freezing q while holding).
   const searchRef = useRef(search);
   const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
   /** Place-centered search: keep q empty so RPC does not also ILIKE the label. */
   function liveSearchQ(place: string | undefined): string {
     return place ? "" : searchRef.current;
@@ -591,6 +590,10 @@ export default function CampgroundListControls({
   useEffect(() => {
     searchRef.current = search;
   }, [search]);
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
   useEffect(() => {
     rigDraftRef.current = rigDraft;
