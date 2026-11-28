@@ -140,10 +140,10 @@ const DRIVEWAY_ANY = "__any__";
 const SEARCH_INPUT_DEBOUNCE_MS = 300;
 /**
  * Quiet period before starting a search navigation for discrete filter
- * clicks (checkboxes, selects). Long enough to multi-select without a
- * reload per click; short enough to feel responsive.
+ * clicks (multi-select checkboxes). Long enough to finish a multi-select
+ * pass without a reload per click; short enough to feel intentional.
  */
-const FILTER_NAV_DEBOUNCE_MS = 600;
+const FILTER_NAV_DEBOUNCE_MS = 2500;
 
 const AMP_FILTERS: {
   value: ElectricityAmpFilterOption;
