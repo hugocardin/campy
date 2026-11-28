@@ -120,6 +120,15 @@ const ALL_PROVINCES = "__all__";
 const STAY_ANY = "__any__";
 const DRIVEWAY_ANY = "__any__";
 
+/** Debounce for free-text search / leave-place URL push. */
+const SEARCH_INPUT_DEBOUNCE_MS = 300;
+/**
+ * Quiet period before starting a search navigation for discrete filter
+ * clicks (checkboxes, selects). Long enough to multi-select without a
+ * reload per click; short enough to feel responsive.
+ */
+const FILTER_NAV_DEBOUNCE_MS = 600;
+
 const AMP_FILTERS: {
   value: ElectricityAmpFilterOption;
   labelKey:
@@ -344,6 +353,7 @@ export default function CampgroundListControls({
   const maxPriceDraftRef = useRef(maxPriceDraft);
 
   const debounceTimeoutRef = useRef<number | null>(null);
+  const filterNavDebounceRef = useRef<number | null>(null);
   const rigDebounceRef = useRef<number | null>(null);
   const maxPriceDebounceRef = useRef<number | null>(null);
   /** True after editing away from a place label until the leave navigation lands. */
@@ -464,6 +474,22 @@ export default function CampgroundListControls({
     return () => {
       cancelledRef.current = true;
       geoRequestIdRef.current += 1;
+      if (debounceTimeoutRef.current != null) {
+        window.clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+      if (filterNavDebounceRef.current != null) {
+        window.clearTimeout(filterNavDebounceRef.current);
+        filterNavDebounceRef.current = null;
+      }
+      if (rigDebounceRef.current != null) {
+        window.clearTimeout(rigDebounceRef.current);
+        rigDebounceRef.current = null;
+      }
+      if (maxPriceDebounceRef.current != null) {
+        window.clearTimeout(maxPriceDebounceRef.current);
+        maxPriceDebounceRef.current = null;
+      }
     };
   }, []);
 
@@ -471,6 +497,13 @@ export default function CampgroundListControls({
     if (debounceTimeoutRef.current != null) {
       window.clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
+    }
+  }
+
+  function clearFilterNavDebounce() {
+    if (filterNavDebounceRef.current != null) {
+      window.clearTimeout(filterNavDebounceRef.current);
+      filterNavDebounceRef.current = null;
     }
   }
 
@@ -554,7 +587,16 @@ export default function CampgroundListControls({
     setGeoBusy(false);
   }
 
-  function replaceQuery(next: CampgroundQueryState) {
+  /**
+   * Apply filter/search state locally and optionally delay the URL replace
+   * that triggers the server search. Debounced navigations always read
+   * `latestParamsRef` when the timer fires so rapid clicks coalesce into
+   * one fetch; a later immediate replace cancels any pending debounce.
+   */
+  function replaceQuery(
+    next: CampgroundQueryState,
+    options?: { debounceMs?: number },
+  ) {
     const trimmedQ = next.q.trim();
     setLastPushedQ(trimmedQ);
     setActivePlace(next.place);
@@ -588,11 +630,27 @@ export default function CampgroundListControls({
     }
     latestParamsRef.current = next;
 
-    const params = buildCampgroundSearchParams(next);
-    const query = params.toString();
-    startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname);
-    });
+    const navigateFromLatest = () => {
+      const latest = latestParamsRef.current;
+      const params = buildCampgroundSearchParams(latest);
+      const query = params.toString();
+      startTransition(() => {
+        router.replace(query ? `${pathname}?${query}` : pathname);
+      });
+    };
+
+    const debounceMs = options?.debounceMs;
+    if (debounceMs != null && debounceMs > 0) {
+      clearFilterNavDebounce();
+      filterNavDebounceRef.current = window.setTimeout(() => {
+        filterNavDebounceRef.current = null;
+        navigateFromLatest();
+      }, debounceMs);
+      return;
+    }
+
+    clearFilterNavDebounce();
+    navigateFromLatest();
   }
 
   function onSearchInputChange(nextValue: string) {
@@ -610,6 +668,7 @@ export default function CampgroundListControls({
     place: Extract<SearchSuggestion, { kind: "place" }>,
   ) {
     clearSearchDebounce();
+    clearFilterNavDebounce();
     setLeavePlacePending(false);
     const label = place.subtitle
       ? `${place.label}, ${place.subtitle}`
@@ -634,6 +693,7 @@ export default function CampgroundListControls({
     campground: Extract<SearchSuggestion, { kind: "campground" }>,
   ) {
     clearSearchDebounce();
+    clearFilterNavDebounce();
     setLeavePlacePending(false);
     startTransition(() => {
       router.push(
@@ -675,9 +735,14 @@ export default function CampgroundListControls({
     );
   }
 
-  /** Apply a filter patch; flush pending rig / max-price drafts so they are not dropped. */
+  /**
+   * Apply a filter patch; flush pending rig / max-price drafts so they are not
+   * dropped. Discrete filter UI updates immediately; the search URL push is
+   * debounced unless `immediate` (near-me / intentional single actions).
+   */
   function replaceWithFilters(
     patch: Parameters<typeof withLatestCampgroundFilters>[1],
+    options?: { immediate?: boolean },
   ) {
     clearSearchDebounce();
     const latest = latestParamsRef.current;
@@ -701,6 +766,9 @@ export default function CampgroundListControls({
         ...("rigLength" in patch ? {} : { rigLength }),
         ...("maxPrice" in patch ? {} : { maxPrice }),
       }),
+      options?.immediate
+        ? undefined
+        : { debounceMs: FILTER_NAV_DEBOUNCE_MS },
     );
   }
 
@@ -738,7 +806,7 @@ export default function CampgroundListControls({
           : undefined,
         maxPrice,
       });
-    }, 300);
+    }, SEARCH_INPUT_DEBOUNCE_MS);
 
     return clearSearchDebounce;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on `search` / leavePlacePending
@@ -759,15 +827,18 @@ export default function CampgroundListControls({
         }
         setGeoBusy(false);
         setSearch("");
-        replaceWithFilters({
-          q: "",
-          sort: "distance",
-          place: undefined,
-          lat: roundCampgroundCoord(pos.coords.latitude),
-          lng: roundCampgroundCoord(pos.coords.longitude),
-          radiusKm:
-            latestParamsRef.current.radiusKm ?? preferredRadius,
-        });
+        replaceWithFilters(
+          {
+            q: "",
+            sort: "distance",
+            place: undefined,
+            lat: roundCampgroundCoord(pos.coords.latitude),
+            lng: roundCampgroundCoord(pos.coords.longitude),
+            radiusKm:
+              latestParamsRef.current.radiusKm ?? preferredRadius,
+          },
+          { immediate: true },
+        );
       },
       (err) => {
         if (cancelledRef.current || requestId !== geoRequestIdRef.current) {
@@ -808,7 +879,9 @@ export default function CampgroundListControls({
       geo ||
       anySiteFilterActive(localFilters),
   );
-  // Discrete controls only — keep the search input enabled during isPending so
+  // Discrete controls: keep enabled while a filter debounce is pending so
+  // multi-select works; disable only once the search navigation is in flight
+  // (or while geolocating). Search input stays enabled during isPending so
   // typing is not blurred/lost while router.replace transitions.
   const discreteControlsDisabled = geoBusy || isPending;
   const selectedAmps = new Set(localFilters.amps);
@@ -973,6 +1046,7 @@ export default function CampgroundListControls({
             disabled={discreteControlsDisabled}
             onClick={() => {
               clearSearchDebounce();
+              clearFilterNavDebounce();
               setLeavePlacePending(false);
               if (rigDebounceRef.current != null) {
                 window.clearTimeout(rigDebounceRef.current);
@@ -1194,7 +1268,7 @@ export default function CampgroundListControls({
                         rigUnit: rigUnitRef.current,
                       }),
                     );
-                  }, 300);
+                  }, SEARCH_INPUT_DEBOUNCE_MS);
                 }}
                 unit={rigUnit}
                 onUnitChange={onRigUnitChange}
@@ -1245,7 +1319,7 @@ export default function CampgroundListControls({
                           GUEST_PRICE_CURRENCY,
                       }),
                     );
-                  }, 300);
+                  }, SEARCH_INPUT_DEBOUNCE_MS);
                 }}
               />
               <Select
