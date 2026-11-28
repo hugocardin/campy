@@ -273,6 +273,7 @@ export default function CampgroundListControls({
   const [isListPending, startListTransition] = useTransition();
   const [, startDetailTransition] = useTransition();
   const filterStatusRef = useRef<HTMLParagraphElement>(null);
+  const filterApplyNowRef = useRef<HTMLButtonElement>(null);
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
@@ -381,6 +382,9 @@ export default function CampgroundListControls({
   const [leavePlacePending, setLeavePlacePending] = useState(false);
   /** Quiet-period hint while multi-select filter nav is debounced (results still stale). */
   const [filterNavPending, setFilterNavPending] = useState(false);
+  /** True after a filter-debounce flush until the list `router.replace` finishes. */
+  const [filterFlushInFlight, setFilterFlushInFlight] = useState(false);
+  const filterDebounceArmedRef = useRef(false);
   const geoRequestIdRef = useRef(0);
   const cancelledRef = useRef(false);
   const latestParamsRef = useRef<CampgroundQueryState>(
@@ -403,7 +407,18 @@ export default function CampgroundListControls({
   const [filterNav] = useState(() =>
     createDebouncedNavigation<CampgroundQueryState>({
       debounceMs: FILTER_NAV_DEBOUNCE_MS,
-      onPendingChange: setFilterNavPending,
+      onPendingChange: (pending) => {
+        setFilterNavPending(pending);
+        if (pending) {
+          filterDebounceArmedRef.current = true;
+        } else {
+          // Cancel ends without navigate; clear on the next microtask so a
+          // synchronous flush/timer navigate can still consume the arm.
+          queueMicrotask(() => {
+            filterDebounceArmedRef.current = false;
+          });
+        }
+      },
     }),
   );
   /**
@@ -495,6 +510,8 @@ export default function CampgroundListControls({
   // Wire navigate outside render (react-hooks/refs).
   useLayoutEffect(() => {
     filterNav.setNavigate((state) => {
+      const fromFilterDebounce = filterDebounceArmedRef.current;
+      filterDebounceArmedRef.current = false;
       // Hold URL-derived fields from `state`, but always take live free-text q
       // so typing during a quiet/in-flight window is not dropped.
       const next: CampgroundQueryState = {
@@ -513,11 +530,16 @@ export default function CampgroundListControls({
       }
       lastReplacedParamsRef.current = new URLSearchParams(params.toString());
       const query = params.toString();
+      if (fromFilterDebounce) setFilterFlushInFlight(true);
       startListTransition(() => {
         router.replace(query ? `${pathname}?${query}` : pathname);
       });
     });
   }, [filterNav, pathname, router, startListTransition]);
+
+  useEffect(() => {
+    if (!isListPending) setFilterFlushInFlight(false);
+  }, [isListPending]);
 
   // Sync search input from URL only for external changes (back/forward / Clear).
   if (displayFromUrl !== prevDisplayFromUrl) {
@@ -1065,10 +1087,10 @@ export default function CampgroundListControls({
   // Keep them enabled while only filterNavPending so multi-select can continue.
   // Search input stays enabled during isListPending so typing is not blurred/lost.
   const discreteControlsDisabled = geoBusy || isListPending;
-  // Status through quiet period + list reload only (not detail navigation).
+  // Status through quiet period + any list reload (search typing included).
   const showFilterUpdateStatus = filterNavPending || isListPending;
-  // Keep Apply now in-tab until the list replace finishes so focus is not dropped.
-  const showFilterApplyNow = filterNavPending || isListPending;
+  // Apply now only for filter-debounce quiet/flush — not search-text reloads.
+  const showFilterApplyNow = filterNavPending || filterFlushInFlight;
   const selectedAmps = new Set(localFilters.amps);
   const selectedSiteTypes = new Set(localFilters.siteTypes);
   const selectedAmenityKeys = new Set(
@@ -1091,6 +1113,14 @@ export default function CampgroundListControls({
     return true;
   });
 
+  // Timer flush can hide Apply now while it still has focus — move to status.
+  useEffect(() => {
+    if (showFilterApplyNow) return;
+    if (document.activeElement === filterApplyNowRef.current) {
+      filterStatusRef.current?.focus({ preventScroll: true });
+    }
+  }, [showFilterApplyNow]);
+
   return (
     // Password managers (e.g. Proton Pass) inject attrs like `data-protonpass-form`
     // onto this shell before hydration. suppressHydrationWarning only silences THIS
@@ -1105,10 +1135,17 @@ export default function CampgroundListControls({
       {/* Always mounted: reserves height (no checkbox jump) and keeps the live
           region in the DOM so AT announces text changes. */}
       <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <p ref={filterStatusRef} tabIndex={-1} role="status" aria-live="polite">
+        <p
+          ref={filterStatusRef}
+          tabIndex={-1}
+          role="status"
+          aria-live="polite"
+          className="outline-none"
+        >
           {showFilterUpdateStatus ? t("filtersUpdating") : ""}
         </p>
         <Button
+          ref={filterApplyNowRef}
           type="button"
           variant="ghost"
           size="sm"
