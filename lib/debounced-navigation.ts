@@ -1,0 +1,78 @@
+/**
+ * Debounced navigation helper: coalesce rapid state updates into one navigate
+ * call after a quiet period. Holds the intended target separately so callers
+ * can keep applying local UI without a later sync effect clobbering what will
+ * be pushed.
+ */
+export type DebouncedNavigation<T> = {
+  /** Queue `state` and (re)start the quiet-period timer. */
+  schedule(state: T): void;
+  /** Cancel any pending timer and navigate with `state` immediately. */
+  flushNow(state: T): void;
+  /** Drop a pending navigation without calling `navigate`. */
+  cancel(): void;
+  /** Pending target, if a timer is armed. */
+  peekPending(): T | null;
+  /** True while a debounced navigation is scheduled. */
+  isPending(): boolean;
+};
+
+type TimerHandle = ReturnType<typeof setTimeout>;
+
+export function createDebouncedNavigation<T>(options: {
+  debounceMs: number;
+  navigate: (state: T) => void;
+  /** Fired when a debounce becomes pending or clears (schedule / flush / cancel / fire). */
+  onPendingChange?: (pending: boolean) => void;
+  setTimeoutFn?: typeof setTimeout;
+  clearTimeoutFn?: typeof clearTimeout;
+}): DebouncedNavigation<T> {
+  const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
+  const clearTimeoutFn = options.clearTimeoutFn ?? clearTimeout;
+  let timer: TimerHandle | null = null;
+  let pending: T | null = null;
+
+  function setPendingFlag(next: boolean) {
+    options.onPendingChange?.(next);
+  }
+
+  function clearTimer() {
+    if (timer != null) {
+      clearTimeoutFn(timer);
+      timer = null;
+    }
+  }
+
+  return {
+    schedule(state) {
+      pending = state;
+      clearTimer();
+      setPendingFlag(true);
+      timer = setTimeoutFn(() => {
+        timer = null;
+        const target = pending;
+        pending = null;
+        setPendingFlag(false);
+        if (target != null) options.navigate(target);
+      }, options.debounceMs);
+    },
+    flushNow(state) {
+      clearTimer();
+      pending = null;
+      setPendingFlag(false);
+      options.navigate(state);
+    },
+    cancel() {
+      const wasPending = timer != null || pending != null;
+      clearTimer();
+      pending = null;
+      if (wasPending) setPendingFlag(false);
+    },
+    peekPending() {
+      return pending;
+    },
+    isPending() {
+      return timer != null;
+    },
+  };
+}
