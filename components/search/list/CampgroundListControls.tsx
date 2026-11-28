@@ -1062,6 +1062,8 @@ export default function CampgroundListControls({
   // Keep them enabled while only filterNavPending so multi-select can continue.
   // Search input stays enabled during isPending so typing is not blurred/lost.
   const discreteControlsDisabled = geoBusy || isPending;
+  // Status through quiet period + in-flight replace; Apply now only while coalescing.
+  const showFilterUpdateStatus = filterNavPending || isPending;
   const selectedAmps = new Set(localFilters.amps);
   const selectedSiteTypes = new Set(localFilters.siteTypes);
   const selectedAmenityKeys = new Set(
@@ -1095,24 +1097,29 @@ export default function CampgroundListControls({
       }`}
       suppressHydrationWarning
     >
-      {filterNavPending ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-          <p role="status" aria-live="polite">
-            {t("filtersUpdating")}
-          </p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-auto px-0 text-foreground underline-offset-4 hover:bg-transparent hover:underline"
-            onClick={() => {
-              filterNav.flushPending();
-            }}
-          >
-            {t("filtersApplyNow")}
-          </Button>
-        </div>
-      ) : null}
+      {/* Always mounted: reserves height (no checkbox jump) and keeps the live
+          region in the DOM so AT announces text changes. */}
+      <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        <p role="status" aria-live="polite">
+          {showFilterUpdateStatus ? t("filtersUpdating") : ""}
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          tabIndex={filterNavPending ? 0 : -1}
+          aria-hidden={!filterNavPending}
+          disabled={!filterNavPending}
+          className={`h-auto px-0 text-foreground underline-offset-4 hover:bg-transparent hover:underline ${
+            filterNavPending ? "" : "invisible pointer-events-none"
+          }`}
+          onClick={() => {
+            filterNav.flushPending();
+          }}
+        >
+          {t("filtersApplyNow")}
+        </Button>
+      </div>
       <div className="md:flex md:flex-wrap md:items-end md:gap-4 lg:gap-6 space-y-4 md:space-y-0">
         <SearchSuggestInput
           value={search}
